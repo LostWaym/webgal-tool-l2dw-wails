@@ -1,0 +1,5 @@
+export const DEFAULT_BG_TEMPLATE = 'changeBg:%bg_path% -writeDefault -duration=750;'
+export const DEFAULT_BG_TRANSFORM_TEMPLATE = 'setTransform:%me% -target=bg-main -duration=750 -writeDefault;'
+export const DEFAULT_STAGE_TRANSFORM_TEMPLATE = 'setTransform:%me% -target=stage-main -duration=750 -writeDefault;'
+export const DEFAULT_FIGURE_TEMPLATE = 'changeFigure:%conf_path% -id=%name% %me%;'
+export const DEFAULT_TRANSFORM_TEMPLATE = 'setTransform:%me% -target=%name% -duration=750 -writeDefault;'

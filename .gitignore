@@ -1,0 +1,9 @@
+build/bin
+node_modules
+frontend/dist
+/extres
+/l2dw-wails.exe
+/frontend/wailsjs
+/frontend/package-lock.json
+/frontend/package.json.md5
+/frontend/public/lib

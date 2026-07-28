@@ -298,7 +298,10 @@ export const useModelStore = defineStore('models', {
       }
     },
 
-    setTransformState(id: string, state: TransformState) {
+    setTransformState(id: string | null, state: TransformState) {
+      if (id == null)
+        return;
+
       // 特殊容器
       if (id === SpecialId.StageMain) {
         this.stageState = state

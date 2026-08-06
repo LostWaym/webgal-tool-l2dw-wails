@@ -74,6 +74,7 @@ async function init() {
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
   })
+  app.ticker.maxFPS = 60
   editRuntime.app = app
 
   // The plugin's auto-update reads window.PIXI.Ticker.

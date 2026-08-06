@@ -7,6 +7,7 @@ import { toFileUrl } from '../../path_utils'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { createTextureWatcher, type TextureWatcher } from '../../live2d/textureUtils'
 import EditStageToolbar from './EditStageToolbar.vue'
+import { editRuntime } from '../../utils/runtimeRegistry'
 
 /**
  * 编辑器窗口的 Pixi 预览画布。
@@ -73,6 +74,7 @@ async function init() {
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
   })
+  editRuntime.app = app
 
   // The plugin's auto-update reads window.PIXI.Ticker.
   ;(window as any).PIXI = PIXI
@@ -263,7 +265,7 @@ async function loadOne(id: string) {
     wrapper.visible = entry.state.visible
 
     // 暴露给 EditActionPanel 等组件访问当前选中模型对应的 Live2D 实例
-    ;(window as any).__l2dwEditModels = live2dById
+    editRuntime.live2dModels = live2dById
 
     // 从模型描述 json 读取动作 / 表情并缓存到 store，供动作/表情页签读取
     void store.populateMotionsExps(id)
@@ -283,7 +285,7 @@ function removeOne(id: string) {
   live2dById.delete(id)
   jsonPathByModelId.delete(id)
   containersById.delete(id)
-  ;(window as any).__l2dwEditModels = live2dById
+  editRuntime.live2dModels = live2dById
 }
 
 function attachDomHandlers() {
@@ -328,7 +330,7 @@ function attachDomHandlers() {
   window.addEventListener('pointercancel', onPointerUp)
   canvas.addEventListener('wheel', onWheel, { passive: false })
 
-  ;(app as any).__l2dwEditCleanup = () => {
+  ;editRuntime.cleanup = () => {
     canvas.removeEventListener('pointerdown', onPointerDown)
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
@@ -349,8 +351,7 @@ function dispose() {
   }
 
   if (app) {
-    const cleanup = (app as any).__l2dwEditCleanup
-    if (typeof cleanup === 'function') cleanup()
+    if (typeof editRuntime.cleanup === 'function') editRuntime.cleanup()
     try {
       app.destroy(true, { children: true, texture: true, baseTexture: true })
     } catch (e) {
@@ -365,7 +366,9 @@ function dispose() {
   isMiddleDown = false
 
   // 清理外部访问入口，避免热重载/卸载后悬挂旧实例
-  ;(window as any).__l2dwEditModels = undefined
+  editRuntime.live2dModels.clear()
+  editRuntime.app = null
+  editRuntime.cleanup = () => {}
 }
 </script>
 

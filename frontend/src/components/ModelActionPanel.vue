@@ -20,6 +20,7 @@ import { reloadAllModelTextures } from '../live2d/textureUtils'
 import { useMessage } from '../composables/useMessage'
 import SearchInput from './common/SearchInput.vue'
 import settingsIcon from '../assets/icons/settings.png'
+import { previewRuntime } from '../utils/runtimeRegistry'
 
 const store = useModelStore()
 
@@ -143,22 +144,19 @@ function getL2dwContainer(): PIXI.Container | undefined {
   const id = store.selectedId
   if (!id) return undefined
   if (isSpecialId(id)) {
-    const m = (window as any).__l2dwSpecialContainers as Map<string, PIXI.Container> | undefined
-    return m?.get(id) as any
+    return previewRuntime.specialContainers.get(id) as PIXI.Container | undefined
   }
-  const containers = (window as any).__l2dwContainers as Map<string, L2dwContainer> | undefined
-  return containers?.get(id)
+  return previewRuntime.modelWrappers.get(id)
 }
 
 // 获取 Live2DModel（用于读取 motion / expression / internalModel）
 // wmdl 场景取第一个子模型
 function getLive2DModel(): Live2DModel | undefined {
   if (!store.selectedId) return undefined
-  const models = (window as any).__l2dwModels as Map<string, Live2DModel> | undefined
 
-  const wmdlInfo = (window as any).__l2dwWmdlSubModels?.get(store.selectedId)
+  const wmdlInfo = previewRuntime.wmdlSubModels.get(store.selectedId)
   const firstSubId = wmdlInfo?.subModelIds?.[0]
-  return firstSubId ? models?.get(firstSubId) : undefined
+  return firstSubId ? previewRuntime.live2dModels.get(firstSubId) : undefined
 }
 
 // 提取动作列表并按名称字母排序
@@ -328,11 +326,10 @@ async function onReloadTextures() {
   const entry = store.selectedModel
   if (!id || !entry?.wmdlModels) return
 
-  const models = (window as any).__l2dwModels as Map<string, Live2DModel>
-  const wmdlInfo = (window as any).__l2dwWmdlSubModels?.get(id)
+  const wmdlInfo = previewRuntime.wmdlSubModels.get(id)
 
   for (const subId of wmdlInfo?.subModelIds ?? []) {
-    const model = models?.get(subId)
+    const model = previewRuntime.live2dModels.get(subId)
     const subEntry = entry.wmdlModels.find(m => m.id === subId)
     if (model && subEntry?.jsonAbsPath) {
       await reloadAllModelTextures(model, subEntry.jsonAbsPath)

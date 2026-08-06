@@ -1,5 +1,6 @@
 import type { Live2DModel } from 'pixi-live2d-display-webgal'
 import { toFileUrl } from '../path_utils'
+import { editRuntime } from '../utils/runtimeRegistry'
 
 /**
  * 选中模型对应的参数（"初始参数" / "部件参数" 页签）枚举与写回的统一适配层。
@@ -157,15 +158,14 @@ function parseExpressions(data: any): ExprEntry[] {
   return out
 }
 
-function readEditModelsMap(): Map<string, Live2DModel> | null {
-  const m = (window as any).__l2dwEditModels as Map<string, Live2DModel> | undefined
-  return m ?? null
+function readEditModelsMap(): Map<string, Live2DModel> {
+  return editRuntime.live2dModels
 }
 
 /** 按 id 拿 Live2DModel 实例，找不到返回 null。 */
 export function getModelById(selectedModelId: string | null): Live2DModel | null {
   if (!selectedModelId) return null
-  return readEditModelsMap()?.get(selectedModelId) ?? null
+  return readEditModelsMap().get(selectedModelId) ?? null
 }
 
 /** 按 id 拿 coreModel（任意版本统一返回 any，找不到返回 null）。 */

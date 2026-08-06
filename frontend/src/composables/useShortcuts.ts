@@ -4,6 +4,7 @@ import { SpecialId, isSpecialId } from '../live2d/specialIds'
 import { parseInst, createEmptyInst, Inst } from '../utils/inst_utils'
 import { SetClipboardText } from '../../wailsjs/go/main/App'
 import { useMessage } from './useMessage'
+import { previewRuntime } from '../utils/runtimeRegistry'
 
 /** 快捷键适用的目标类型；与 useShortcuts 内的 store.selectedId 判定保持一致 */
 export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'none'
@@ -77,8 +78,7 @@ const handler = {
     const store = useModelStore()
     const entry = store.selectedModel
     if (!entry) return null
-    const containers = (window as any).__l2dwContainers as Map<string, any> | undefined
-    const wrapper = containers?.get(entry.id)
+    const wrapper = previewRuntime.modelWrappers.get(entry.id)
     const x = wrapper?.x ?? 0
     const y = wrapper?.y ?? 0
     const scaleX = wrapper?.scale?.x ?? 1
@@ -168,8 +168,7 @@ const handler = {
 
   bgTransform: (): Inst | null => {
     const store = useModelStore()
-    const specials = (window as any).__l2dwSpecialContainers as Map<string, any> | undefined
-    const container = specials?.get(SpecialId.BgContainer)
+    const container = previewRuntime.specialContainers.get(SpecialId.BgContainer)
     const x = container?.x ?? 0
     const y = container?.y ?? 0
     const scaleX = container?.scale?.x ?? 1
@@ -191,8 +190,7 @@ const handler = {
 
   stageTransform: (): Inst | null => {
     const store = useModelStore()
-    const specials = (window as any).__l2dwSpecialContainers as Map<string, any> | undefined
-    const container = specials?.get(SpecialId.StageMain)
+    const container = previewRuntime.specialContainers.get(SpecialId.StageMain)
     const x = container?.x ?? 0
     const y = container?.y ?? 0
     const scaleX = container?.scale?.x ?? 1

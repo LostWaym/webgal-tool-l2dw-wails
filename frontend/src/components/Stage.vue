@@ -12,6 +12,7 @@ import type { WmdlModelItem } from '../stores/wmdlTypes'
 import { getShortcutHints, resolveShortcutTargetType } from '../composables/useShortcuts'
 import emitter, { StageEvents } from '../stores/emitter'
 import defaultBackgroundUrl from '../assets/backgrounds/default.jpg'
+import { previewRuntime } from '../utils/runtimeRegistry'
 
 const store = useModelStore()
 
@@ -116,6 +117,7 @@ async function init() {
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
   })
+  previewRuntime.app = app
 
   // The plugin's auto-update reads window.PIXI.Ticker.
   ;(window as any).PIXI = PIXI
@@ -181,10 +183,8 @@ async function init() {
   attachDomHandlers()
 
   // 暴露特殊容器（StageMain / BGContainer），供 ModelActionPanel 直接做变换
-  ;(window as any).__l2dwSpecialContainers = new Map<string, PIXI.Container>([
-    [SpecialId.StageMain, stageMain!],
-    [SpecialId.BgContainer, backgroundContainer!],
-  ])
+  previewRuntime.specialContainers.set(SpecialId.StageMain, stageMain!)
+  previewRuntime.specialContainers.set(SpecialId.BgContainer, backgroundContainer!)
 
   void loadDefaultBackground()
 }
@@ -311,12 +311,11 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
   }
 
   // 存储子模型 ID 映射
-  ;(window as any).__l2dwWmdlSubModels ??= new Map()
-  ;(window as any).__l2dwWmdlSubModels.set(entry.id, { subModelIds, mainWrapper })
+  previewRuntime.wmdlSubModels.set(entry.id, { subModelIds, mainWrapper })
 
   // 暴露给外部组件访问
-  ;(window as any).__l2dwModels = live2dById
-  ;(window as any).__l2dwContainers = containersById
+  previewRuntime.live2dModels = live2dById
+  previewRuntime.modelWrappers = containersById
 }
 
 async function reloadOne(id: string) {
@@ -333,11 +332,11 @@ async function reloadOne(id: string) {
 }
 
 function removeOne(id: string) {
-  const wmdlInfo = (window as any).__l2dwWmdlSubModels?.get(id)
+  const wmdlInfo = previewRuntime.wmdlSubModels.get(id)
   wmdlInfo?.subModelIds.forEach((subId: string) => {
     live2dById.delete(subId)
   })
-  ;(window as any).__l2dwWmdlSubModels?.delete(id)
+  previewRuntime.wmdlSubModels.delete(id)
 
   const wrapper = containersById.get(id)
   if (wrapper) {
@@ -350,8 +349,8 @@ function removeOne(id: string) {
   }
 
   // 更新全局引用
-  ;(window as any).__l2dwModels = live2dById
-  ;(window as any).__l2dwContainers = containersById
+  previewRuntime.live2dModels = live2dById
+  previewRuntime.modelWrappers = containersById
 }
 
 // Pixi v6's pointer events go through the InteractionManager plugin and use
@@ -399,8 +398,7 @@ function attachDomHandlers() {
       return
     }
     // 占位项（StageMain / BGContainer）也可以拖拽
-    const special = (window as any).__l2dwSpecialContainers as Map<string, PIXI.Container> | undefined
-    const specialC = special?.get(id)
+    const specialC = previewRuntime.specialContainers.get(id)
     if (specialC) {
       const p = toLocal(e.clientX, e.clientY)
       const scale = rootContainer!.scale.x
@@ -464,7 +462,7 @@ function attachDomHandlers() {
   window.addEventListener('keydown', onKeyDown)
 
   // Save for cleanup
-  ;(app as any).__l2dwCleanup = () => {
+  previewRuntime.cleanup = () => {
     canvas.removeEventListener('pointerdown', onPointerDown)
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
@@ -591,8 +589,7 @@ function dispose() {
   }
 
   if (app) {
-    const cleanup = (app as any).__l2dwCleanup
-    if (typeof cleanup === 'function') cleanup()
+    if (typeof previewRuntime.cleanup === 'function') previewRuntime.cleanup()
     try {
       app.destroy(true, { children: true, texture: true, baseTexture: true })
     } catch (e) {
@@ -611,7 +608,10 @@ function dispose() {
   }
   isMiddleDown = false
 
-  ;(window as any).__l2dwSpecialContainers = undefined
+  previewRuntime.specialContainers.clear()
+  previewRuntime.wmdlSubModels.clear()
+  previewRuntime.app = null
+  previewRuntime.cleanup = () => {}
 }
 </script>
 

@@ -13,6 +13,7 @@ import {
 } from '../utils/consts'
 import { SpecialId } from '../live2d/specialIds'
 import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
+import { previewRuntime } from '../utils/runtimeRegistry'
 
 interface MotionState {
   group: string
@@ -205,7 +206,7 @@ export const useModelStore = defineStore('models', {
     async remove(id: string): Promise<void> {
       const entry = this.models.find((m) => m.id === id)
       // 清理 wmdl 子模型引用（实际渲染清理由 Stage.vue 处理）
-      ;(window as any).__l2dwWmdlSubModels?.delete(id)
+      previewRuntime.wmdlSubModels.delete(id)
       this.models = this.models.filter((m) => m.id !== id)
       if (this.selectedId === id) {
         this.selectedId = this.models.length > 0 ? this.models[this.models.length - 1].id : null
@@ -251,10 +252,9 @@ export const useModelStore = defineStore('models', {
       if (patch.transformTemplate !== undefined) entry.wmdlConfig.transformTemplate = patch.transformTemplate
     },
     async playMotion(modelId: string, group: string, index: number, name: string) {
-      const models = (window as any).__l2dwModels as Map<string, Live2DModel>
-      const wmdlInfo = (window as any).__l2dwWmdlSubModels?.get(modelId)
+      const wmdlInfo = previewRuntime.wmdlSubModels.get(modelId)
       for (const subId of wmdlInfo?.subModelIds ?? []) {
-        const model = models?.get(subId)
+        const model = previewRuntime.live2dModels.get(subId)
         if (model) {
           await model.internalModel.motionManager?.startMotion(group, index, MotionPriority.FORCE)
         }
@@ -264,10 +264,9 @@ export const useModelStore = defineStore('models', {
     },
 
     async playExpression(modelId: string, index: number, name: string) {
-      const models = (window as any).__l2dwModels as Map<string, Live2DModel>
-      const wmdlInfo = (window as any).__l2dwWmdlSubModels?.get(modelId)
+      const wmdlInfo = previewRuntime.wmdlSubModels.get(modelId)
       for (const subId of wmdlInfo?.subModelIds ?? []) {
-        const model = models?.get(subId)
+        const model = previewRuntime.live2dModels.get(subId)
         if (model) {
           const mm = model.internalModel.motionManager as any
           await mm?.expressionManager?.setExpression(index)

@@ -24,8 +24,8 @@ import { previewRuntime } from '../utils/runtimeRegistry'
 
 const store = useModelStore()
 
-type TabKey = 'motion' | 'expression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo'
-const activeTab = ref<TabKey>('motion') // 页签
+type TabKey = 'motionExpression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo'
+const activeTab = ref<TabKey>('motionExpression') // 页签
 
 interface TabConfig {
   key: TabKey
@@ -33,14 +33,16 @@ interface TabConfig {
 }
 
 const TAB_CONFIGS: Record<TabKey, TabConfig> = {
-  motion:     { key: 'motion',     label: '动作' },
-  expression: { key: 'expression', label: '表情' },
+  motionExpression: { key: 'motionExpression', label: '动作/表情' },
   transform:  { key: 'transform',  label: '变换' },
   bgInfo:     { key: 'bgInfo',     label: '场景信息' },
   stageInfo:  { key: 'stageInfo',  label: '主场景信息' },
   figureInfo: { key: 'figureInfo', label: '立绘信息' },
 }
-const searchQuery = ref('')
+const motionSearch = ref('')
+const expressionSearch = ref('')
+const motionCollapsed = ref(false)
+const expressionCollapsed = ref(false)
 const panelWidth = ref(280)
 const hoveredTab = ref<TabKey | null>(null) // 当前悬停的页签
 const msg = useMessage()
@@ -60,8 +62,7 @@ watch(() => store.selectedId, (newId) => {
   } else {
     // 普通模型（立绘）
     visibleTabs.value = [
-      TAB_CONFIGS.motion,
-      TAB_CONFIGS.expression,
+      TAB_CONFIGS.motionExpression,
       TAB_CONFIGS.transform,
       TAB_CONFIGS.figureInfo,
     ]
@@ -238,11 +239,11 @@ watch(() => store.selectedId, async (newId, oldId) => {
 
   await nextTick()
 
-  // 仅当上一次选中的是占位项（或停留在不可用的页签）时才重置为 motion
+  // 仅当上一次选中的是占位项（或停留在不可用的页签）时才重置为 motionExpression
   // 立绘之间切换时保留当前页签
   const cameFromSpecial = isSpecialId(oldId)
   if (activeTab.value !== 'transform' && (cameFromSpecial || activeTab.value === 'bgInfo' || activeTab.value === 'stageInfo')) {
-    activeTab.value = 'motion'
+    activeTab.value = 'motionExpression'
   }
 
   const model = getLive2DModel()
@@ -381,12 +382,12 @@ function onSelectHistory(path: string) {
 
 // 过滤后的动作列表
 const filteredMotions = computed(() =>
-  filterBySearch(motions.value, searchQuery.value, (m) => m.name),
+  filterBySearch(motions.value, motionSearch.value, (m) => m.name),
 )
 
 // 过滤后的表情列表
 const filteredExpressions = computed(() =>
-  filterBySearch(expressions.value, searchQuery.value, (e) => e.name),
+  filterBySearch(expressions.value, expressionSearch.value, (e) => e.name),
 )
 
 // 当前播放状态
@@ -434,15 +435,13 @@ function onDragStart(e: MouseEvent) {
   document.body.style.userSelect = 'none'
 }
 
-// 是否显示当前页签的配置按钮（目前仅 motion 和 expression）
-const availableTabs = ['motion', 'expression']
+// 是否显示当前页签的配置按钮
+const availableTabs: TabKey[] = ['motionExpression']
 const hasTabConfig = computed(() => availableTabs.includes(activeTab.value))
 
 // 页签配置按钮点击回调
 function onTabConfigClick() {
-  if (activeTab.value === 'motion') {
-    msg.info('这里是配置界面(施工中)')
-  }
+  msg.info('这里是配置界面(施工中)')
 }
 
 function onDragMove(e: MouseEvent) {
@@ -545,42 +544,78 @@ function onLabelDragEnd() {
       </button>
     </div>
 
-    <!-- 搜索栏 -->
-    <div v-if="activeTab === 'motion' || activeTab === 'expression'" class="panel__search">
-      <SearchInput v-model="searchQuery" variant="action" placeholder="搜索..." />
+    <!-- 动作 / 表情 合并页签 -->
+    <div v-if="activeTab === 'motionExpression'" class="panel__motion-expression">
+      <!-- 上：动作区 -->
+      <div class="panel__list-region" :class="{ 'is-collapsed': motionCollapsed }">
+        <div class="list-region-header">
+          <span class="list-region-title">动作</span>
+          <button
+            type="button"
+            class="list-region-toggle"
+            :aria-expanded="!motionCollapsed"
+            :aria-label="motionCollapsed ? '展开动作' : '折叠动作'"
+            @click="motionCollapsed = !motionCollapsed"
+          >
+            <span aria-hidden="true">{{ motionCollapsed ? '▸' : '▾' }}</span>
+          </button>
+        </div>
+        <div v-show="!motionCollapsed" class="list-region-body">
+          <div class="panel__search">
+            <SearchInput v-model="motionSearch" variant="action" placeholder="搜索动作..." />
+          </div>
+          <ul class="panel__list">
+            <li
+              v-for="item in filteredMotions"
+              :key="`${item.group}_${item.index}`"
+              class="list-item"
+              :class="{ 'is-playing': isMotionPlaying(item) }"
+              @click="playMotion(item)"
+            >
+              {{ item.name }}
+            </li>
+            <li v-if="filteredMotions.length === 0" class="list-item list-item--empty">
+              暂无动作
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 下：表情区 -->
+      <div class="panel__list-region" :class="{ 'is-collapsed': expressionCollapsed }">
+        <div class="list-region-header">
+          <span class="list-region-title">表情</span>
+          <button
+            type="button"
+            class="list-region-toggle"
+            :aria-expanded="!expressionCollapsed"
+            :aria-label="expressionCollapsed ? '展开表情' : '折叠表情'"
+            @click="expressionCollapsed = !expressionCollapsed"
+          >
+            <span aria-hidden="true">{{ expressionCollapsed ? '▸' : '▾' }}</span>
+          </button>
+        </div>
+        <div v-show="!expressionCollapsed" class="list-region-body">
+          <div class="panel__search">
+            <SearchInput v-model="expressionSearch" variant="action" placeholder="搜索表情..." />
+          </div>
+          <ul class="panel__list">
+            <li
+              v-for="item in filteredExpressions"
+              :key="item.index"
+              class="list-item"
+              :class="{ 'is-playing': isExpressionPlaying(item) }"
+              @click="playExpression(item)"
+            >
+              {{ item.name }}
+            </li>
+            <li v-if="filteredExpressions.length === 0" class="list-item list-item--empty">
+              暂无表情
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
-
-    <!-- 动作列表 -->
-    <ul v-if="activeTab === 'motion'" class="panel__list">
-      <li
-        v-for="item in filteredMotions"
-        :key="`${item.group}_${item.index}`"
-        class="list-item"
-        :class="{ 'is-playing': isMotionPlaying(item) }"
-        @click="playMotion(item)"
-      >
-        {{ item.name }}
-      </li>
-      <li v-if="filteredMotions.length === 0" class="list-item list-item--empty">
-        暂无动作
-      </li>
-    </ul>
-
-    <!-- 表情列表 -->
-    <ul v-else-if="activeTab === 'expression'" class="panel__list">
-      <li
-        v-for="item in filteredExpressions"
-        :key="item.index"
-        class="list-item"
-        :class="{ 'is-playing': isExpressionPlaying(item) }"
-        @click="playExpression(item)"
-      >
-        {{ item.name }}
-      </li>
-      <li v-if="filteredExpressions.length === 0" class="list-item list-item--empty">
-        暂无表情
-      </li>
-    </ul>
 
     <!-- 变换表单 -->
     <div v-else-if="activeTab === 'transform'" class="panel__transform">
@@ -847,6 +882,95 @@ function onLabelDragEnd() {
   pointer-events: auto;
 }
 
+/* ───────── 动作 / 表情 合并页签 ───────── */
+
+.panel__motion-expression {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel__list-region {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel__list-region.is-collapsed {
+  flex: 0 0 auto;
+  height: 56px;
+}
+
+.list-region-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2c313a;
+  background: #232830;
+}
+
+.list-region-title {
+  flex: 1;
+  color: #e6e6e6;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.list-region-settings {
+  position: static;
+  transform: none;
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  filter: brightness(0) invert(1);
+  pointer-events: auto;
+}
+
+.list-region-settings:hover {
+  opacity: 1;
+}
+
+.list-region-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid #3a4150;
+  border-radius: 4px;
+  color: #8a93a3;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.list-region-toggle:hover {
+  background: #2a3140;
+  color: #e6e6e6;
+}
+
+.list-region-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.list-region-body .panel__list {
+  min-height: 0;
+}
+
 .panel__search {
   padding: 8px 12px;
   border-bottom: 1px solid #2c313a;
@@ -857,7 +981,7 @@ function onLabelDragEnd() {
   margin: 0;
   padding: 8px 0;
   overflow-y: auto;
-  flex: 1;
+  min-height: 0;
 }
 
 .list-item {

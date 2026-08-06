@@ -191,7 +191,7 @@ function extractExpressions(model: Live2DModel): ExpressionInfo[] {
   const defs = em.definitions as any[]
   const result = defs.map((def, i) => ({
     index: i,
-    name: def.name || `expression`,
+    name: def.Name || def.File || `expression`,
   }))
   result.sort((a, b) => a.name.localeCompare(b.name))
   return result

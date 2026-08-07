@@ -825,6 +825,7 @@ function onLabelDragEnd() {
   display: flex;
   flex-direction: column;
   user-select: none;
+  transition: opacity 0.15s ease;
 }
 
 .panel__drag-handle {

@@ -125,6 +125,7 @@ function onDragEnd() {
   background: #1d2026;
   color: #e6e6e6;
   box-sizing: border-box;
+  transition: opacity 0.15s ease;
 }
 
 .model-list__header {

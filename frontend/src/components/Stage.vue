@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import * as PIXI from 'pixi.js'
 import { LoaderResource } from 'pixi.js'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
@@ -10,6 +10,7 @@ import { SpecialId } from '../live2d/specialIds'
 import { OpenEditor } from '../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../stores/wmdlTypes'
 import { getShortcutHints, resolveShortcutTargetType } from '../composables/useShortcuts'
+import { isSpecialId } from '../live2d/specialIds'
 import emitter, { StageEvents } from '../stores/emitter'
 import defaultBackgroundUrl from '../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../utils/runtimeRegistry'
@@ -22,6 +23,149 @@ const containerRef = ref<HTMLDivElement | null>(null)
 const hintsExpanded = ref(true)
 function toggleHints() {
   hintsExpanded.value = !hintsExpanded.value
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Blender 风格变换操作（g/s/r + x/y 轴锁定）
+// ─────────────────────────────────────────────────────────────────────────────
+type TransformMode = 'none' | 'g' | 's' | 'r'
+type AxisLock = 'none' | 'x' | 'y'
+
+const transformMode = ref<TransformMode>('none')
+const axisLock = ref<AxisLock>('none')
+const isTransforming = computed(() => transformMode.value !== 'none')
+
+// 变换操作的初始值（用于右键取消时还原）
+let startX = 0
+let startY = 0
+let startScaleX = 1
+let startScaleY = 1
+let startRotation = 0
+
+// 变换开始时鼠标的屏幕坐标
+let tStartMouseX = 0
+let tStartMouseY = 0
+
+// s 模式：鼠标到模型初始位置的距离
+let startDist = 0
+// r 模式：鼠标指向模型的初始方向（已标准化）
+let startDirX = 0
+let startDirY = 0
+let startScreenMP = new PIXI.Point(0, 0)
+// 鼠标起点/起点距离/方向是否已记录（首次 onPointerMove 时记录）
+let baseInitialized = false
+
+function getTransformTarget(): PIXI.Container | undefined {
+  const id = store.selectedId
+  if (!id) return undefined
+  if (isSpecialId(id)) {
+    return previewRuntime.specialContainers.get(id)
+  }
+  return previewRuntime.modelWrappers.get(id)
+}
+
+function pixiToClientCoords(displayObject: PIXI.DisplayObject, localPoint: { x: number; y: number }, app: PIXI.Application): PIXI.Point {
+  // 获取旋转中心（pivot）, 默认为 (0,0)
+  let pivot = { x: 0, y: 0 };
+  // @ts-ignore
+  if ('pivot' in displayObject && displayObject.pivot) {
+    // @ts-ignore
+    pivot = { x: displayObject.pivot.x, y: displayObject.pivot.y };
+  }
+  // 取得旋转中心的全局坐标
+  const globalPoint = displayObject.toGlobal(pivot);
+
+  // 获取 Canvas 在 DOM 视口中的实际渲染边界
+  const canvas = app.canvas || app.view;
+  const rect = canvas.getBoundingClientRect();
+
+  // 计算 CSS 缩放比例
+  const scaleX = rect.width / app.screen.width;
+  const scaleY = rect.height / app.screen.height;
+
+  // 映射到 DOM clientX/clientY
+  const clientX = rect.left + globalPoint.x * scaleX;
+  const clientY = rect.top + globalPoint.y * scaleY;
+
+  return new PIXI.Point(clientX, clientY);
+}
+
+const transformHint = reactive({
+  modeName: '',
+  axis: '无',
+  x: '0',
+  y: '0',
+  scaleX: '1.000',
+  scaleY: '1.000',
+  rotationDeg: '0.0',
+})
+
+function refreshTransformHint() {
+  if (!isTransforming.value) {
+    transformHint.modeName = ''
+    return
+  }
+  const target = getTransformTarget()
+  if (!target) return
+
+  transformHint.x = target.x.toFixed(1)
+  transformHint.y = target.y.toFixed(1)
+  transformHint.scaleX = target.scale.x.toFixed(3)
+  transformHint.scaleY = target.scale.y.toFixed(3)
+  transformHint.rotationDeg = ((target.rotation * 180) / Math.PI).toFixed(1)
+  transformHint.modeName =
+    transformMode.value === 'g' ? '拖拽'
+    : transformMode.value === 's' ? '缩放'
+    : '旋转'
+  transformHint.axis = axisLock.value === 'none' ? '无' : axisLock.value + ' 轴'
+}
+
+function startTransform(mode: TransformMode) {
+  const target = getTransformTarget()
+  if (!target) return
+
+  transformMode.value = mode
+  axisLock.value = 'none'
+
+  // 缓存模型的初始状态
+  startX = target.x
+  startY = target.y
+  startScaleX = target.scale.x
+  startScaleY = target.scale.y
+  startRotation = target.rotation
+  startScreenMP = pixiToClientCoords(target, { x: 0, y: 0 }, app!)
+
+  // 标记鼠标起点尚未记录，首次 onPointerMove 时记录
+  baseInitialized = false
+
+  emitter.emit(StageEvents.TransformStart, true)
+  emitter.emit(StageEvents.TransformChange, store.selectedId)
+  refreshTransformHint()
+}
+
+function cancelTransform() {
+  const target = getTransformTarget()
+  if (target) {
+    if (transformMode.value === 'g') {
+      target.x = startX
+      target.y = startY
+    } else if (transformMode.value === 's') {
+      target.scale.x = startScaleX
+      target.scale.y = startScaleY
+    } else if (transformMode.value === 'r') {
+      target.rotation = startRotation
+    }
+  }
+  endTransform()
+}
+
+function endTransform() {
+  transformMode.value = 'none'
+  axisLock.value = 'none'
+  baseInitialized = false
+  emitter.emit(StageEvents.TransformStart, false)
+  emitter.emit(StageEvents.TransformChange, store.selectedId)
+  refreshTransformHint()
 }
 
 interface MouseHint { keys: string; description: string }
@@ -49,9 +193,9 @@ const COMMON_SHORTCUT_HINTS: MouseHint[] = [
 
 // 各类型专属的鼠标提示
 const MOUSE_HINTS_BY_TYPE: Record<ReturnType<typeof resolveShortcutTargetType>, MouseHint[]> = {
-  background: [{ keys: '左键拖动', description: '移动背景' }],
-  stage: [{ keys: '左键拖动', description: '移动主场景' }],
-  model: [{ keys: '左键拖动', description: '移动立绘' }],
+  background: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
+  stage: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
+  model: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
   none: [],
 }
 
@@ -85,12 +229,6 @@ let backgroundContainer: L2dwContainer | null = null
 let figureContainer: PIXI.Container | null = null
 let frameContainer: PIXI.Container | null = null
 
-interface DragState {
-  wrapper: { x: number; y: number }
-  offsetX: number
-  offsetY: number
-}
-let drag: DragState | null = null
 let isMiddleDown = false
 let lastMouseX = 0
 let lastMouseY = 0
@@ -245,7 +383,7 @@ watch(
 watch(
   () => store.selectedId,
   (id) => {
-    setCursor(id ? 'grab' : 'default')
+    setCursor('default')
   },
   { immediate: true },
 )
@@ -342,9 +480,6 @@ function removeOne(id: string) {
 
   const wrapper = containersById.get(id)
   if (wrapper) {
-    if (drag && drag.wrapper === wrapper) {
-      drag = null
-    }
     figureContainer?.removeChild(wrapper)
     wrapper.destroy({ children: true })
     containersById.delete(id)
@@ -363,11 +498,8 @@ function attachDomHandlers() {
   if (!app) return
   const canvas = app.view as HTMLCanvasElement
 
-  const toLocal = (clientX: number, clientY: number): PIXI.Point => {
-    const rect = canvas.getBoundingClientRect()
-    const x = ((clientX - rect.left) / rect.width) * app!.renderer.width
-    const y = ((clientY - rect.top) / rect.height) * app!.renderer.height
-    return new PIXI.Point(x, y)
+  const toScreen = (clientX: number, clientY: number): PIXI.Point => {
+    return new PIXI.Point(clientX, clientY)
   }
 
   const onPointerDown = (e: PointerEvent) => {
@@ -378,6 +510,20 @@ function attachDomHandlers() {
       ;(document.activeElement as HTMLElement).blur()
     }
 
+    // 变换操作中：左键确认结束，右键取消并回滚
+    if (isTransforming.value) {
+      if (e.button === 0) {
+        endTransform()
+        e.preventDefault()
+        return
+      }
+      if (e.button === 2) {
+        cancelTransform()
+        e.preventDefault()
+        return
+      }
+    }
+
     // 中键优先：中键按下即标记拖拽
     if (e.button === 1 && rootContainer) {
       isMiddleDown = true
@@ -386,33 +532,11 @@ function attachDomHandlers() {
       e.preventDefault()
       return
     }
-    // 中键正在拖拽时忽略左键
-    if (isMiddleDown) return
-    const id = store.selectedId
-    if (!id) return
-    const wrapper = containersById.get(id)
-    if (wrapper) {
-      const p = toLocal(e.clientX, e.clientY)
-      const scale = rootContainer!.scale.x
-      drag = { wrapper, offsetX: p.x / scale - wrapper.x, offsetY: p.y / scale - wrapper.y }
-      setCursor('grabbing')
-      e.preventDefault()
-      return
-    }
-    // 占位项（StageMain / BGContainer）也可以拖拽
-    const specialC = previewRuntime.specialContainers.get(id)
-    if (specialC) {
-      const p = toLocal(e.clientX, e.clientY)
-      const scale = rootContainer!.scale.x
-      drag = { wrapper: specialC, offsetX: p.x / scale - specialC.x, offsetY: p.y / scale - specialC.y }
-      setCursor('grabbing')
-      e.preventDefault()
-    }
   }
 
   const onPointerMove = (e: PointerEvent) => {
-    // 中键拖拽 Root（优先）
-    if (isMiddleDown && rootContainer) {
+    // 中键拖拽 Root
+    if (!isTransforming.value && isMiddleDown && rootContainer) {
       const dx = (e.clientX - lastMouseX) * DRAG_SENSITIVITY
       const dy = (e.clientY - lastMouseY) * DRAG_SENSITIVITY
       rootContainer.x += dx
@@ -421,24 +545,98 @@ function attachDomHandlers() {
       lastMouseY = e.clientY
       return
     }
-    // 左键拖拽立绘
-    if (drag) {
-      const p = toLocal(e.clientX, e.clientY)
-      const scale = rootContainer!.scale.x
-      drag.wrapper.x = p.x / scale - drag.offsetX
-      drag.wrapper.y = p.y / scale - drag.offsetY
-      emitter.emit(StageEvents.TransformChange, store.selectedId)
+    // Blender 风格变换操作中：鼠标移动实时应用
+    if (isTransforming.value) {
+      const target = getTransformTarget()
+      if (target && rootContainer) {
+        // 首次移动时记录起点 / 起点距离 / 起点方向
+        if (!baseInitialized) {
+          tStartMouseX = e.clientX
+          tStartMouseY = e.clientY
+          // target 在屏幕坐标系下的锚点（canvas 中心 + target 偏移 × rootContainer scale）
+          startScreenMP = pixiToClientCoords(target, { x: 0, y: 0 }, app!)
+
+          if (transformMode.value === 's') {
+            const p = toScreen(e.clientX, e.clientY)
+            const dx = p.x - startScreenMP.x
+            const dy = p.y - startScreenMP.y
+            startDist = Math.sqrt(dx * dx + dy * dy)
+          } else if (transformMode.value === 'r') {
+            const p = toScreen(e.clientX, e.clientY)
+            const dx = p.x - startScreenMP.x
+            const dy = p.y - startScreenMP.y
+            const len = Math.sqrt(dx * dx + dy * dy) || 1
+            startDirX = dx / len
+            startDirY = dy / len
+          }
+          baseInitialized = true
+        }
+
+        const scale = rootContainer.scale.x
+
+        if (transformMode.value === 'g') {
+          // g：相对起点的位移差值
+          const dx = (e.clientX - tStartMouseX) / scale
+          const dy = (e.clientY - tStartMouseY) / scale
+          if (axisLock.value === 'x') {
+            target.x = startX + dx
+          } else if (axisLock.value === 'y') {
+            target.y = startY + dy
+          } else {
+            target.x = startX + dx
+            target.y = startY + dy
+          }
+        } else if (transformMode.value === 's') {
+          // s：鼠标到模型距离 / 起点距离 = 缩放倍数
+          const p = toScreen(e.clientX, e.clientY)
+          const dx = p.x - startScreenMP.x
+          const dy = p.y - startScreenMP.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          const factor = dist > 0 ? dist / startDist : 1
+          if (axisLock.value === 'x') {
+            target.scale.x = startScaleX * factor
+          } else if (axisLock.value === 'y') {
+            target.scale.y = startScaleY * factor
+          } else {
+            target.scale.x = startScaleX * factor
+            target.scale.y = startScaleY * factor
+          }
+        } else if (transformMode.value === 'r') {
+          // r：当前鼠标→模型向量与起点向量之间的角度差
+          const p = toScreen(e.clientX, e.clientY)
+          const dx = p.x - startScreenMP.x
+          const dy = p.y - startScreenMP.y
+          const len = Math.sqrt(dx * dx + dy * dy) || 1
+          const curDirX = dx / len
+          const curDirY = dy / len
+          const cosA = startDirX * curDirX + startDirY * curDirY
+          const sinA = startDirX * curDirY - startDirY * curDirX
+          const deltaAngle = Math.atan2(sinA, cosA)
+          target.rotation = startRotation + deltaAngle
+
+          // 计算 startDir 和 curDir 的角度（以弧度为单位，转为角度）
+          const startAngle = Math.atan2(startDirY, startDirX) * 180 / Math.PI
+          const curAngle = Math.atan2(curDirY, curDirX) * 180 / Math.PI
+          console.log('mp:', startScreenMP)
+          console.log('p:', p)
+          console.log('startDir:', startDirX, startDirY, 'angle:', startAngle)
+          console.log('curDir:', curDirX, curDirY, 'angle:', curAngle)
+          console.log('deltaAngle:', deltaAngle)
+     
+        }
+        emitter.emit(StageEvents.TransformChange, store.selectedId)
+        refreshTransformHint()
+      }
+      return
     }
   }
 
   const onPointerUp = (e: PointerEvent) => {
-    if (drag) setCursor(store.selectedId ? 'grab' : 'default')
-    drag = null
     // pointerup 一定触发（任意按钮），统一清空中键状态
     isMiddleDown = false
   }
 
-  canvas.addEventListener('pointerdown', onPointerDown)
+  window.addEventListener('pointerdown', onPointerDown)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
   window.addEventListener('pointercancel', onPointerUp)
@@ -454,18 +652,90 @@ function attachDomHandlers() {
 
   canvas.addEventListener('wheel', onWheel, { passive: false })
 
-  // F1 打开独立的"模型编辑器"窗口
+  // 检测输入框焦点
+  const isInputFocused = () => {
+    const active = document.activeElement
+    if (!active) return false
+    const tag = active.tagName.toLowerCase()
+    return tag === 'input' || tag === 'textarea' || (active as HTMLElement).isContentEditable
+  }
+
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'F1') {
       e.preventDefault()
       OpenEditor().catch((err) => console.error('OpenEditor failed:', err))
+      return
+    }
+
+    // 输入框焦点时不响应变换快捷键
+    if (isInputFocused()) return
+
+    // g / s / r 进入变换模式
+    if (e.key === 'g' || e.key === 's' || e.key === 'r') {
+      if (!store.selectedId) return
+      if (transformMode.value === e.key) {
+        // 按同键：取消并回滚
+        cancelTransform()
+      } else if (transformMode.value === 'none') {
+        startTransform(e.key as TransformMode)
+      } else {
+        // 切换模式：先回滚当前模式的所有修改，再以回滚后的状态为新起点
+        cancelTransform()
+        startTransform(e.key as TransformMode)
+      }
+      e.preventDefault()
+      return
+    }
+
+    // 变换中：x / y 锁定轴，并把未锁轴回滚到起点
+    if (isTransforming.value && (e.key === 'x' || e.key === 'y')) {
+      const target = getTransformTarget()
+      if (target) {
+        if (axisLock.value === e.key) {
+          axisLock.value = 'none'
+        } else {
+          axisLock.value = e.key as AxisLock
+        }
+        if (transformMode.value === 'g') {
+          if (axisLock.value === 'x') target.y = startY
+          else if (axisLock.value === 'y') target.x = startX
+          else {
+            target.x = startX
+            target.y = startY
+          }
+        } else if (transformMode.value === 's') {
+          if (axisLock.value === 'x') target.scale.y = startScaleY
+          else if (axisLock.value === 'y') target.scale.x = startScaleX
+          else {
+            target.scale.x = startScaleX
+            target.scale.y = startScaleY
+          }
+        }
+      }
+      e.preventDefault()
+      return
+    }
+
+    // Escape 取消；Enter / 空格 确认
+    if (isTransforming.value) {
+      if (e.key === 'Escape') {
+        cancelTransform()
+        e.preventDefault()
+        return
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        endTransform()
+        e.preventDefault()
+        return
+      }
     }
   }
+
   window.addEventListener('keydown', onKeyDown)
 
   // Save for cleanup
   previewRuntime.cleanup = () => {
-    canvas.removeEventListener('pointerdown', onPointerDown)
+    window.removeEventListener('pointerdown', onPointerDown)
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
     window.removeEventListener('pointercancel', onPointerUp)
@@ -618,12 +888,27 @@ function dispose() {
 </script>
 
 <template>
-  <section class="stage">
+  <section class="stage" @contextmenu.prevent>
     <div ref="containerRef" class="stage__canvas" />
+    <!-- 变换操作遮罩 -->
+    <div
+      v-if="isTransforming"
+      class="stage__overlay"
+    />
+    <!-- 变换操作提示（替换原有 hints） -->
+    <div v-if="isTransforming" class="stage__transform-hint">
+      <div class="transform-hint__title">正在{{ transformHint.modeName }}</div>
+      <div class="transform-hint__line">鼠标移动控制{{ transformHint.modeName }}，左键确定，右键取消</div>
+      <div class="transform-hint__line">按 X / Y 锁定对应轴（未锁轴会回滚到起点）</div>
+      <div class="transform-hint__line" v-if="transformMode !== 'r'">当前锁定轴：{{ transformHint.axis }}</div>
+      <div class="transform-hint__line">当前 X={{ transformHint.x }}，Y={{ transformHint.y }}</div>
+      <div class="transform-hint__line" v-if="transformMode !== 'g'">缩放 X={{ transformHint.scaleX }}，Y={{ transformHint.scaleY }}</div>
+      <div class="transform-hint__line" v-if="transformMode !== 'g'">旋转 {{ transformHint.rotationDeg }}°</div>
+    </div>
     <!-- <p v-if="!store.models.length && !backgroundSprite" class="stage__hint">
       点击左上角 “加载模型” 按钮选择 Live2D 模型文件 (.model.json 或 .model3.json)
     </p> -->
-    <div class="stage__hints" :class="{ 'is-collapsed': !hintsExpanded }">
+    <div v-if="!isTransforming" class="stage__hints" :class="{ 'is-collapsed': !hintsExpanded }">
       <button
         type="button"
         class="stage__hints-toggle"
@@ -673,6 +958,41 @@ function dispose() {
 
 .stage__canvas :deep(canvas) {
   display: block;
+}
+
+.stage__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 5;
+  cursor: crosshair;
+}
+
+.stage__transform-hint {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.6;
+  z-index: 10;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  user-select: none;
+}
+
+.transform-hint__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #ffe082;
+}
+
+.transform-hint__line + .transform-hint__line {
+  margin-top: 2px;
 }
 
 .stage__hint {

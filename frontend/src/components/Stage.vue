@@ -76,7 +76,7 @@ function pixiToClientCoords(displayObject: PIXI.DisplayObject, localPoint: { x: 
   const globalPoint = displayObject.toGlobal(pivot);
 
   // 获取 Canvas 在 DOM 视口中的实际渲染边界
-  const canvas = app.canvas || app.view;
+  const canvas = app.view;
   const rect = canvas.getBoundingClientRect();
 
   // 计算 CSS 缩放比例

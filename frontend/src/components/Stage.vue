@@ -283,7 +283,8 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
   if (entry.state) {
     mainWrapper.x = entry.state.x ?? 0
     mainWrapper.y = entry.state.y ?? 0
-    mainWrapper.scale.set(entry.state.scale ?? 1)
+    mainWrapper.scale.x = entry.state.scale?.x ?? 1
+    mainWrapper.scale.y = entry.state.scale?.y ?? 1
     mainWrapper.rotation = ((entry.state.rotation ?? 0) * Math.PI) / 180
     mainWrapper.alpha = entry.state.alpha ?? 1
   }

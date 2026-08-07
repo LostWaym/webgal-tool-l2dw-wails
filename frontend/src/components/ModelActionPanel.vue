@@ -117,7 +117,10 @@ function syncTransformFromModel() {
   const state: TransformState = {
     x: Math.round(container.x * 100) / 100,
     y: Math.round(container.y * 100) / 100,
-    scale: Math.round(container.scale.x * 100) / 100,
+    scale: {
+      x: Math.round(container.scale.x * 100) / 100,
+      y: Math.round(container.scale.y * 100) / 100,
+    },
     rotation: Math.round(container.rotation * 180 / Math.PI),
     alpha: Math.round(container.alpha * 100) / 100,
   }
@@ -268,7 +271,8 @@ function onTransformInput() {
 
   container.x = transformState.value.x
   container.y = transformState.value.y
-  container.scale.set(transformState.value.scale)
+  container.scale.x = transformState.value.scale.x
+  container.scale.y = transformState.value.scale.y
   container.rotation = transformState.value.rotation * Math.PI / 180
   container.alpha = transformState.value.alpha
   setTimeout(() => { _updatingTransform = false }, 50)
@@ -282,7 +286,8 @@ function resetTransform() {
   _updatingTransform = true
   container.x = 0
   container.y = 0
-  container.scale.set(1)
+  container.scale.x = 1
+  container.scale.y = 1
   container.rotation = 0
   container.alpha = 1
   syncTransformFromModel()
@@ -457,20 +462,21 @@ function onDragEnd() {
 }
 
 // 标签拖拽调参
-let _dragAxis: 'x' | 'y' | 'scale' | 'rotation' | 'alpha' | null = null
+let _dragAxis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | 'alpha' | null = null
 let _dragStartX = 0
 let _dragStartValue = 0
 
-function onLabelDragStart(axis: 'x' | 'y' | 'scale' | 'rotation' | 'alpha', e: MouseEvent) {
+function onLabelDragStart(axis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | 'alpha', e: MouseEvent) {
   e.preventDefault()
   e.stopPropagation()
   _dragAxis = axis
   _dragStartX = e.clientX
   _dragStartValue = axis === 'x' ? transformState.value.x
                 : axis === 'y' ? transformState.value.y
+                : axis === 'scaleX' ? transformState.value.scale.x
+                : axis === 'scaleY' ? transformState.value.scale.y
                 : axis === 'rotation' ? transformState.value.rotation
-                : axis === 'alpha' ? transformState.value.alpha
-                : transformState.value.scale
+                : transformState.value.alpha
   document.addEventListener('mousemove', onLabelDragMove)
   document.addEventListener('mouseup', onLabelDragEnd)
   document.body.style.cursor = 'ew-resize'
@@ -485,18 +491,36 @@ function onLabelDragMove(e: MouseEvent) {
   const delta = e.clientX - _dragStartX
   const step = _dragAxis === 'x' ? DRAG_STEP_X
              : _dragAxis === 'y' ? DRAG_STEP_Y
+             : (_dragAxis === 'scaleX' || _dragAxis === 'scaleY') ? DRAG_STEP_SCALE
              : _dragAxis === 'rotation' ? DRAG_STEP_ROTATION
-             : _dragAxis === 'alpha' ? DRAG_STEP_ALPHA
-             : DRAG_STEP_SCALE
+             : DRAG_STEP_ALPHA
   const newVal = Math.round((_dragStartValue + delta * step) * 1000) / 1000
 
-  if (_dragAxis === 'x') container.x = newVal
-  else if (_dragAxis === 'y') container.y = newVal
-  else if (_dragAxis === 'scale') container.scale.set(newVal)
-  else if (_dragAxis === 'rotation') container.rotation = newVal * Math.PI / 180
-  else if (_dragAxis === 'alpha') container.alpha = newVal
+  const newState: TransformState = {
+    ...transformState.value,
+    scale: { ...transformState.value.scale },
+  }
 
-  const newState = { ...transformState.value, [_dragAxis]: newVal }
+  if (_dragAxis === 'x') {
+    container.x = newVal
+    newState.x = newVal
+  } else if (_dragAxis === 'y') {
+    container.y = newVal
+    newState.y = newVal
+  } else if (_dragAxis === 'scaleX') {
+    container.scale.x = newVal
+    newState.scale.x = newVal
+  } else if (_dragAxis === 'scaleY') {
+    container.scale.y = newVal
+    newState.scale.y = newVal
+  } else if (_dragAxis === 'rotation') {
+    container.rotation = newVal * Math.PI / 180
+    newState.rotation = newVal
+  } else if (_dragAxis === 'alpha') {
+    container.alpha = newVal
+    newState.alpha = newVal
+  }
+
   store.setTransformState(store.selectedId, newState)
 }
 
@@ -649,9 +673,21 @@ function onLabelDragEnd() {
         />
       </div>
       <div class="form-row">
-        <label @mousedown="(e) => onLabelDragStart('scale', e)">缩放</label>
+        <label @mousedown="(e) => onLabelDragStart('scaleX', e)">X 缩放</label>
         <input
-          v-model.number="transformState.scale"
+          v-model.number="transformState.scale.x"
+          type="number"
+          class="form-input"
+          step="0.01"
+          min="0.01"
+          max="10"
+          @input="onTransformInput"
+        />
+      </div>
+      <div class="form-row">
+        <label @mousedown="(e) => onLabelDragStart('scaleY', e)">Y 缩放</label>
+        <input
+          v-model.number="transformState.scale.y"
           type="number"
           class="form-input"
           step="0.01"

@@ -34,7 +34,7 @@ interface PlayingState {
 export interface TransformState {
   x: number
   y: number
-  scale: number
+  scale: { x: number; y: number }
   rotation: number
   alpha: number
 }
@@ -42,7 +42,7 @@ export interface TransformState {
 export const DEFAULT_TRANSFORM_STATE: TransformState = {
   x: 0,
   y: 0,
-  scale: 1,
+  scale: { x: 1, y: 1 },
   rotation: 0,
   alpha: 1,
 }

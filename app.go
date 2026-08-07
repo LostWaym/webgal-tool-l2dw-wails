@@ -103,17 +103,28 @@ func (a *App) AppMode() string {
 	return "main"
 }
 
+// EditorWmdlPath 返回启动时通过 --wmdl 参数传入的 wmdl 文件绝对路径；编辑器进程使用，
+// 若未传则返回空串。主进程调用始终返回空串。
+func (a *App) EditorWmdlPath() string {
+	return editorWmdlPath
+}
+
 // OpenEditor 异步 spawn 一个新的 L2DW 进程（带 --editor 参数），新进程会打开
 // 独立的"模型编辑器"窗口。子进程在 main.go 启动时识别该 flag 后进入编辑器模式。
 //
+// wmdlPath 非空时附带 --wmdl 参数传递到子进程；子进程启动后会自动加载该 wmdl 文件。
 // 这里只 Start() 不 Wait()，避免阻塞主窗口的 UI 线程；新进程退出由 OS 回收。
 // 不传 Stdin/Stdout/Stderr，避免子进程意外继承/阻塞主进程的 console。
-func (a *App) OpenEditor() error {
+func (a *App) OpenEditor(wmdlPath string) error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(self, "--editor")
+	args := []string{"--editor"}
+	if wmdlPath != "" {
+		args = append(args, "--wmdl", wmdlPath)
+	}
+	cmd := exec.Command(self, args...)
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil

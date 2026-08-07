@@ -18,6 +18,9 @@ var assets embed.FS
 // 主进程启动时不会带此 flag；子进程（由 App.OpenEditor 拉起）会带。
 var editorFlag bool
 
+// editorWmdlPath 由 --wmdl 参数携带；编辑器进程启动时若非空，会自动加载该 wmdl 文件。
+var editorWmdlPath string
+
 // hasFlag 手动扫描 os.Args，避免引入 flag 包带来的额外输出副作用。
 func hasFlag(args []string, name string) bool {
 	for _, a := range args {
@@ -28,8 +31,19 @@ func hasFlag(args []string, name string) bool {
 	return false
 }
 
+// hasValue 返回 name 紧跟的下一个参数值；name 不存在或没有值时返回空串。
+func hasValue(args []string, name string) string {
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
 func main() {
 	editorFlag = hasFlag(os.Args[1:], "--editor")
+	editorWmdlPath = hasValue(os.Args[1:], "--wmdl")
 
 	app := NewApp()
 

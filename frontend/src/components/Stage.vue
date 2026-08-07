@@ -663,7 +663,9 @@ function attachDomHandlers() {
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'F1') {
       e.preventDefault()
-      OpenEditor().catch((err) => console.error('OpenEditor failed:', err))
+      // 若当前选中了模型，把对应 wmdl 文件路径透传给编辑器进程，启动后自动加载
+      const wmdlPath = store.selectedModel?.wmdlConfig?.wmdlFilePath ?? ''
+      OpenEditor(wmdlPath).catch((err) => console.error('OpenEditor failed:', err))
       return
     }
 

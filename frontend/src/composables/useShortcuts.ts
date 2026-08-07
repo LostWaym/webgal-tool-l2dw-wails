@@ -338,6 +338,7 @@ export function useShortcuts() {
 
     const entry = SHORTCUTS.find((s) => s.key === key && s.targets.includes(type))
     if (!entry) return
+    e.preventDefault()
     copyHandlerResult(entry.run())
   }
 

@@ -475,6 +475,12 @@ const fileName = computed(() => {
   gap: 6px;
 }
 
+.bounds-row .field__input--num {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 80px;
+}
+
 .models-list {
   list-style: none;
   margin: 0;

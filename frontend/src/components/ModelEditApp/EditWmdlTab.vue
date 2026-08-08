@@ -205,10 +205,10 @@ const fileName = computed(() => {
 <template>
   <div class="wmdl-tab">
     <!-- 顶部操作区 -->
+    <div class="file-name" :title="store.currentWmdl.wmdlFilePath">{{ fileName }}</div>
     <header class="wmdl-tab__header">
       <button class="op-btn op-btn--primary" :disabled="busy" @click="onLoad">加载 wmdl</button>
       <button class="op-btn" :disabled="busy" @click="onSave">保存 wmdl</button>
-      <span class="file-name" :title="store.currentWmdl.wmdlFilePath">{{ fileName }}</span>
     </header>
 
     <!-- 模型 json 保存 -->
@@ -377,13 +377,11 @@ const fileName = computed(() => {
 }
 
 .file-name {
-  margin-left: auto;
   font-size: 12px;
   color: #8a93a3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 60%;
 }
 
 .config-section,

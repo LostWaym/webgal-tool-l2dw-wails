@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { isSpecialId, getSpecialName } from '../live2d/specialIds'
-import { useModelStore } from '../stores/models'
-import type { TransformSnapshot } from '../stores/models'
-import { useTransformSnapshotModal } from '../composables/useTransformSnapshotModal'
+import { isSpecialId, getSpecialName } from '../../../live2d/specialIds'
+import { useModelStore } from '../../../stores/models'
+import type { TransformSnapshot } from '../../../stores/models'
+import { useTransformSnapshotModal } from '../../../composables/useTransformSnapshotModal'
 
 /**
  * 变换快照模态。

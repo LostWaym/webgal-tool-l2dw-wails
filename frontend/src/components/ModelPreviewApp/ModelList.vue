@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useModelStore } from '../stores/models'
-import { SPECIAL_IDS, getSpecialName } from '../live2d/specialIds'
-import eyeIcon from '../assets/icons/eye.png'
-import eyeOffIcon from '../assets/icons/eye-off.png'
+import { useModelStore } from '../../stores/models'
+import { SPECIAL_IDS, getSpecialName } from '../../live2d/specialIds'
+import eyeIcon from '../../assets/icons/eye.png'
+import eyeOffIcon from '../../assets/icons/eye-off.png'
 
 const store = useModelStore()
 const dragFromIndex = ref<number | null>(null)

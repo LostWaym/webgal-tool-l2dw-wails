@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue'
-import ModelList from './components/ModelList.vue'
-import Stage from './components/Stage.vue'
-import ModelActionPanel from './components/ModelActionPanel.vue'
-import TransformSnapshotModal from './components/TransformSnapshotModal.vue'
+import ModelList from './components/ModelPreviewApp/ModelList.vue'
+import Stage from './components/ModelPreviewApp/Stage.vue'
+import ModelActionPanel from './components/ModelPreviewApp/ModelActionPanel.vue'
+import TransformSnapshotModal from './components/ModelPreviewApp/Modal/TransformSnapshotModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
 import { useModelStore } from './stores/models'
 import { useShortcuts } from './composables/useShortcuts'

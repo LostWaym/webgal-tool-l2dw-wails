@@ -4,7 +4,7 @@ import EditModelList from './EditModelList.vue'
 import EditStage from './EditStage.vue'
 import EditActionPanel from './EditActionPanel.vue'
 import ResizeHandle from './ResizeHandle.vue'
-import EditBatchAddModal from './EditBatchAddModal.vue'
+import EditBatchAddModal from './Modal/EditBatchAddModal.vue'
 import MessageHost from '../common/MessageHost.vue'
 
 /**

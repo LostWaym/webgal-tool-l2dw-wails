@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { PickDirectory } from '../../../wailsjs/go/main/App'
-import { useWmdlModelEditorStore, type ScannedEntry } from '../../stores/wmdlModelEditor'
-import { pathDirname } from '../../path_utils'
-import { useBatchAddModal } from '../../composables/useBatchAddModal'
+import { PickDirectory } from '../../../../wailsjs/go/main/App'
+import { useWmdlModelEditorStore, type ScannedEntry } from '../../../stores/wmdlModelEditor'
+import { pathDirname } from '../../../path_utils'
+import { useBatchAddModal } from '../../../composables/useBatchAddModal'
 
 /**
  * 全屏"批量添加动作/表情"模态。

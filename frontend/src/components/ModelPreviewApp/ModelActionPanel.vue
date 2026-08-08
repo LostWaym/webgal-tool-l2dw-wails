@@ -2,26 +2,26 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
 import * as PIXI from 'pixi.js'
-import { useModelStore, DEFAULT_TRANSFORM_STATE } from '../stores/models'
-import type { TransformState } from '../stores/models'
+import { useModelStore, DEFAULT_TRANSFORM_STATE } from '../../stores/models'
+import type { TransformState } from '../../stores/models'
 import {
   DEFAULT_BG_TEMPLATE,
   DEFAULT_BG_TRANSFORM_TEMPLATE,
   DEFAULT_STAGE_TRANSFORM_TEMPLATE,
   DEFAULT_FIGURE_TEMPLATE,
   DEFAULT_TRANSFORM_TEMPLATE,
-} from '../utils/consts'
-import { L2dwContainer } from '../live2d/L2dwContainer'
-import { isSpecialId, getSpecialName, SpecialId } from '../live2d/specialIds'
-import { PickImageFile } from '../../wailsjs/go/main/App'
-import { filterBySearch } from '../utils/searchUtils'
-import emitter, { StageEvents } from '../stores/emitter'
-import { reloadAllModelTextures } from '../live2d/textureUtils'
-import { useMessage } from '../composables/useMessage'
-import SearchInput from './common/SearchInput.vue'
-import settingsIcon from '../assets/icons/settings.png'
-import { previewRuntime } from '../utils/runtimeRegistry'
-import { useTransformSnapshotModal } from '../composables/useTransformSnapshotModal'
+} from '../../utils/consts'
+import { L2dwContainer } from '../../live2d/L2dwContainer'
+import { isSpecialId, getSpecialName, SpecialId } from '../../live2d/specialIds'
+import { PickImageFile } from '../../../wailsjs/go/main/App'
+import { filterBySearch } from '../../utils/searchUtils'
+import emitter, { StageEvents } from '../../stores/emitter'
+import { reloadAllModelTextures } from '../../live2d/textureUtils'
+import { useMessage } from '../../composables/useMessage'
+import SearchInput from '../common/SearchInput.vue'
+import settingsIcon from '../../assets/icons/settings.png'
+import { previewRuntime } from '../../utils/runtimeRegistry'
+import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
 
 const store = useModelStore()
 const snapshotModal = useTransformSnapshotModal()

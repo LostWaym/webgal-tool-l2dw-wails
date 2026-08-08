@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useModelStore } from '../../stores/models'
+import { useModelStore } from '../../stores/previewStore'
 import { SPECIAL_IDS, getSpecialName } from '../../live2d/specialIds'
 import eyeIcon from '../../assets/icons/eye.png'
 import eyeOffIcon from '../../assets/icons/eye-off.png'

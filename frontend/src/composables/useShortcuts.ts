@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useModelStore } from '../stores/models'
+import { useModelStore } from '../stores/previewStore'
 import { SpecialId, isSpecialId } from '../live2d/specialIds'
 import { parseInst, createEmptyInst, Inst } from '../utils/inst_utils'
 import { SetClipboardText } from '../../wailsjs/go/main/App'

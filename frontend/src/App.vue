@@ -5,7 +5,7 @@ import Stage from './components/ModelPreviewApp/Stage.vue'
 import ModelActionPanel from './components/ModelPreviewApp/ModelActionPanel.vue'
 import TransformSnapshotModal from './components/ModelPreviewApp/Modal/TransformSnapshotModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
-import { useModelStore } from './stores/models'
+import { useModelStore } from './stores/previewStore'
 import { useShortcuts } from './composables/useShortcuts'
 import emitter, { StageEvents } from './stores/emitter'
 

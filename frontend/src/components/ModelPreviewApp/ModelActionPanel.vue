@@ -2,8 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
 import * as PIXI from 'pixi.js'
-import { useModelStore, DEFAULT_TRANSFORM_STATE } from '../../stores/models'
-import type { TransformState } from '../../stores/models'
+import { useModelStore, DEFAULT_TRANSFORM_STATE } from '../../stores/previewStore'
+import type { TransformState } from '../../stores/previewStore'
 import {
   DEFAULT_BG_TEMPLATE,
   DEFAULT_BG_TRANSFORM_TEMPLATE,

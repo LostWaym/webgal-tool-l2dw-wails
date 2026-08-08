@@ -21,8 +21,10 @@ import { useMessage } from '../composables/useMessage'
 import SearchInput from './common/SearchInput.vue'
 import settingsIcon from '../assets/icons/settings.png'
 import { previewRuntime } from '../utils/runtimeRegistry'
+import { useTransformSnapshotModal } from '../composables/useTransformSnapshotModal'
 
 const store = useModelStore()
+const snapshotModal = useTransformSnapshotModal()
 
 type TabKey = 'motionExpression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo'
 const activeTab = ref<TabKey>('motionExpression') // 页签
@@ -292,6 +294,29 @@ function resetTransform() {
   container.alpha = 1
   syncTransformFromModel()
   setTimeout(() => { _updatingTransform = false }, 50)
+}
+
+// 记录当前选中模型的变换快照
+function onRecordSnapshot() {
+  if (!store.selectedId) {
+    msg.warning('请先选中模型')
+    return
+  }
+  syncTransformFromModel()
+  const snap = store.recordTransformSnapshot()
+  if (snap) {
+    msg.success(`已记录快照：${snap.name}`)
+  }
+}
+
+// 打开变换快照模态
+function onApplySnapshot() {
+  if (!store.selectedId) {
+    msg.warning('请先选中模型')
+    return
+  }
+  syncTransformFromModel()
+  snapshotModal.open()
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -718,6 +743,10 @@ function onLabelDragEnd() {
           @input="onTransformInput"
         />
       </div>
+      <div class="form-row form-row--btn form-row--snapshot">
+        <button class="snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>
+        <button class="snapshot-btn" @click="onApplySnapshot">应用快照</button>
+      </div>
       <div class="form-row form-row--btn">
         <button class="reset-btn" @click="resetTransform">重置</button>
       </div>
@@ -1101,6 +1130,10 @@ function onLabelDragEnd() {
   justify-content: center;
 }
 
+.form-row--snapshot {
+  gap: 8px;
+}
+
 .reset-btn {
   padding: 8px 24px;
   background: #2f80ed;
@@ -1114,6 +1147,23 @@ function onLabelDragEnd() {
 
 .reset-btn:hover {
   background: #3d8ef0;
+}
+
+.snapshot-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: #2c313a;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  color: #e6e6e6;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.snapshot-btn:hover {
+  background: #353c47;
+  border-color: #2f80ed;
 }
 
 /* ───────── 信息页签 ───────── */

@@ -11,9 +11,10 @@ import {
   DEFAULT_FIGURE_TEMPLATE,
   DEFAULT_TRANSFORM_TEMPLATE,
 } from '../utils/consts'
-import { SpecialId } from '../live2d/specialIds'
+import { SpecialId, isSpecialId } from '../live2d/specialIds'
 import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
 import { previewRuntime } from '../utils/runtimeRegistry'
+import type { L2dwContainer } from '../live2d/L2dwContainer'
 
 interface MotionState {
   group: string
@@ -45,6 +46,16 @@ export const DEFAULT_TRANSFORM_STATE: TransformState = {
   scale: { x: 1, y: 1 },
   rotation: 0,
   alpha: 1,
+}
+
+/** 变换快照：仅缓存 x/y/scale/rotation */
+export interface TransformSnapshot {
+  id: string
+  name: string
+  x: number
+  y: number
+  scale: { x: number; y: number }
+  rotation: number
 }
 
 export interface ModelEntry {
@@ -80,6 +91,10 @@ export const useModelStore = defineStore('models', {
     bgState: { ...DEFAULT_TRANSFORM_STATE } as TransformState,
     /** 主场景容器（StageMain）的变换状态 */
     stageState: { ...DEFAULT_TRANSFORM_STATE } as TransformState,
+    /** 变换快照列表 */
+    transformSnapshots: [] as TransformSnapshot[],
+    /** 模态打开时缓存的原始变换（关闭时用于恢复） */
+    cachedTransformBeforeModal: null as TransformState | null,
   }),
   getters: {
     selectedModel(state): ModelEntry | null {
@@ -316,5 +331,119 @@ export const useModelStore = defineStore('models', {
         model.state = state
       }
     },
+
+    /** 记录当前选中模型的变换快照，默认名为时间戳 */
+    recordTransformSnapshot(): TransformSnapshot | null {
+      if (!this.selectedId) return null
+      const state = this.getTransformState(this.selectedId)
+      const snapshot: TransformSnapshot = {
+        id: crypto.randomUUID(),
+        name: formatSnapshotTimestamp(new Date()),
+        x: state.x,
+        y: state.y,
+        scale: { x: state.scale.x, y: state.scale.y },
+        rotation: state.rotation,
+      }
+      this.transformSnapshots.push(snapshot)
+      return snapshot
+    },
+
+    /** 应用指定快照的变换到当前选中模型 */
+    applyTransformSnapshot(id: string): boolean {
+      const snap = this.transformSnapshots.find((s) => s.id === id)
+      if (!snap || !this.selectedId) return false
+      const current = this.getTransformState(this.selectedId)
+      const newState: TransformState = {
+        ...current,
+        x: snap.x,
+        y: snap.y,
+        scale: { x: snap.scale.x, y: snap.scale.y },
+        rotation: snap.rotation,
+      }
+      this.setTransformState(this.selectedId, newState)
+      syncTransformToPixi(this.selectedId, newState)
+      return true
+    },
+
+    /** 直接应用快照的原始数据（不做合并），用于预览 */
+    applyTransformSnapshotRaw(snap: TransformSnapshot): void {
+      if (!this.selectedId) return
+      const current = this.getTransformState(this.selectedId)
+      const newState: TransformState = {
+        ...current,
+        x: snap.x,
+        y: snap.y,
+        scale: { x: snap.scale.x, y: snap.scale.y },
+        rotation: snap.rotation,
+      }
+      this.setTransformState(this.selectedId, newState)
+      syncTransformToPixi(this.selectedId, newState)
+    },
+
+    /** 删除指定快照 */
+    deleteTransformSnapshot(id: string): void {
+      this.transformSnapshots = this.transformSnapshots.filter((s) => s.id !== id)
+    },
+
+    /** 重命名快照 */
+    renameTransformSnapshot(id: string, name: string): void {
+      const snap = this.transformSnapshots.find((s) => s.id === id)
+      if (snap) snap.name = name
+    },
+
+    /** 缓存当前选中模型的变换（模态打开时调用） */
+    setCachedTransform(): void {
+      if (!this.selectedId) {
+        this.cachedTransformBeforeModal = null
+        return
+      }
+      const state = this.getTransformState(this.selectedId)
+      this.cachedTransformBeforeModal = {
+        ...state,
+        scale: { x: state.scale.x, y: state.scale.y },
+      }
+    },
+
+    /** 恢复缓存的变换（鼠标移出列表项时调用） */
+    restoreCachedTransform(): void {
+      if (!this.cachedTransformBeforeModal || !this.selectedId) return
+      this.setTransformState(this.selectedId, this.cachedTransformBeforeModal)
+      syncTransformToPixi(this.selectedId, this.cachedTransformBeforeModal)
+    },
+
+    /** 清除缓存 */
+    clearCachedTransform(): void {
+      this.cachedTransformBeforeModal = null
+    },
   },
 })
+
+/** 生成快照默认名称：年年年年-月月-日日-时时分分秒秒 */
+function formatSnapshotTimestamp(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+}
+
+/**
+ * 把指定 id 对应模型的 TransformState 同步到 PIXI 容器。
+ *
+ * 与 ModelActionPanel 中 onTransformInput 的写入保持一致：
+ * rotation 在 store 中以"度"存储，PIXI 期望"弧度"。
+ * 普通模型容器是 L2dwContainer（含 alpha），特殊容器是普通 Container（无 alpha）。
+ */
+function syncTransformToPixi(id: string, state: TransformState): void {
+  const container = isSpecialId(id)
+    ? previewRuntime.specialContainers.get(id)
+    : previewRuntime.modelWrappers.get(id)
+  if (!container) return
+
+  container.x = state.x
+  container.y = state.y
+  container.scale.x = state.scale.x
+  container.scale.y = state.scale.y
+  container.rotation = (state.rotation * Math.PI) / 180
+  // alpha 仅 L2dwContainer 支持，特殊容器跳过
+  if (!isSpecialId(id)) {
+    ;(container as L2dwContainer).alpha = state.alpha
+  }
+}

@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, ref } from 'vue'
 import ModelList from './components/ModelList.vue'
 import Stage from './components/Stage.vue'
 import ModelActionPanel from './components/ModelActionPanel.vue'
+import TransformSnapshotModal from './components/TransformSnapshotModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
 import { useModelStore } from './stores/models'
 import { useShortcuts } from './composables/useShortcuts'
@@ -34,6 +35,7 @@ onBeforeUnmount(() => {
     <ModelList class="app__left" />
     <Stage class="app__right" />
     <ModelActionPanel v-if="store.selectedId" />
+    <TransformSnapshotModal />
     <MessageHost />
   </div>
 </template>

@@ -17,6 +17,9 @@ import { useMessage } from '../../composables/useMessage'
 const store = useWmdlModelEditorStore()
 const message = useMessage()
 
+// 拖拽 offsetX/offsetY 标签时，每像素变化对应的数值增量
+const OFFSET_DRAG_SENSITIVITY = 0.1
+
 // ─── 加载 / 保存 ───────────────────────────────────────────────────────────
 
 const busy = ref(false)
@@ -172,6 +175,42 @@ function updateOffsetY(model: WmdlModelItem, v: string) {
   store.updateModelOffset(model.id, model.offsetX, num)
 }
 
+// ─── offsetX/offsetY 拖拽增减值 ────────────────────────────────────────────
+type OffsetField = 'offsetX' | 'offsetY'
+const dragging = ref<{ model: WmdlModelItem; field: OffsetField; startX: number; startVal: number } | null>(null)
+
+function onOffsetLabelMouseDown(field: OffsetField, e: MouseEvent, model: WmdlModelItem) {
+  // 仅响应主键，避免与右键 / 中键冲突
+  if (e.button !== 0) return
+  dragging.value = {
+    model,
+    field,
+    startX: e.clientX,
+    startVal: field === 'offsetX' ? model.offsetX : model.offsetY,
+  }
+  window.addEventListener('mousemove', onOffsetDragMouseMove)
+  window.addEventListener('mouseup', onOffsetDragMouseUp)
+  e.preventDefault()
+}
+
+function onOffsetDragMouseMove(e: MouseEvent) {
+  const d = dragging.value
+  if (!d) return
+  const delta = (e.clientX - d.startX) * OFFSET_DRAG_SENSITIVITY
+  const next = d.startVal + delta
+  if (d.field === 'offsetX') {
+    store.updateModelOffset(d.model.id, next, d.model.offsetY)
+  } else {
+    store.updateModelOffset(d.model.id, d.model.offsetX, next)
+  }
+}
+
+function onOffsetDragMouseUp() {
+  dragging.value = null
+  window.removeEventListener('mousemove', onOffsetDragMouseMove)
+  window.removeEventListener('mouseup', onOffsetDragMouseUp)
+}
+
 function onSelectModel(id: string) {
   store.selectModel(store.selectedModelId === id ? null : id)
 }
@@ -300,7 +339,11 @@ const fileName = computed(() => {
           </div>
           <div v-show="!isMain(m)" class="model-item__offset-row">
             <label class="offset-field">
-              offsetX
+              <span
+                class="offset-field__handle"
+                :class="{ 'offset-field__handle--dragging': dragging?.model.id === m.id && dragging?.field === 'offsetX' }"
+                @mousedown="onOffsetLabelMouseDown('offsetX', $event, m)"
+              >offsetX</span>
               <input
                 class="field__input field__input--num"
                 type="number"
@@ -310,7 +353,11 @@ const fileName = computed(() => {
               />
             </label>
             <label class="offset-field">
-              offsetY
+              <span
+                class="offset-field__handle"
+                :class="{ 'offset-field__handle--dragging': dragging?.model.id === m.id && dragging?.field === 'offsetY' }"
+                @mousedown="onOffsetLabelMouseDown('offsetY', $event, m)"
+              >offsetY</span>
               <input
                 class="field__input field__input--num"
                 type="number"
@@ -548,6 +595,23 @@ const fileName = computed(() => {
   gap: 6px;
   font-size: 11px;
   color: #8a93a3;
+  min-width: 0;
+  flex: 1;
+}
+
+.offset-field__handle {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.offset-field__handle--dragging {
+  user-select: none;
+}
+
+.offset-field .field__input--num {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 80px;
 }
 
 .mini-btn {

@@ -17,7 +17,6 @@ import { onUnmounted, reactive, readonly, ref } from 'vue'
  * })
  * ```
  *
- * 注意：需要给可滚动容器添加 `is-dragging-scroll` class。
  * 拖拽超过 5px 后松开会触发惯性滚动，惯性参数见文件顶部常量。
  */
 
@@ -42,13 +41,13 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
   let lastMoveTime = 0
   let lastMoveX = 0
   let lastMoveY = 0
+  let scrollEl: HTMLElement | null = null
 
   function inertiaLoop() {
-    const el = document.querySelector('.is-dragging-scroll') as HTMLElement
-    if (!el) return
+    if (!scrollEl) return
 
-    el.scrollTop += velocity.y
-    el.scrollLeft += velocity.x
+    scrollEl.scrollTop += velocity.y
+    scrollEl.scrollLeft += velocity.x
 
     velocity.x *= FRICTION
     velocity.y *= FRICTION
@@ -93,15 +92,14 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
     }
 
     if (!isDragging.value) return
-    const el = document.querySelector('.is-dragging-scroll') as HTMLElement
-    if (!el) return
+    if (!scrollEl) return
 
     const sensitivity = options.sensitivity ?? 1
     const scrollDy = (e.clientY - startPos.y) * sensitivity
     const scrollDx = (e.clientX - startPos.x) * sensitivity
 
-    if (options.direction !== 'horizontal') el.scrollTop = scrollStart.top - scrollDy
-    if (options.direction !== 'vertical') el.scrollLeft = scrollStart.left - scrollDx
+    if (options.direction !== 'horizontal') scrollEl.scrollTop = scrollStart.top - scrollDy
+    if (options.direction !== 'vertical') scrollEl.scrollLeft = scrollStart.left - scrollDx
   }
 
   function onClickCapture(e: MouseEvent) {
@@ -120,8 +118,10 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
     velocity.x *= INERTIA_MULTIPLIER
     velocity.y *= INERTIA_MULTIPLIER
     const speed = Math.sqrt(velocity.x ** 2 + velocity.y ** 2)
-    if (speed > SPEED_THRESHOLD) {
+    if (speed > SPEED_THRESHOLD && scrollEl) {
       animFrameId = requestAnimationFrame(inertiaLoop)
+    } else {
+      scrollEl = null
     }
   }
 
@@ -141,9 +141,9 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
         document.addEventListener('click', onClickCapture, { capture: true, once: true })
         startPos.x = e.clientX
         startPos.y = e.clientY
-        const el = e.currentTarget as HTMLElement
-        scrollStart.left = el.scrollLeft
-        scrollStart.top = el.scrollTop
+        scrollEl = e.currentTarget as HTMLElement
+        scrollStart.left = scrollEl.scrollLeft
+        scrollStart.top = scrollEl.scrollTop
         lastMoveTime = performance.now()
         lastMoveX = e.clientX
         lastMoveY = e.clientY

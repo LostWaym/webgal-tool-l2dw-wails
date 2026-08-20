@@ -205,11 +205,11 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
       let jsonInitParamMap = new Map<string, number>()
       let jsonInitOpacityMap = new Map<string, number>()
       if (!isMoc3 && item.rawJsonObject && typeof item.rawJsonObject === 'object') {
-        const jsonParams = Array.isArray(item.rawJsonObject.initParams)
-          ? item.rawJsonObject.initParams
+        const jsonParams = Array.isArray(item.rawJsonObject.init_params)
+          ? item.rawJsonObject.init_params
           : []
-        const jsonOpacities = Array.isArray(item.rawJsonObject.initOpacities)
-          ? item.rawJsonObject.initOpacities
+        const jsonOpacities = Array.isArray(item.rawJsonObject.init_opacities)
+          ? item.rawJsonObject.init_opacities
           : []
         jsonInitParamMap = new Map(
           jsonParams
@@ -464,10 +464,10 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
           name: e.name,
           file: e.path,
         }))
-        out.initParams = item.initParams
+        out.init_params = item.initParams
           .filter((p) => p.override !== undefined)
           .map((p) => ({ id: p.id, value: p.override as number }))
-        out.initOpacities = item.initOpacities
+        out.init_opacities = item.initOpacities
           .filter((p) => p.override !== undefined)
           .map((p) => ({ id: p.id, value: p.override as number }))
       }

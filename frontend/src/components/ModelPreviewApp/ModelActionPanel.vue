@@ -18,6 +18,7 @@ import { filterBySearch } from '../../utils/searchUtils'
 import emitter, { StageEvents } from '../../stores/emitter'
 import { reloadAllModelTextures } from '../../live2d/textureUtils'
 import { useMessage } from '../../composables/useMessage'
+import { useDraggableScroll } from '../../composables/useDraggableScroll'
 import SearchInput from '../common/SearchInput.vue'
 import settingsIcon from '../../assets/icons/settings.png'
 import { previewRuntime } from '../../utils/runtimeRegistry'
@@ -25,6 +26,8 @@ import { useTransformSnapshotModal } from '../../composables/useTransformSnapsho
 
 const store = useModelStore()
 const snapshotModal = useTransformSnapshotModal()
+const motionScroll = useDraggableScroll()
+const expressionScroll = useDraggableScroll()
 
 type TabKey = 'motionExpression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo'
 const activeTab = ref<TabKey>('motionExpression') // 页签
@@ -613,7 +616,7 @@ function onLabelDragEnd() {
           <div class="panel__search">
             <SearchInput v-model="motionSearch" variant="action" placeholder="搜索动作..." />
           </div>
-          <ul class="panel__list">
+          <ul class="panel__list is-dragging-scroll" v-bind="motionScroll.scrollHandlers">
             <li
               v-for="item in filteredMotions"
               :key="`${item.group}_${item.index}`"
@@ -648,7 +651,7 @@ function onLabelDragEnd() {
           <div class="panel__search">
             <SearchInput v-model="expressionSearch" variant="action" placeholder="搜索表情..." />
           </div>
-          <ul class="panel__list">
+          <ul class="panel__list is-dragging-scroll" v-bind="expressionScroll.scrollHandlers">
             <li
               v-for="item in filteredExpressions"
               :key="item.index"
@@ -1048,6 +1051,12 @@ function onLabelDragEnd() {
   padding: 8px 0;
   overflow-y: auto;
   min-height: 0;
+  cursor: grab;
+}
+
+.is-dragging-scroll {
+  cursor: grabbing !important;
+  user-select: none;
 }
 
 .list-item {

@@ -84,6 +84,12 @@ export class BevelFilter extends PIXI.Filter {
     this.uniforms.lightColor = new Float32Array(3)
     this.uniforms.shadowColor = new Float32Array(3)
 
+    // 让透明边外有 1px padding，shader 内 light/shadow 采样才能拿到正确的 alpha 邻居
+    this.padding = 1
+
+    this._blurFilter = new MotionBlurFilter()
+    this._blurFilter.kernelSize = 11
+
     Object.assign(
       this,
       {
@@ -96,12 +102,6 @@ export class BevelFilter extends PIXI.Filter {
       },
       options,
     )
-
-    // 让透明边外有 1px padding，shader 内 light/shadow 采样才能拿到正确的 alpha 邻居
-    this.padding = 1
-
-    this._blurFilter = new MotionBlurFilter()
-    this._blurFilter.kernelSize = 11
   }
 
   // eslint-disable-next-line max-params

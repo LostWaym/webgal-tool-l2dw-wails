@@ -29,6 +29,7 @@ const store = useModelStore()
 const snapshotModal = useTransformSnapshotModal()
 const motionScroll = useDraggableScroll()
 const expressionScroll = useDraggableScroll()
+const filterScroll = useDraggableScroll()
 
 type TabKey = 'motionExpression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo'
 const activeTab = ref<TabKey>('motionExpression') // 页签
@@ -811,85 +812,117 @@ function onLabelDragEnd() {
     </div>
 
     <!-- 变换表单 -->
-    <div v-else-if="activeTab === 'transform'" class="panel__transform">
-      <div class="form-row">
-        <label>名字</label>
-        <input
-          v-model="selectedEntry!.name"
-          type="text"
-          class="form-input"
-          :readonly="isSpecial"
-        />
-      </div>
-      <div class="form-row">
-        <label @mousedown="(e) => onLabelDragStart('x', e)">X</label>
-        <input
-          v-model.number="transformState.x"
-          type="number"
-          class="form-input"
-          step="1"
-          @input="onTransformInput"
-        />
-      </div>
-      <div class="form-row">
-        <label @mousedown="(e) => onLabelDragStart('y', e)">Y</label>
-        <input
-          v-model.number="transformState.y"
-          type="number"
-          class="form-input"
-          step="1"
-          @input="onTransformInput"
-        />
-      </div>
-      <div class="form-row">
-        <label @mousedown="(e) => onLabelDragStart('scaleX', e)">X 缩放</label>
-        <input
-          v-model.number="transformState.scale.x"
-          type="number"
-          class="form-input"
-          step="0.01"
-          min="0.01"
-          max="10"
-          @input="onTransformInput"
-        />
-      </div>
-      <div class="form-row">
-        <label @mousedown="(e) => onLabelDragStart('scaleY', e)">Y 缩放</label>
-        <input
-          v-model.number="transformState.scale.y"
-          type="number"
-          class="form-input"
-          step="0.01"
-          min="0.01"
-          max="10"
-          @input="onTransformInput"
-        />
-      </div>
-      <div class="form-row">
-        <label @mousedown="(e) => onLabelDragStart('rotation', e)">旋转</label>
-        <input
-          v-model.number="transformState.rotation"
-          type="number"
-          class="form-input"
-          step="1"
-          @input="onTransformInput"
-        />
-      </div>
-      <div class="form-row">
-        <label @mousedown="(e) => onLabelDragStart('alpha', e)">透明度</label>
-        <input
-          v-model.number="transformState.alpha"
-          type="number"
-          class="form-input"
-          step="0.01"
-          min="0"
-          max="1"
-          @input="onTransformInput"
-        />
+    <div v-else-if="activeTab === 'transform'" class="panel__motion-expression">
+      <!-- 上：基础字段（始终展开，作为唯一滚动容器） -->
+      <div class="panel__list-region">
+        <div class="list-region-body">
+          <ul class="panel__list" v-bind="motionScroll.scrollHandlers">
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>名字</label>
+                <input
+                  v-model="selectedEntry!.name"
+                  type="text"
+                  class="form-input"
+                  :readonly="isSpecial"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label @mousedown="(e) => onLabelDragStart('x', e)">X</label>
+                <input
+                  v-model.number="transformState.x"
+                  type="number"
+                  class="form-input"
+                  step="1"
+                  @input="onTransformInput"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label @mousedown="(e) => onLabelDragStart('y', e)">Y</label>
+                <input
+                  v-model.number="transformState.y"
+                  type="number"
+                  class="form-input"
+                  step="1"
+                  @input="onTransformInput"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label @mousedown="(e) => onLabelDragStart('scaleX', e)">X 缩放</label>
+                <input
+                  v-model.number="transformState.scale.x"
+                  type="number"
+                  class="form-input"
+                  step="0.01"
+                  min="0.01"
+                  max="10"
+                  @input="onTransformInput"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label @mousedown="(e) => onLabelDragStart('scaleY', e)">Y 缩放</label>
+                <input
+                  v-model.number="transformState.scale.y"
+                  type="number"
+                  class="form-input"
+                  step="0.01"
+                  min="0.01"
+                  max="10"
+                  @input="onTransformInput"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label @mousedown="(e) => onLabelDragStart('rotation', e)">旋转</label>
+                <input
+                  v-model.number="transformState.rotation"
+                  type="number"
+                  class="form-input"
+                  step="1"
+                  @input="onTransformInput"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label @mousedown="(e) => onLabelDragStart('alpha', e)">透明度</label>
+                <input
+                  v-model.number="transformState.alpha"
+                  type="number"
+                  class="form-input"
+                  step="0.01"
+                  min="0"
+                  max="1"
+                  @input="onTransformInput"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row form-row--btn form-row--snapshot">
+                <button class="snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>
+                <button class="snapshot-btn" @click="onApplySnapshot">应用快照</button>
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row form-row--btn">
+                <button class="reset-btn" @click="resetTransform">重置</button>
+              </div>
+            </li>
+          </ul>
+        </div>
       </div>
 
-      <!-- 滤镜（可折叠） -->
-      <div class="panel__filter-region" :class="{ 'is-collapsed': filterCollapsed }">
+      <!-- 下：滤镜（可折叠） -->
+      <div class="panel__list-region" :class="{ 'is-collapsed': filterCollapsed }">
         <div class="list-region-header">
           <span class="list-region-title">滤镜</span>
           <button
@@ -902,52 +935,54 @@ function onLabelDragEnd() {
             <span aria-hidden="true">{{ filterCollapsed ? '▸' : '▾' }}</span>
           </button>
         </div>
-        <div v-show="!filterCollapsed" class="panel__filter-body">
-          <div v-for="group in FILTER_GROUPS" :key="group.title" class="filter-group">
-            <div class="filter-group-title">{{ group.title }}</div>
-            <div
-              v-for="item in group.items"
-              :key="item.key"
-              class="form-row"
-              :class="{ 'form-row--check': item.boolean }"
+        <div v-show="!filterCollapsed" class="list-region-body">
+          <ul class="panel__list" v-bind="filterScroll.scrollHandlers">
+            <li
+              v-for="group in FILTER_GROUPS"
+              :key="group.title"
+              class="list-item list-item--row"
             >
-              <template v-if="item.boolean">
-                <label class="form-row__check-label">
-                  <input
-                    type="checkbox"
-                    class="form-row__check"
-                    :checked="filterState[item.key] === 1"
-                    @change="(e: any) => onFilterToggle(item.key, e.target.checked)"
-                  />
-                  <span>{{ item.label }}</span>
-                </label>
-              </template>
-              <template v-else>
-                <label>{{ item.label }}</label>
-                <input
-                  :value="filterState[item.key]"
-                  type="number"
-                  class="form-input"
-                  :step="item.step ?? 'any'"
-                  :min="item.min"
-                  :max="item.max"
-                  @input="(e: any) => onFilterInput(item.key, Number(e.target.value))"
-                />
-              </template>
-            </div>
-          </div>
-          <div class="form-row form-row--btn">
-            <button class="reset-btn" @click="resetFilters">重置滤镜</button>
-          </div>
+              <div class="filter-group">
+                <div class="filter-group-title">{{ group.title }}</div>
+                <div
+                  v-for="item in group.items"
+                  :key="item.key"
+                  class="form-row"
+                  :class="{ 'form-row--check': item.boolean }"
+                >
+                  <template v-if="item.boolean">
+                    <label class="form-row__check-label">
+                      <input
+                        type="checkbox"
+                        class="form-row__check"
+                        :checked="filterState[item.key] === 1"
+                        @change="(e: any) => onFilterToggle(item.key, e.target.checked)"
+                      />
+                      <span>{{ item.label }}</span>
+                    </label>
+                  </template>
+                  <template v-else>
+                    <label>{{ item.label }}</label>
+                    <input
+                      :value="filterState[item.key]"
+                      type="number"
+                      class="form-input"
+                      :step="item.step ?? 'any'"
+                      :min="item.min"
+                      :max="item.max"
+                      @input="(e: any) => onFilterInput(item.key, Number(e.target.value))"
+                    />
+                  </template>
+                </div>
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row form-row--btn">
+                <button class="reset-btn" @click="resetFilters">重置滤镜</button>
+              </div>
+            </li>
+          </ul>
         </div>
-      </div>
-
-      <div class="form-row form-row--btn form-row--snapshot">
-        <button class="snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>
-        <button class="snapshot-btn" @click="onApplySnapshot">应用快照</button>
-      </div>
-      <div class="form-row form-row--btn">
-        <button class="reset-btn" @click="resetTransform">重置</button>
       </div>
     </div>
 
@@ -1052,6 +1087,7 @@ function onLabelDragEnd() {
   border-left: 1px solid #2c313a;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   user-select: none;
   transition: opacity 0.15s ease;
 }
@@ -1286,11 +1322,12 @@ function onLabelDragEnd() {
   background: transparent;
 }
 
-.panel__transform {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* 变换页签里的列表项（与动作列表共用 ul.panel__list，仅做行内微调） */
+.list-item--row {
+  display: block;
+  padding: 6px 12px;
+  border-left: none;
+  cursor: default;
 }
 
 .form-row {
@@ -1492,24 +1529,8 @@ function onLabelDragEnd() {
 
 /* ───────── 滤镜 ───────── */
 
-.panel__filter-region {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #2c313a;
-  border-radius: 6px;
-  overflow: hidden;
-  margin-top: 4px;
-}
-
 .panel__filter-region .list-region-header {
   background: #232830;
-}
-
-.panel__filter-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
 }
 
 .filter-group {

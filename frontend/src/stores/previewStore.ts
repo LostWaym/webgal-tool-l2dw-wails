@@ -17,6 +17,7 @@ import { SpecialId, isSpecialId } from '../live2d/specialIds'
 import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
 import { previewRuntime } from '../utils/runtimeRegistry'
 import type { L2dwContainer } from '../live2d/L2dwContainer'
+import { DEFAULT_FILTER_PROPERTY_VALUES, FILTER_PROPERTY_KEYS } from '../live2d/L2dwContainer'
 
 interface MotionState {
   group: string
@@ -59,6 +60,45 @@ export interface TransformSnapshot {
   scale: { x: number; y: number }
   rotation: number
 }
+
+/**
+ * 滤镜状态（仅运行时，不持久化到 wmdl）。
+ * 与 L2dwContainer 的 PROPERTY_CONFIGS 一一对应；多出 `l2dwAlphaFilter`
+ * 表示"整容器 alpha 滤镜"（与父类 `PIXI.Container.alpha` 区分开）。
+ */
+export interface FilterState {
+  blur: number
+  brightness: number
+  contrast: number
+  saturation: number
+  gamma: number
+  colorRed: number
+  colorGreen: number
+  colorBlue: number
+  oldFilm: number
+  dotFilm: number
+  reflectionFilm: number
+  glitchFilm: number
+  rgbFilm: number
+  godrayFilm: number
+  bevel: number
+  bevelThickness: number
+  bevelRotation: number
+  bevelSoftness: number
+  bevelRed: number
+  bevelGreen: number
+  bevelBlue: number
+  bloom: number
+  bloomBrightness: number
+  bloomBlur: number
+  bloomThreshold: number
+  l2dwAlphaFilter: number
+}
+
+export const DEFAULT_FILTER_STATE: FilterState = {
+  ...DEFAULT_FILTER_PROPERTY_VALUES,
+  l2dwAlphaFilter: 1,
+} as FilterState
 
 export interface ModelEntry {
   id: string
@@ -108,6 +148,10 @@ export const useModelStore = defineStore('models', {
     /** 图片立绘全局模板：所有 kind==='image' 共用 */
     imageFigureTemplate: DEFAULT_IMAGE_FIGURE_TEMPLATE,
     imageTransformTemplate: DEFAULT_IMAGE_TRANSFORM_TEMPLATE,
+    /** 滤镜状态：按 modelId 索引（仅运行时，不写入 wmdl） */
+    figureFilterStates: {} as Record<string, FilterState>,
+    bgFilterState: { ...DEFAULT_FILTER_STATE } as FilterState,
+    stageFilterState: { ...DEFAULT_FILTER_STATE } as FilterState,
   }),
   getters: {
     selectedModel(state): ModelEntry | null {
@@ -124,6 +168,14 @@ export const useModelStore = defineStore('models', {
       // 普通模型
       const model = state.models.find((m) => m.id === id)
       return model?.state ?? { ...DEFAULT_TRANSFORM_STATE }
+    },
+    getFilterState: (state) => (id: string | null): FilterState => {
+      if (!id) return { ...DEFAULT_FILTER_STATE }
+      if (id === SpecialId.StageMain) return state.stageFilterState
+      if (id === SpecialId.BgContainer) return state.bgFilterState
+      const own = state.figureFilterStates[id]
+      // 惰性初始化通过 setFilterState 完成；此处读到 undefined 直接给默认快照
+      return own ?? { ...DEFAULT_FILTER_STATE }
     },
   },
   actions: {
@@ -466,6 +518,65 @@ export const useModelStore = defineStore('models', {
     clearCachedTransform(): void {
       this.cachedTransformBeforeModal = null
     },
+
+    /**
+     * 写入滤镜状态（仅运行时），并立即把字段同步到对应的 L2dwContainer。
+     * patch 为部分字段，merge 到现有 state 上。
+     */
+    setFilterState(id: string | null, patch: Partial<FilterState>): void {
+      if (id == null) return
+
+      let target: FilterState
+      if (id === SpecialId.StageMain) {
+        target = { ...this.stageFilterState, ...patch }
+        this.stageFilterState = target
+      } else if (id === SpecialId.BgContainer) {
+        target = { ...this.bgFilterState, ...patch }
+        this.bgFilterState = target
+      } else {
+        const own = this.figureFilterStates[id]
+        target = own
+          ? { ...own, ...patch }
+          : { ...DEFAULT_FILTER_STATE, ...patch }
+        this.figureFilterStates[id] = target
+      }
+      syncFilterToContainer(id, target)
+    },
+
+    /** 把指定 id 的滤镜属性读回 store（用于选中切换时把容器当前值同步到 UI） */
+    readFilterStateFromContainer(id: string | null): void {
+      if (id == null) return
+      const container = resolveFilterContainer(id)
+      if (!container) return
+      const next: FilterState = {
+        ...DEFAULT_FILTER_STATE,
+        l2dwAlphaFilter: container.l2dwAlphaFilter,
+      }
+      for (const key of FILTER_PROPERTY_KEYS) {
+        ;(next as any)[key] = (container as any)[key]
+      }
+      if (id === SpecialId.StageMain) {
+        this.stageFilterState = next
+      } else if (id === SpecialId.BgContainer) {
+        this.bgFilterState = next
+      } else {
+        this.figureFilterStates[id] = next
+      }
+    },
+
+    /** 把指定 id 的 FilterState 重置回 DEFAULT_FILTER_STATE，并写回容器 */
+    resetFilterState(id: string | null): void {
+      if (id == null) return
+      const fresh = { ...DEFAULT_FILTER_STATE }
+      if (id === SpecialId.StageMain) {
+        this.stageFilterState = fresh
+      } else if (id === SpecialId.BgContainer) {
+        this.bgFilterState = fresh
+      } else {
+        this.figureFilterStates[id] = fresh
+      }
+      syncFilterToContainer(id, fresh)
+    },
   },
 })
 
@@ -497,4 +608,21 @@ function syncTransformToPixi(id: string, state: TransformState): void {
   if (!isSpecialId(id)) {
     ;(container as L2dwContainer).alpha = state.alpha
   }
+}
+
+/** 取 id 对应的容器：模型从 modelWrappers，特殊容器从 specialContainers。 */
+function resolveFilterContainer(id: string): L2dwContainer | undefined {
+  return isSpecialId(id)
+    ? (previewRuntime.specialContainers.get(id) as L2dwContainer | undefined)
+    : previewRuntime.modelWrappers.get(id)
+}
+
+/** 把 FilterState 字段写回对应 L2dwContainer；不存在的容器直接跳过。 */
+function syncFilterToContainer(id: string, state: FilterState): void {
+  const container = resolveFilterContainer(id)
+  if (!container) return
+  for (const key of FILTER_PROPERTY_KEYS) {
+    ;(container as any)[key] = (state as any)[key]
+  }
+  container.l2dwAlphaFilter = state.l2dwAlphaFilter
 }

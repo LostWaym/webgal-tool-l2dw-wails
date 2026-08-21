@@ -3,7 +3,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
 import * as PIXI from 'pixi.js'
 import { useModelStore, DEFAULT_TRANSFORM_STATE } from '../../stores/previewStore'
-import type { TransformState } from '../../stores/previewStore'
+import type { TransformState, FilterState } from '../../stores/previewStore'
+import { DEFAULT_FILTER_STATE } from '../../stores/previewStore'
 import {
   DEFAULT_BG_TEMPLATE,
   DEFAULT_BG_TRANSFORM_TEMPLATE,
@@ -102,6 +103,100 @@ const transformState = computed<TransformState>(
   },
 )
 let _updatingTransform = false
+
+// ───────── 滤镜状态 ─────────
+// 选中 id 变化或用户调整后，通过 syncFilterFromContainer 把容器当前值读回 store；
+// store 自身已经是 reactive，filterState 直接从 store.getFilterState 取。
+const filterState = computed<FilterState>(
+  () => store.getFilterState(store.selectedId),
+)
+const filterCollapsed = ref(false)
+
+/** 每个 group: { title, items: { key, label, min?, max?, step?, boolean? }[] } */
+interface FilterItemSpec {
+  key: keyof FilterState
+  label: string
+  min?: number
+  max?: number
+  step?: number
+  boolean?: boolean
+}
+interface FilterGroupSpec {
+  title: string
+  items: FilterItemSpec[]
+}
+const FILTER_GROUPS: FilterGroupSpec[] = [
+  {
+    title: '基础',
+    items: [
+      { key: 'blur', label: '模糊', min: 0, max: 32, step: 0.1 },
+      { key: 'l2dwAlphaFilter', label: '整体透明度', min: 0, max: 1, step: 0.01 },
+    ],
+  },
+  {
+    title: '色彩调整',
+    items: [
+      { key: 'brightness', label: '亮度', min: 0, max: 2, step: 0.01 },
+      { key: 'contrast', label: '对比度', min: 0, max: 2, step: 0.01 },
+      { key: 'saturation', label: '饱和度', min: 0, max: 2, step: 0.01 },
+      { key: 'gamma', label: '伽马', min: 0, max: 2, step: 0.01 },
+      { key: 'colorRed', label: '红色', min: 0, max: 255, step: 1 },
+      { key: 'colorGreen', label: '绿色', min: 0, max: 255, step: 1 },
+      { key: 'colorBlue', label: '蓝色', min: 0, max: 255, step: 1 },
+    ],
+  },
+  {
+    title: '风格化',
+    items: [
+      { key: 'oldFilm', label: '老电影', boolean: true },
+      { key: 'dotFilm', label: '点阵', boolean: true },
+      { key: 'reflectionFilm', label: '反射', boolean: true },
+      { key: 'glitchFilm', label: '故障', boolean: true },
+      { key: 'rgbFilm', label: 'RGB 分离', boolean: true },
+      { key: 'godrayFilm', label: '体积光', boolean: true },
+    ],
+  },
+  {
+    title: '光照',
+    items: [
+      { key: 'bevel', label: '强度', min: 0, max: 1, step: 0.01 },
+      { key: 'bevelThickness', label: '厚度', min: 0, max: 32, step: 0.1 },
+      { key: 'bevelRotation', label: '角度', min: 0, max: 360, step: 1 },
+      { key: 'bevelSoftness', label: '柔度', min: 0, max: 1, step: 0.01 },
+      { key: 'bevelRed', label: '光红', min: 0, max: 255, step: 1 },
+      { key: 'bevelGreen', label: '光绿', min: 0, max: 255, step: 1 },
+      { key: 'bevelBlue', label: '光蓝', min: 0, max: 255, step: 1 },
+    ],
+  },
+  {
+    title: '辉光',
+    items: [
+      { key: 'bloom', label: '强度', min: 0, max: 2, step: 0.01 },
+      { key: 'bloomBrightness', label: '亮度', min: 0, max: 5, step: 0.01 },
+      { key: 'bloomBlur', label: '模糊', min: 0, max: 32, step: 0.1 },
+      { key: 'bloomThreshold', label: '阈值', min: 0, max: 1, step: 0.01 },
+    ],
+  },
+]
+
+/** 选中项变化时把容器当前值同步到 store（避免 UI 与画面不一致） */
+function syncFilterFromContainer() {
+  store.readFilterStateFromContainer(store.selectedId)
+}
+
+/** 写某个滤镜字段到 store（store 内部会自动同步到 L2dwContainer） */
+function onFilterInput(key: keyof FilterState, value: number) {
+  store.setFilterState(store.selectedId, { [key]: value } as Partial<FilterState>)
+}
+
+/** 切换布尔型滤镜（0/1） */
+function onFilterToggle(key: keyof FilterState, checked: boolean) {
+  store.setFilterState(store.selectedId, { [key]: checked ? 1 : 0 } as Partial<FilterState>)
+}
+
+function resetFilters() {
+  store.resetFilterState(store.selectedId)
+}
 
 // 拖拽调参步幅
 const DRAG_STEP_X = 1        // X 轴每 px 增减量
@@ -264,6 +359,7 @@ watch(() => store.selectedId, async (newId, oldId) => {
     expressions.value = []
     await nextTick()
     syncTransformFromModel()
+    syncFilterFromContainer()
     return
   }
 
@@ -271,6 +367,7 @@ watch(() => store.selectedId, async (newId, oldId) => {
     motions.value = []
     expressions.value = []
     syncTransformFromModel()
+    syncFilterFromContainer()
     return
   }
 
@@ -293,6 +390,7 @@ watch(() => store.selectedId, async (newId, oldId) => {
       activeTab.value = 'figureInfo'
     }
     syncTransformFromModel()
+    syncFilterFromContainer()
     return
   }
 
@@ -305,6 +403,7 @@ watch(() => store.selectedId, async (newId, oldId) => {
   motions.value = extractMotions(model)
   expressions.value = extractExpressions(model)
   syncTransformFromModel()
+  syncFilterFromContainer()
 }, { immediate: true })
 
 // 表单输入更新模型
@@ -788,6 +887,61 @@ function onLabelDragEnd() {
           @input="onTransformInput"
         />
       </div>
+
+      <!-- 滤镜（可折叠） -->
+      <div class="panel__filter-region" :class="{ 'is-collapsed': filterCollapsed }">
+        <div class="list-region-header">
+          <span class="list-region-title">滤镜</span>
+          <button
+            type="button"
+            class="list-region-toggle"
+            :aria-expanded="!filterCollapsed"
+            :aria-label="filterCollapsed ? '展开滤镜' : '折叠滤镜'"
+            @click="filterCollapsed = !filterCollapsed"
+          >
+            <span aria-hidden="true">{{ filterCollapsed ? '▸' : '▾' }}</span>
+          </button>
+        </div>
+        <div v-show="!filterCollapsed" class="panel__filter-body">
+          <div v-for="group in FILTER_GROUPS" :key="group.title" class="filter-group">
+            <div class="filter-group-title">{{ group.title }}</div>
+            <div
+              v-for="item in group.items"
+              :key="item.key"
+              class="form-row"
+              :class="{ 'form-row--check': item.boolean }"
+            >
+              <template v-if="item.boolean">
+                <label class="form-row__check-label">
+                  <input
+                    type="checkbox"
+                    class="form-row__check"
+                    :checked="filterState[item.key] === 1"
+                    @change="(e: any) => onFilterToggle(item.key, e.target.checked)"
+                  />
+                  <span>{{ item.label }}</span>
+                </label>
+              </template>
+              <template v-else>
+                <label>{{ item.label }}</label>
+                <input
+                  :value="filterState[item.key]"
+                  type="number"
+                  class="form-input"
+                  :step="item.step ?? 'any'"
+                  :min="item.min"
+                  :max="item.max"
+                  @input="(e: any) => onFilterInput(item.key, Number(e.target.value))"
+                />
+              </template>
+            </div>
+          </div>
+          <div class="form-row form-row--btn">
+            <button class="reset-btn" @click="resetFilters">重置滤镜</button>
+          </div>
+        </div>
+      </div>
+
       <div class="form-row form-row--btn form-row--snapshot">
         <button class="snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>
         <button class="snapshot-btn" @click="onApplySnapshot">应用快照</button>
@@ -1334,5 +1488,66 @@ function onLabelDragEnd() {
   font-size: 13px;
   text-align: center;
   padding: 24px 0;
+}
+
+/* ───────── 滤镜 ───────── */
+
+.panel__filter-region {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #2c313a;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.panel__filter-region .list-region-header {
+  background: #232830;
+}
+
+.panel__filter-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group-title {
+  color: #8a93a3;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  padding: 2px 0;
+}
+
+.form-row--check label {
+  width: auto;
+  cursor: default;
+}
+
+.form-row--check label:hover {
+  background: transparent;
+}
+
+.form-row__check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #e6e6e6;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.form-row__check {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #2f80ed;
 }
 </style>

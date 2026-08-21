@@ -397,13 +397,64 @@ async function loadOne(id: string) {
   if (!entry) return
 
   try {
-    await loadWmdlModels(entry)
+    if (entry.kind === 'image') {
+      await loadImageFigure(entry)
+    } else {
+      await loadWmdlModels(entry)
+    }
 
     store.selectedId = id
   } catch (err) {
-    console.error('Failed to load model:', err)
+    console.error('Failed to load figure:', err)
     await store.remove(id)
   }
+}
+
+/**
+ * 加载图片立绘：PIXI.Sprite + FitInside（Math.min），
+ * 让 sprite 在 stageMain 坐标系下被等比缩放至长边刚好贴齐 STAGE 边界，
+ * 再交给外层 wrapper 接管用户主动的 x/y/scale/rotation/alpha。
+ */
+async function loadImageFigure(entry: NonNullable<ReturnType<typeof store.models.find>>) {
+  if (!app || !entry.imageUrl) return
+
+  // 同步 state 到 wrapper
+  const wrapper = new L2dwContainer()
+  wrapper.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  wrapper.x = entry.state.x ?? 0
+  wrapper.y = entry.state.y ?? 0
+  wrapper.scale.x = entry.state.scale?.x ?? 1
+  wrapper.scale.y = entry.state.scale?.y ?? 1
+  wrapper.rotation = ((entry.state.rotation ?? 0) * Math.PI) / 180
+  wrapper.alpha = entry.state.alpha ?? 1
+
+  figureContainer?.addChild(wrapper)
+  containersById.set(entry.id, wrapper)
+  previewRuntime.modelWrappers = containersById
+
+  // 加载图片纹理：复用 loadBackground 的 PIXI.Loader 模式（避免 baseTexture 竞态）
+  const texture = await new Promise<PIXI.Texture>((resolve, reject) => {
+    const loader = new PIXI.Loader()
+    loader.add('image', toFileUrl(entry.imageUrl!), {
+      loadType: LoaderResource.LOAD_TYPE.IMAGE,
+    })
+    loader.onError.add((_, __, err) => reject(err))
+    loader.load((_, resources) => {
+      if (resources.image?.texture) resolve(resources.image.texture)
+      else reject(resources.image?.error || new Error('Failed to load image'))
+    })
+  })
+
+  const sprite = new PIXI.Sprite(texture)
+  sprite.anchor.set(0.5)
+  // FitInside: 长边贴齐 stage 边界，整体不被裁剪
+  const imgW = texture.baseTexture.width
+  const imgH = texture.baseTexture.height
+  const scale = Math.min(STAGE_WIDTH / imgW, STAGE_HEIGHT / imgH)
+  sprite.width = imgW * scale
+  sprite.height = imgH * scale
+
+  wrapper.addChild(sprite)
 }
 
 async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.find>>) {
@@ -460,7 +511,10 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
 
 async function reloadOne(id: string) {
   const entry = store.models.find((m) => m.id === id)
-  if (!entry?.wmdlConfig?.wmdlFilePath) return
+  if (!entry) return
+  // 图片立绘没有 wmdl 可重载
+  if (entry.kind === 'image') return
+  if (!entry.wmdlConfig?.wmdlFilePath) return
 
   const ok = await store.reloadWmdlConfig(id)
   if (!ok) return
@@ -472,11 +526,15 @@ async function reloadOne(id: string) {
 }
 
 function removeOne(id: string) {
-  const wmdlInfo = previewRuntime.wmdlSubModels.get(id)
-  wmdlInfo?.subModelIds.forEach((subId: string) => {
-    live2dById.delete(subId)
-  })
-  previewRuntime.wmdlSubModels.delete(id)
+  const entry = store.models.find((m) => m.id === id)
+  // 图片立绘不走 wmdlSubModels
+  if (entry?.kind !== 'image') {
+    const wmdlInfo = previewRuntime.wmdlSubModels.get(id)
+    wmdlInfo?.subModelIds.forEach((subId: string) => {
+      live2dById.delete(subId)
+    })
+    previewRuntime.wmdlSubModels.delete(id)
+  }
 
   const wrapper = containersById.get(id)
   if (wrapper) {

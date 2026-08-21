@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { Live2DModel, MotionPriority } from 'pixi-live2d-display-webgal'
-import { PickLive2DModel, PickWmdlFile, ReadWmdlFile, SaveWmdlFile, GetFileModifyTime } from '../../wailsjs/go/main/App'
+import { PickLive2DModel, PickWmdlFile, ReadWmdlFile, SaveWmdlFile, GetFileModifyTime, PickImageFile } from '../../wailsjs/go/main/App'
 import { pathDirname, pathRelative } from '../path_utils'
 import { parseWmdlJson } from '../utils/wmdlUtils'
 import { deriveNameFromPath } from '../utils/wmdlUtils'
@@ -10,6 +10,8 @@ import {
   DEFAULT_STAGE_TRANSFORM_TEMPLATE,
   DEFAULT_FIGURE_TEMPLATE,
   DEFAULT_TRANSFORM_TEMPLATE,
+  DEFAULT_IMAGE_FIGURE_TEMPLATE,
+  DEFAULT_IMAGE_TRANSFORM_TEMPLATE,
 } from '../utils/consts'
 import { SpecialId, isSpecialId } from '../live2d/specialIds'
 import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
@@ -62,11 +64,19 @@ export interface ModelEntry {
   id: string
   name: string
   /**
+   * 'live2d'：.model.json / .model3.json（wmdl 子模型列表）
+   * 'image'：单张图片（PIXI.Sprite，FitInside）
+   * 缺省视为 'live2d'，老数据兼容。
+   */
+  kind: 'live2d' | 'image'
+  /**
    * 模型描述 json 的**绝对路径**。
    * Wails 的 `PickLive2DModel` 返回的就是 OS 给出的绝对路径，
    * 直接拿去做 `/abs_files/<encoded>` 的资源访问。
    */
   jsonPath: string
+  /** 仅 kind==='image' 时使用：图片绝对路径 */
+  imageUrl?: string
   visible: boolean
   playing: PlayingState
   /** 变换状态（x, y, scale, rotation） */
@@ -95,6 +105,9 @@ export const useModelStore = defineStore('models', {
     transformSnapshots: [] as TransformSnapshot[],
     /** 模态打开时缓存的原始变换（关闭时用于恢复） */
     cachedTransformBeforeModal: null as TransformState | null,
+    /** 图片立绘全局模板：所有 kind==='image' 共用 */
+    imageFigureTemplate: DEFAULT_IMAGE_FIGURE_TEMPLATE,
+    imageTransformTemplate: DEFAULT_IMAGE_TRANSFORM_TEMPLATE,
   }),
   getters: {
     selectedModel(state): ModelEntry | null {
@@ -152,6 +165,7 @@ export const useModelStore = defineStore('models', {
       }
 
       if (entry) {
+        entry.kind = 'live2d'
         this.models.push(entry)
       }
       return entry
@@ -162,8 +176,32 @@ export const useModelStore = defineStore('models', {
 
       const entry = await this._loadWmdlFromFile(filePath)
       if (entry) {
+        entry.kind = 'live2d'
         this.models.push(entry)
       }
+      return entry
+    },
+    /** 新增"加载图片"类型：以图片作为立绘（FitInside） */
+    async addImageFigure(): Promise<ModelEntry | null> {
+      const imagePath = await PickImageFile()
+      if (!imagePath) return null
+
+      // 去掉扩展名（.png / .jpg / .jpeg / .webp）
+      const name = deriveNameFromPath(imagePath).replace(/\.[^.]+$/, '')
+
+      const entry: ModelEntry = {
+        id: crypto.randomUUID(),
+        kind: 'image',
+        name,
+        jsonPath: '',
+        imageUrl: imagePath,
+        visible: true,
+        playing: { motion: null, expression: null },
+        state: { ...DEFAULT_TRANSFORM_STATE },
+        wmdlModels: [],
+        isMoc3: false,
+      }
+      this.models.push(entry)
       return entry
     },
     async _loadWmdlFromFile(filePath: string): Promise<ModelEntry | null> {
@@ -173,6 +211,7 @@ export const useModelStore = defineStore('models', {
       const mainModel = config.models[0]
       return {
         id: crypto.randomUUID(),
+        kind: 'live2d',
         name: config.name || mainModel?.name || 'Wmdl Model',
         jsonPath: mainModel?.jsonAbsPath || '',
         visible: true,
@@ -259,6 +298,12 @@ export const useModelStore = defineStore('models', {
     setStageTransformTemplate(template: string): void {
       this.stageTransformTemplate = template
     },
+    setImageFigureTemplate(template: string): void {
+      this.imageFigureTemplate = template
+    },
+    setImageTransformTemplate(template: string): void {
+      this.imageTransformTemplate = template
+    },
     /** 编辑器保存 figure/transform template 到当前选中 wmdl entry */
     setModelWmdlConfig(entryId: string, patch: Partial<Pick<WmdlConfig, 'figureTemplate' | 'transformTemplate'>>): void {
       const entry = this.models.find((m) => m.id === entryId)
@@ -267,6 +312,9 @@ export const useModelStore = defineStore('models', {
       if (patch.transformTemplate !== undefined) entry.wmdlConfig.transformTemplate = patch.transformTemplate
     },
     async playMotion(modelId: string, group: string, index: number, name: string) {
+      const entry = this.models.find((m) => m.id === modelId)
+      if (entry?.kind === 'image') return
+
       const wmdlInfo = previewRuntime.wmdlSubModels.get(modelId)
       for (const subId of wmdlInfo?.subModelIds ?? []) {
         const model = previewRuntime.live2dModels.get(subId)
@@ -279,6 +327,9 @@ export const useModelStore = defineStore('models', {
     },
 
     async playExpression(modelId: string, index: number, name: string) {
+      const entry = this.models.find((m) => m.id === modelId)
+      if (entry?.kind === 'image') return
+
       const wmdlInfo = previewRuntime.wmdlSubModels.get(modelId)
       for (const subId of wmdlInfo?.subModelIds ?? []) {
         const model = previewRuntime.live2dModels.get(subId)
@@ -292,9 +343,9 @@ export const useModelStore = defineStore('models', {
     },
 
     clearModel(modelId: string) {
-      const model = this.models.find((m) => m.id === modelId)
-      if (model) {
-        model.playing = { motion: null, expression: null }
+      const entry = this.models.find((m) => m.id === modelId)
+      if (entry) {
+        entry.playing = { motion: null, expression: null }
       }
     },
 

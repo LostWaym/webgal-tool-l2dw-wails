@@ -12,6 +12,10 @@ async function onAdd() {
   await store.add()
 }
 
+async function onAddImage() {
+  await store.addImageFigure()
+}
+
 async function onLoadWmdl() {
   await store.loadWmdl()
 }
@@ -66,6 +70,7 @@ function onDragEnd() {
   <aside class="model-list">
     <header class="model-list__header">
       <button class="add-btn" @click="onAdd">加载模型</button>
+      <button class="add-btn" @click="onAddImage">加载图片</button>
       <button class="add-btn" @click="onLoadWmdl">加载 Wmdl</button>
     </header>
 
@@ -102,7 +107,8 @@ function onDragEnd() {
         >
           <img :src="m.visible ? eyeIcon : eyeOffIcon" :alt="m.visible ? '眼睛' : '闭眼'" />
         </button>
-        <span class="model-row__name" :title="m.jsonPath">{{ m.name }}</span>
+        <span v-if="m.kind === 'image'" class="model-row__kind-badge" title="图片立绘">图</span>
+        <span class="model-row__name" :title="m.jsonPath || m.imageUrl">{{ m.name }}</span>
         <button
           class="model-row__close"
           aria-label="移除"
@@ -216,6 +222,21 @@ function onDragEnd() {
 .model-row__visibility img {
   width: 16px;
   height: 16px;
+}
+
+.model-row__kind-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  background: #5a8f3b;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .model-row__close {

@@ -65,12 +65,17 @@ watch(() => store.selectedId, (newId) => {
   } else if (newId === SpecialId.StageMain) {
     visibleTabs.value = [TAB_CONFIGS.stageInfo, TAB_CONFIGS.transform]
   } else {
-    // 普通模型（立绘）
-    visibleTabs.value = [
-      TAB_CONFIGS.motionExpression,
-      TAB_CONFIGS.transform,
-      TAB_CONFIGS.figureInfo,
-    ]
+    const entry = store.models.find((m) => m.id === newId)
+    if (entry?.kind === 'image') {
+      // 图片立绘：无 motion/expr，仅 figureInfo + transform
+      visibleTabs.value = [TAB_CONFIGS.figureInfo, TAB_CONFIGS.transform]
+    } else {
+      visibleTabs.value = [
+        TAB_CONFIGS.motionExpression,
+        TAB_CONFIGS.transform,
+        TAB_CONFIGS.figureInfo,
+      ]
+    }
   }
 }, { immediate: true })
 
@@ -206,20 +211,44 @@ function extractExpressions(model: Live2DModel): ExpressionInfo[] {
   return result
 }
 
-// 立绘模板（来自当前选中模型的 wmdlConfig）
-const figureTemplateInput = ref('')
-const figureTransformTemplateInput = ref('')
+// 立绘模板（live2d 走 wmdlConfig，image 走 store 全局模板）
+const figureTemplateInput = computed({
+  get: () => {
+    const entry = store.selectedModel
+    if (entry?.kind === 'image') return store.imageFigureTemplate
+    return entry?.wmdlConfig?.figureTemplate ?? ''
+  },
+  set: (v: string) => {
+    const entry = store.selectedModel
+    if (!entry) return
+    if (entry.kind === 'image') {
+      store.setImageFigureTemplate(v)
+    } else if (entry.wmdlConfig) {
+      store.setModelWmdlConfig(entry.id, { figureTemplate: v })
+    }
+  },
+})
 
-function syncFigureTemplatesFromEntry() {
-  const entry = store.selectedModel
-  figureTemplateInput.value = entry?.wmdlConfig?.figureTemplate ?? ''
-  figureTransformTemplateInput.value = entry?.wmdlConfig?.transformTemplate ?? ''
-}
+const figureTransformTemplateInput = computed({
+  get: () => {
+    const entry = store.selectedModel
+    if (entry?.kind === 'image') return store.imageTransformTemplate
+    return entry?.wmdlConfig?.transformTemplate ?? ''
+  },
+  set: (v: string) => {
+    const entry = store.selectedModel
+    if (!entry) return
+    if (entry.kind === 'image') {
+      store.setImageTransformTemplate(v)
+    } else if (entry.wmdlConfig) {
+      store.setModelWmdlConfig(entry.id, { transformTemplate: v })
+    }
+  },
+})
 
 // 监听模型选择变化
 watch(() => store.selectedId, async (newId, oldId) => {
   console.log('selectedId changed:', newId, oldId)
-  syncFigureTemplatesFromEntry()
 
   // 占位项：通用页签（transform）保留，否则切到默认页签
   if (isSpecialId(newId)) {
@@ -252,6 +281,19 @@ watch(() => store.selectedId, async (newId, oldId) => {
   const cameFromSpecial = isSpecialId(oldId)
   if (activeTab.value !== 'transform' && (cameFromSpecial || activeTab.value === 'bgInfo' || activeTab.value === 'stageInfo')) {
     activeTab.value = 'motionExpression'
+  }
+
+  // 图片立绘没有 motion/expr，跳过提取并回退到 figureInfo 页签
+  const selectedEntry = store.selectedModel
+  if (selectedEntry?.kind === 'image') {
+    motions.value = []
+    expressions.value = []
+    // 当前可能停留在 motionExpression 上，visibleTabs 不含该 tab → 强制回退
+    if (activeTab.value !== 'transform' && activeTab.value !== 'figureInfo') {
+      activeTab.value = 'figureInfo'
+    }
+    syncTransformFromModel()
+    return
   }
 
   const model = getLive2DModel()
@@ -835,7 +877,7 @@ function onLabelDragEnd() {
           rows="3"
           @change="commitFigureTemplates"
         />
-        <div class="info-row">
+        <div v-if="store.selectedModel?.kind !== 'image'" class="info-row">
           <button class="reset-btn reset-btn--small" @click="onReloadModel">重载模型配置</button>
           <button class="reset-btn reset-btn--small" @click="onReloadTextures">重载纹理</button>
         </div>

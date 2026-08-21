@@ -42,6 +42,24 @@ const handler = {
     const store = useModelStore()
     const entry = store.selectedModel
     if (!entry) return null
+
+    // 图片立绘：用全局图片模板
+    if (entry.kind === 'image') {
+      if (!entry.imageUrl) {
+        useMessage().error('图片路径为空!!')
+        return null
+      }
+      const imgPath = getResourceRelativePath(entry.imageUrl, 'figure')
+      const template = store.imageFigureTemplate
+      const line = template.replace('%img_path%', imgPath).replace('%img_name%', entry.name)
+      const inst = parseInst(line)
+
+      console.log('[Shortcut] imageFigure:', { entry, imgPath, inst })
+      console.log('[Shortcut] imageFigure:', inst.toInstString())
+      useMessage().success('复制图片立绘指令成功!!')
+      return inst
+    }
+
     const name = entry.name
     const motion = entry.playing?.motion?.name ?? null
     const expression = entry.playing?.expression?.name ?? null
@@ -78,6 +96,30 @@ const handler = {
     const store = useModelStore()
     const entry = store.selectedModel
     if (!entry) return null
+
+    // 图片立绘：用 wrapper 变换 + imageTransformTemplate
+    if (entry.kind === 'image') {
+      const wrapper = previewRuntime.modelWrappers.get(entry.id)
+      const x = wrapper?.x ?? 0
+      const y = wrapper?.y ?? 0
+      const scaleX = wrapper?.scale?.x ?? 1
+      const scaleY = wrapper?.scale?.y ?? 1
+      const rotation = wrapper?.rotation ?? 0
+
+      const template = store.imageTransformTemplate
+      const transformData = { position: { x, y }, scale: { x: scaleX, y: scaleY }, rotation }
+      const line = template
+        .replace('%me%', JSON.stringify(transformData))
+        .replace('%img_name%', entry.name)
+
+      const inst = parseInst(line)
+
+      console.log('[Shortcut] imageTransform:', { entry, transform: { x, y, scaleX, scaleY, rotation }, inst })
+      console.log('[Shortcut] imageTransform:', inst.toInstString())
+      useMessage().success('复制图片变换指令成功!!')
+      return inst
+    }
+
     const wrapper = previewRuntime.modelWrappers.get(entry.id)
     const x = wrapper?.x ?? 0
     const y = wrapper?.y ?? 0

@@ -40,7 +40,6 @@ export interface TransformState {
   y: number
   scale: { x: number; y: number }
   rotation: number
-  alpha: number
 }
 
 export const DEFAULT_TRANSFORM_STATE: TransformState = {
@@ -48,7 +47,6 @@ export const DEFAULT_TRANSFORM_STATE: TransformState = {
   y: 0,
   scale: { x: 1, y: 1 },
   rotation: 0,
-  alpha: 1,
 }
 
 /** 变换快照：仅缓存 x/y/scale/rotation */
@@ -604,10 +602,6 @@ function syncTransformToPixi(id: string, state: TransformState): void {
   container.scale.x = state.scale.x
   container.scale.y = state.scale.y
   container.rotation = (state.rotation * Math.PI) / 180
-  // alpha 仅 L2dwContainer 支持，特殊容器跳过
-  if (!isSpecialId(id)) {
-    ;(container as L2dwContainer).alpha = state.alpha
-  }
 }
 
 /** 取 id 对应的容器：模型从 modelWrappers，特殊容器从 specialContainers。 */

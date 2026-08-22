@@ -50,7 +50,7 @@ function pickNonDefaultFilters(state: FilterState): Partial<FilterState> {
     const dv = DEFAULT_FILTER_PROPERTY_VALUES[key]
     if (v !== dv) (out as any)[key] = v
   }
-  if (state.l2dwAlphaFilter !== 1) out.l2dwAlphaFilter = state.l2dwAlphaFilter
+  if (state.l2dwAlphaFilter !== 1) (out as Record<string, number>)['alpha'] = state.l2dwAlphaFilter
   return out
 }
 

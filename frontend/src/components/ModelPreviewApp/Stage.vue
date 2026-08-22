@@ -426,7 +426,6 @@ async function loadImageFigure(entry: NonNullable<ReturnType<typeof store.models
   wrapper.scale.x = entry.state.scale?.x ?? 1
   wrapper.scale.y = entry.state.scale?.y ?? 1
   wrapper.rotation = ((entry.state.rotation ?? 0) * Math.PI) / 180
-  wrapper.alpha = entry.state.alpha ?? 1
 
   figureContainer?.addChild(wrapper)
   containersById.set(entry.id, wrapper)
@@ -475,7 +474,6 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
     mainWrapper.scale.x = entry.state.scale?.x ?? 1
     mainWrapper.scale.y = entry.state.scale?.y ?? 1
     mainWrapper.rotation = ((entry.state.rotation ?? 0) * Math.PI) / 180
-    mainWrapper.alpha = entry.state.alpha ?? 1
   }
 
   const subModelIds: string[] = []

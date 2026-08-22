@@ -204,14 +204,9 @@ const DRAG_STEP_X = 1        // X 轴每 px 增减量
 const DRAG_STEP_Y = -1       // Y 轴每 px 增减量（向上拖增大）
 const DRAG_STEP_SCALE = 0.001 // 缩放每 px 增减量
 const DRAG_STEP_ROTATION = 0.2 // 旋转每 px 增减角度
-const DRAG_STEP_ALPHA = 0.005  // 透明度每 px 增减量
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(Math.min(value, max), min)
-}
-
-function clamp01(value: number): number {
-  return clamp(value, 0, 1)
 }
 
 // 从模型同步变换数据到 store
@@ -228,7 +223,6 @@ function syncTransformFromModel() {
       y: Math.round(container.scale.y * 100) / 100,
     },
     rotation: Math.round(container.rotation * 180 / Math.PI),
-    alpha: Math.round(container.alpha * 100) / 100,
   }
   store.setTransformState(store.selectedId, state)
 }
@@ -414,14 +408,11 @@ function onTransformInput() {
   if (!container) return
   _updatingTransform = true
 
-  transformState.value.alpha = clamp01(transformState.value.alpha)
-
   container.x = transformState.value.x
   container.y = transformState.value.y
   container.scale.x = transformState.value.scale.x
   container.scale.y = transformState.value.scale.y
   container.rotation = transformState.value.rotation * Math.PI / 180
-  container.alpha = transformState.value.alpha
   setTimeout(() => { _updatingTransform = false }, 50)
 }
 
@@ -436,7 +427,6 @@ function resetTransform() {
   container.scale.x = 1
   container.scale.y = 1
   container.rotation = 0
-  container.alpha = 1
   syncTransformFromModel()
   setTimeout(() => { _updatingTransform = false }, 50)
 }
@@ -632,11 +622,11 @@ function onDragEnd() {
 }
 
 // 标签拖拽调参
-let _dragAxis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | 'alpha' | null = null
+let _dragAxis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | null = null
 let _dragStartX = 0
 let _dragStartValue = 0
 
-function onLabelDragStart(axis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | 'alpha', e: MouseEvent) {
+function onLabelDragStart(axis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation', e: MouseEvent) {
   e.preventDefault()
   e.stopPropagation()
   _dragAxis = axis
@@ -645,8 +635,7 @@ function onLabelDragStart(axis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | '
                 : axis === 'y' ? transformState.value.y
                 : axis === 'scaleX' ? transformState.value.scale.x
                 : axis === 'scaleY' ? transformState.value.scale.y
-                : axis === 'rotation' ? transformState.value.rotation
-                : transformState.value.alpha
+                : transformState.value.rotation
   document.addEventListener('mousemove', onLabelDragMove)
   document.addEventListener('mouseup', onLabelDragEnd)
   document.body.style.cursor = 'ew-resize'
@@ -662,8 +651,7 @@ function onLabelDragMove(e: MouseEvent) {
   const step = _dragAxis === 'x' ? DRAG_STEP_X
              : _dragAxis === 'y' ? DRAG_STEP_Y
              : (_dragAxis === 'scaleX' || _dragAxis === 'scaleY') ? DRAG_STEP_SCALE
-             : _dragAxis === 'rotation' ? DRAG_STEP_ROTATION
-             : DRAG_STEP_ALPHA
+             : DRAG_STEP_ROTATION
   const newVal = Math.round((_dragStartValue + delta * step) * 1000) / 1000
 
   const newState: TransformState = {
@@ -686,9 +674,6 @@ function onLabelDragMove(e: MouseEvent) {
   } else if (_dragAxis === 'rotation') {
     container.rotation = newVal * Math.PI / 180
     newState.rotation = newVal
-  } else if (_dragAxis === 'alpha') {
-    container.alpha = newVal
-    newState.alpha = newVal
   }
 
   store.setTransformState(store.selectedId, newState)
@@ -888,20 +873,6 @@ function onLabelDragEnd() {
                   type="number"
                   class="form-input"
                   step="1"
-                  @input="onTransformInput"
-                />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
-                <label @mousedown="(e) => onLabelDragStart('alpha', e)">透明度</label>
-                <input
-                  v-model.number="transformState.alpha"
-                  type="number"
-                  class="form-input"
-                  step="0.01"
-                  min="0"
-                  max="1"
                   @input="onTransformInput"
                 />
               </div>

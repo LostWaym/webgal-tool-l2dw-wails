@@ -58,7 +58,7 @@ l2dw-wails/
         ├── assets/              # 静态资源（图标 eye.png、默认背景 default.jpg 等）
         ├── live2d/              # Live2D 加载与适配层
         │   ├── coreAdapter.ts   # 统一 Cubism 2 / Cubism 4 适配（part / motion / expression / param 增删查改）
-        │   ├── L2dwContainer.ts # 自定义 PIXI 容器（含 alpha）
+        │   ├── L2dwContainer.ts # 自定义 PIXI 容器（含 alpha，滤镜相关内容）
         │   ├── loader.ts        # 模型加载入口
         │   ├── specialIds.ts    # 主场景 / 背景容器的特殊 ID 常量
         │   └── textureUtils.ts  # 贴图工具
@@ -123,6 +123,8 @@ l2dw-wails/
 - 舞台vue = Stage.vue
 - 主要组件路径 = "frontend/src/components/ModelPreviewApp"
 - 相关PiniaStore = "frontend/src/stores/previewStore.ts"（注册名 `models`，通过 `useModelStore()` 获取）
+- 相关术语：
+  - grs（Stage.vue对立绘的快捷键操作）
 
 ### 改模编辑器相关
 

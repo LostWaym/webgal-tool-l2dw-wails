@@ -1,10 +1,11 @@
 import { computed } from 'vue'
-import { useModelStore } from '../stores/previewStore'
+import { useModelStore, type FilterState } from '../stores/previewStore'
 import { SpecialId, isSpecialId } from '../live2d/specialIds'
 import { parseInst, createEmptyInst, Inst } from '../utils/inst_utils'
 import { SetClipboardText } from '../../wailsjs/go/main/App'
 import { useMessage } from './useMessage'
 import { previewRuntime } from '../utils/runtimeRegistry'
+import { FILTER_PROPERTY_KEYS, DEFAULT_FILTER_PROPERTY_VALUES } from '../live2d/L2dwContainer'
 
 /** 快捷键适用的目标类型；与 useShortcuts 内的 store.selectedId 判定保持一致 */
 export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'none'
@@ -34,6 +35,38 @@ export function resolveShortcutTargetType(selectedId: string | null): ShortcutTa
     return selectedId === SpecialId.BgContainer ? 'background' : 'stage'
   }
   return 'model'
+}
+
+/**
+ * 把当前滤镜状态与默认值对比，过滤出"非默认"的字段。
+ *  - 默认值：来自 L2dwContainer.DEFAULT_FILTER_PROPERTY_VALUES + l2dwAlphaFilter=1
+ *  - 默认快照与 DEFAULT_FILTER_STATE 完全一致，沿用现成常量，避免在 useShortcuts 里再硬编码一遍
+ */
+function pickNonDefaultFilters(state: FilterState): Partial<FilterState> {
+  const out: Partial<FilterState> = {}
+  const sAny = state as any
+  for (const key of FILTER_PROPERTY_KEYS) {
+    const v = sAny[key]
+    const dv = DEFAULT_FILTER_PROPERTY_VALUES[key]
+    if (v !== dv) (out as any)[key] = v
+  }
+  if (state.l2dwAlphaFilter !== 1) out.l2dwAlphaFilter = state.l2dwAlphaFilter
+  return out
+}
+
+/**
+ * 组装 setTransform 的 transformData JSON：position/scale/rotation + 非默认滤镜（扁平）
+ */
+function buildTransformData(
+  x: number, y: number, scaleX: number, scaleY: number, rotation: number,
+  filters?: Partial<FilterState>,
+) {
+  return {
+    position: { x, y },
+    scale: { x: scaleX, y: scaleY },
+    rotation,
+    ...(filters ?? {}),
+  }
 }
 
 // 快捷键处理（外层独立，方便管理）
@@ -106,15 +139,17 @@ const handler = {
       const scaleY = wrapper?.scale?.y ?? 1
       const rotation = wrapper?.rotation ?? 0
 
+      const filters = pickNonDefaultFilters(store.getFilterState(entry.id))
+
       const template = store.imageTransformTemplate
-      const transformData = { position: { x, y }, scale: { x: scaleX, y: scaleY }, rotation }
+      const transformData = buildTransformData(x, y, scaleX, scaleY, rotation, filters)
       const line = template
         .replace('%me%', JSON.stringify(transformData))
         .replace('%img_name%', entry.name)
 
       const inst = parseInst(line)
 
-      console.log('[Shortcut] imageTransform:', { entry, transform: { x, y, scaleX, scaleY, rotation }, inst })
+      console.log('[Shortcut] imageTransform:', { entry, transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
       console.log('[Shortcut] imageTransform:', inst.toInstString())
       useMessage().success('复制图片变换指令成功!!')
       return inst
@@ -127,16 +162,17 @@ const handler = {
     const scaleY = wrapper?.scale?.y ?? 1
     const rotation = wrapper?.rotation ?? 0
     const name = entry.name
+    const filters = pickNonDefaultFilters(store.getFilterState(entry.id))
 
     const template = entry.wmdlConfig?.transformTemplate || "setTransform:%me% -target=%name% -writeDefault;";
 
-    const transformData = { position: { x: x, y: y }, scale: { x: scaleX, y: scaleY }, rotation } // to %me%
+    const transformData = buildTransformData(x, y, scaleX, scaleY, rotation, filters) // to %me%
 
     const line = template.replace('%me%', JSON.stringify(transformData)).replace('%name%', name)
 
     const inst = parseInst(line)
 
-    console.log('[Shortcut] modelTransform:', { entry, transform: { x, y, scaleX, scaleY, rotation }, inst })
+    console.log('[Shortcut] modelTransform:', { entry, transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
     console.log('[Shortcut] modelTransform:', inst.toInstString())
     useMessage().success(`复制立绘变换指令成功!!`)
     return inst
@@ -217,14 +253,16 @@ const handler = {
     const scaleY = container?.scale?.y ?? 1
     const rotation = container?.rotation ?? 0
 
+    const filters = pickNonDefaultFilters(store.getFilterState(SpecialId.BgContainer))
+
     const template = store.bgTransformTemplate
 
-    const transformData = { position: { x: x, y: y }, scale: { x: scaleX, y: scaleY }, rotation } // to %me%
+    const transformData = buildTransformData(x, y, scaleX, scaleY, rotation, filters) // to %me%
     const line = template.replace('%me%', JSON.stringify(transformData))
 
     const inst = parseInst(line)
 
-    console.log('[Shortcut] bgTransform:', { transform: { x, y, scaleX, scaleY, rotation }, inst })
+    console.log('[Shortcut] bgTransform:', { transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
     console.log('[Shortcut] bgTransform:', inst.toInstString())
     useMessage().success(`复制背景变换指令成功!!`)
     return inst
@@ -239,14 +277,16 @@ const handler = {
     const scaleY = container?.scale?.y ?? 1
     const rotation = container?.rotation ?? 0
 
+    const filters = pickNonDefaultFilters(store.getFilterState(SpecialId.StageMain))
+
     const template = store.stageTransformTemplate
 
-    const transformData = { position: { x: x, y: y }, scale: { x: scaleX, y: scaleY }, rotation } // to %me%
+    const transformData = buildTransformData(x, y, scaleX, scaleY, rotation, filters) // to %me%
     const line = template.replace('%me%', JSON.stringify(transformData))
 
     const inst = parseInst(line)
 
-    console.log('[Shortcut] stageTransform:', { transform: { x, y, scaleX, scaleY, rotation }, inst })
+    console.log('[Shortcut] stageTransform:', { transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
     console.log('[Shortcut] stageTransform:', inst.toInstString())
     useMessage().success(`复制主场景变换指令成功!!`)
     return inst

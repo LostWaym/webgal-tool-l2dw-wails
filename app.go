@@ -546,3 +546,25 @@ func (a *App) ReadPresetFile(filename string) (string, error) {
 func (a *App) SetClipboardText(text string) error {
 	return runtime.ClipboardSetText(a.ctx, text)
 }
+
+// ReadTextFile reads the raw text content of an arbitrary file at the given
+// absolute path. Intended as a generic IO helper used by the editor to read
+// motion (.mtn) / expression (.exp.json) files; no business logic is applied
+// on the Go side. Path is not anchored to any sandbox; callers must pass an
+// absolute path returned from a picker / scan.
+func (a *App) ReadTextFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// WriteTextFile writes the given text content to an arbitrary file at the
+// given absolute path. Intended as a generic IO helper used by the editor to
+// write back modified motion / expression files; no business logic is applied
+// on the Go side. Path is not anchored to any sandbox; callers must pass an
+// absolute path returned from a picker / scan.
+func (a *App) WriteTextFile(path string, content string) error {
+	return os.WriteFile(path, []byte(content), 0644)
+}

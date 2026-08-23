@@ -5,6 +5,7 @@ import EditStage from './EditStage.vue'
 import EditActionPanel from './EditActionPanel.vue'
 import ResizeHandle from './ResizeHandle.vue'
 import EditBatchAddModal from './Modal/EditBatchAddModal.vue'
+import EditBatchModifyModal from './Modal/EditBatchModifyModal.vue'
 import MessageHost from '../common/MessageHost.vue'
 
 /**
@@ -53,6 +54,9 @@ function onRightDrag(dx: number) {
 
     <!-- 批量添加动作/表情 全屏模态 -->
     <EditBatchAddModal />
+
+    <!-- 批量修改动作/表情 全屏模态 -->
+    <EditBatchModifyModal />
 
     <!-- 全局气泡提示 -->
     <MessageHost />

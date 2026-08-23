@@ -24,17 +24,19 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'batch-add'): void
+  (e: 'batch-modify'): void
 }>()
 
 const store = useWmdlModelEditorStore()
 
-const labels: Record<Kind, { single: string; clearAll: string; clearConfirm: string; syncAll: string; syncConfirm: string }> = {
+const labels: Record<Kind, { single: string; clearAll: string; clearConfirm: string; syncAll: string; syncConfirm: string; batchModify: string }> = {
   motion: {
     single: '添加动作',
     clearAll: '删除全部动作',
     clearConfirm: '确定要删除全部动作吗？',
     syncAll: '同步所有模型',
     syncConfirm: '是否要将本模型的动作同步到其他所有模型？',
+    batchModify: '批量修改动作',
   },
   expression: {
     single: '添加表情',
@@ -42,6 +44,7 @@ const labels: Record<Kind, { single: string; clearAll: string; clearConfirm: str
     clearConfirm: '确定要删除全部表情吗？',
     syncAll: '同步所有模型',
     syncConfirm: '是否要将本模型的表情同步到其他所有模型？',
+    batchModify: '批量修改表情',
   },
 }
 
@@ -76,6 +79,10 @@ async function onAddSingle() {
 
 function onBatchAdd() {
   emit('batch-add')
+}
+
+function onBatchModify() {
+  emit('batch-modify')
 }
 
 function onSyncAll() {
@@ -116,6 +123,13 @@ void pathDirname
       @click="onBatchAdd"
     >
       批量添加
+    </button>
+    <button
+      class="toolbar-btn toolbar-btn--modify"
+      :disabled="props.disabled"
+      @click="onBatchModify"
+    >
+      {{ labels[props.kind].batchModify }}
     </button>
     <button
       class="toolbar-btn toolbar-btn--sync"
@@ -177,6 +191,17 @@ void pathDirname
 .toolbar-btn--sync:hover:not(:disabled) {
   background: #258a52;
   border-color: #258a52;
+}
+
+.toolbar-btn--modify {
+  background: #b37800;
+  border-color: #b37800;
+  color: #fff;
+}
+
+.toolbar-btn--modify:hover:not(:disabled) {
+  background: #cc8a00;
+  border-color: #cc8a00;
 }
 
 .toolbar-btn--danger:hover:not(:disabled) {

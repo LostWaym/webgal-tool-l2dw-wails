@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import MotionsToolbar from './MotionsToolbar.vue'
 import { useBatchAddModal } from '../../composables/useBatchAddModal'
+import { useBatchModifyModal } from '../../composables/useBatchModifyModal'
 import { filterBySearch } from '../../utils/searchUtils'
 import SearchInput from '../common/SearchInput.vue'
 
@@ -19,6 +20,7 @@ import SearchInput from '../common/SearchInput.vue'
 
 const store = useWmdlModelEditorStore()
 const modal = useBatchAddModal()
+const modifyModal = useBatchModifyModal()
 
 const motions = computed(() => store.selectedModel?.motions ?? [])
 const hasSelection = computed(() => !!store.selectedModelId)
@@ -42,6 +44,10 @@ function onBatchAdd() {
   modal.open('motion')
 }
 
+function onBatchModify() {
+  modifyModal.open('motion')
+}
+
 function onRemove(item: { name: string; path: string }) {
   store.removeMotion(item.name, item.path)
 }
@@ -49,7 +55,7 @@ function onRemove(item: { name: string; path: string }) {
 
 <template>
   <div class="motions-tab">
-    <MotionsToolbar v-if="hasSelection" @batch-add="onBatchAdd" />
+    <MotionsToolbar v-if="hasSelection" @batch-add="onBatchAdd" @batch-modify="onBatchModify" />
     <div v-if="!hasSelection" class="empty-hint">
       请先在左侧选择要查看的模型
     </div>

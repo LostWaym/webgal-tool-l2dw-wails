@@ -21,6 +21,7 @@ import { reloadAllModelTextures } from '../../live2d/textureUtils'
 import { useMessage } from '../../composables/useMessage'
 import { useDraggableScroll } from '../../composables/useDraggableScroll'
 import SearchInput from '../common/SearchInput.vue'
+import FocusPicker from '../common/FocusPicker.vue'
 import settingsIcon from '../../assets/icons/settings.png'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
@@ -1058,6 +1059,15 @@ function onLabelDragEnd() {
         </div>
         <div v-show="!focusCollapsed" class="list-region-body">
           <ul class="panel__list" v-bind="focusScroll.scrollHandlers">
+            <li class="list-item list-item--row focus-picker-row">
+              <FocusPicker
+                :x="focusState.x"
+                :y="focusState.y"
+                :disabled="!focusState.enabled"
+                @update:x="(v: number) => onFocusInput('x', v)"
+                @update:y="(v: number) => onFocusInput('y', v)"
+              />
+            </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>X</label>
@@ -1771,6 +1781,10 @@ function onLabelDragEnd() {
 }
 
 /* ───────── 滤镜 ───────── */
+
+.focus-picker-row {
+  padding: 0;
+}
 
 .panel__filter-region .list-region-header {
   background: #232830;

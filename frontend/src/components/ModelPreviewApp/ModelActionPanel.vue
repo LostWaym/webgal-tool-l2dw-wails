@@ -953,8 +953,8 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn form-row--snapshot">
+                <button class="snapshot-btn" @click="onApplySnapshot">变换快照列表</button>
                 <button class="snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>
-                <button class="snapshot-btn" @click="onApplySnapshot">应用快照</button>
               </div>
             </li>
             <li class="list-item list-item--row">

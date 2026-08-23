@@ -60,11 +60,11 @@ func main() {
 	}
 
 	// 根据启动模式选择窗口标题、尺寸与窗口选项
-	title := "L2DW"
+	title := "L2DW-Wails - 预览编辑器"
 	width, height := 1280, 800
 	var winOpts *windows.Options
 	if editorFlag {
-		title = "L2DW - 模型编辑器"
+		title = "L2DW-Wails - 模型编辑器"
 		width, height = 1400, 900
 		winOpts = &windows.Options{
 			WebviewIsTransparent: false,

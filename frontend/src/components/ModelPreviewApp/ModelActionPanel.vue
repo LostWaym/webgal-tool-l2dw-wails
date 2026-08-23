@@ -591,6 +591,22 @@ async function playExpression(item: ExpressionInfo) {
   await store.playExpression(store.selectedId, item.index, item.name)
 }
 
+// 随机播放一个动作
+async function playRandomMotion() {
+  const list = filteredMotions.value
+  if (list.length === 0) return
+  const item = list[Math.floor(Math.random() * list.length)]
+  await playMotion(item)
+}
+
+// 随机播放一个表情
+async function playRandomExpression() {
+  const list = filteredExpressions.value
+  if (list.length === 0) return
+  const item = list[Math.floor(Math.random() * list.length)]
+  await playExpression(item)
+}
+
 // 拖拽宽度
 function onDragStart(e: MouseEvent) {
   e.preventDefault()
@@ -731,6 +747,14 @@ function onLabelDragEnd() {
           <span class="list-region-title">动作</span>
           <button
             type="button"
+            class="list-region-shuffle"
+            title="随机播放动作"
+            @click="playRandomMotion"
+          >
+            抽
+          </button>
+          <button
+            type="button"
             class="list-region-toggle"
             :aria-expanded="!motionCollapsed"
             :aria-label="motionCollapsed ? '展开动作' : '折叠动作'"
@@ -764,6 +788,14 @@ function onLabelDragEnd() {
       <div class="panel__list-region" :class="{ 'is-collapsed': expressionCollapsed }">
         <div class="list-region-header">
           <span class="list-region-title">表情</span>
+          <button
+            type="button"
+            class="list-region-shuffle"
+            title="随机播放表情"
+            @click="playRandomExpression"
+          >
+            抽
+          </button>
           <button
             type="button"
             class="list-region-toggle"
@@ -1227,6 +1259,23 @@ function onLabelDragEnd() {
 }
 
 .list-region-toggle:hover {
+  background: #2a3140;
+  color: #e6e6e6;
+}
+
+.list-region-shuffle {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid #3a4150;
+  border-radius: 4px;
+  color: #8a93a3;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+
+.list-region-shuffle:hover {
   background: #2a3140;
   color: #e6e6e6;
 }

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { Live2DModel, MotionPriority } from 'pixi-live2d-display-webgal'
+import { Live2DModel, MotionPriority, baseBlinkParam } from 'pixi-live2d-display-webgal'
 import { PickLive2DModel, PickWmdlFile, ReadWmdlFile, SaveWmdlFile, GetFileModifyTime, PickImageFile } from '../../wailsjs/go/main/App'
 import { pathDirname, pathRelative } from '../path_utils'
 import { parseWmdlJson } from '../utils/wmdlUtils'
@@ -98,6 +98,42 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   l2dwAlphaFilter: 1,
 } as FilterState
 
+/**
+ * 注视状态（仅运行时，不持久化到 wmdl）。
+ * `enabled` 为 false 时不应用控制器（眼睛居中）且不输出 -focus 参数。
+ */
+export interface FocusState {
+  enabled: boolean
+  x: number
+  y: number
+  instant: boolean
+}
+
+export const DEFAULT_FOCUS_STATE: FocusState = {
+  enabled: false,
+  x: 0,
+  y: 0,
+  instant: false,
+}
+
+/**
+ * 眨眼状态（仅运行时，不持久化到 wmdl）。
+ * `enabled` 为 false 时回退 baseBlinkParam（接近不眨眼）且不输出 -blink 参数。
+ */
+export interface BlinkState {
+  enabled: boolean
+  blinkInterval: number
+  blinkIntervalRandom: number
+  closingDuration: number
+  closedDuration: number
+  openingDuration: number
+}
+
+export const DEFAULT_BLINK_STATE: BlinkState = {
+  enabled: false,
+  ...baseBlinkParam,
+}
+
 export interface ModelEntry {
   id: string
   name: string
@@ -150,6 +186,10 @@ export const useModelStore = defineStore('models', {
     figureFilterStates: {} as Record<string, FilterState>,
     bgFilterState: { ...DEFAULT_FILTER_STATE } as FilterState,
     stageFilterState: { ...DEFAULT_FILTER_STATE } as FilterState,
+    /** 注视状态：按 modelId 索引（仅 live2d 模型，仅运行时） */
+    figureFocusStates: {} as Record<string, FocusState>,
+    /** 眨眼状态：按 modelId 索引（仅 live2d 模型，仅运行时） */
+    figureBlinkStates: {} as Record<string, BlinkState>,
   }),
   getters: {
     selectedModel(state): ModelEntry | null {
@@ -174,6 +214,14 @@ export const useModelStore = defineStore('models', {
       const own = state.figureFilterStates[id]
       // 惰性初始化通过 setFilterState 完成；此处读到 undefined 直接给默认快照
       return own ?? { ...DEFAULT_FILTER_STATE }
+    },
+    getFocusState: (state) => (id: string | null): FocusState => {
+      if (!id) return { ...DEFAULT_FOCUS_STATE }
+      return state.figureFocusStates[id] ?? { ...DEFAULT_FOCUS_STATE }
+    },
+    getBlinkState: (state) => (id: string | null): BlinkState => {
+      if (!id) return { ...DEFAULT_BLINK_STATE }
+      return state.figureBlinkStates[id] ?? { ...DEFAULT_BLINK_STATE }
     },
   },
   actions: {
@@ -575,6 +623,48 @@ export const useModelStore = defineStore('models', {
       }
       syncFilterToContainer(id, fresh)
     },
+
+    /**
+     * 写入注视状态（仅运行时），并立即同步到该模型的全部子 Live2DModel。
+     * 仅 live2d 立绘有意义；图片/背景/主场景传入时静默忽略。
+     */
+    setFocusState(id: string | null, patch: Partial<FocusState>): void {
+      if (id == null) return
+      const own = this.figureFocusStates[id]
+      const target = own
+        ? { ...own, ...patch }
+        : { ...DEFAULT_FOCUS_STATE, ...patch }
+      this.figureFocusStates[id] = target
+      syncFocusToModels(id, target)
+    },
+
+    /** 把指定 id 的 FocusState 重置回默认，并写回模型 */
+    resetFocusState(id: string | null): void {
+      if (id == null) return
+      this.figureFocusStates[id] = { ...DEFAULT_FOCUS_STATE }
+      syncFocusToModels(id, this.figureFocusStates[id])
+    },
+
+    /**
+     * 写入眨眼状态（仅运行时），并立即同步到该模型的全部子 Live2DModel。
+     * 仅 live2d 立绘有意义；图片/背景/主场景传入时静默忽略。
+     */
+    setBlinkState(id: string | null, patch: Partial<BlinkState>): void {
+      if (id == null) return
+      const own = this.figureBlinkStates[id]
+      const target = own
+        ? { ...own, ...patch }
+        : { ...DEFAULT_BLINK_STATE, ...patch }
+      this.figureBlinkStates[id] = target
+      syncBlinkToModels(id, target)
+    },
+
+    /** 把指定 id 的 BlinkState 重置回默认，并写回模型 */
+    resetBlinkState(id: string | null): void {
+      if (id == null) return
+      this.figureBlinkStates[id] = { ...DEFAULT_BLINK_STATE }
+      syncBlinkToModels(id, this.figureBlinkStates[id])
+    },
   },
 })
 
@@ -619,4 +709,39 @@ function syncFilterToContainer(id: string, state: FilterState): void {
     ;(container as any)[key] = (state as any)[key]
   }
   container.l2dwAlphaFilter = state.l2dwAlphaFilter
+}
+
+/** 取指定模型的全部子 Live2DModel（wmdl 子模型），不存在则返回空数组。 */
+function resolveSubLive2DModels(id: string): Live2DModel[] {
+  const wmdlInfo = previewRuntime.wmdlSubModels.get(id)
+  if (!wmdlInfo) return []
+  return wmdlInfo.subModelIds
+    .map((subId) => previewRuntime.live2dModels.get(subId))
+    .filter((m): m is Live2DModel => !!m)
+}
+
+/** 把 FocusState 同步到子模型：enabled=false 时注视归零（眼睛居中）。 */
+function syncFocusToModels(id: string, state: FocusState): void {
+  const x = state.enabled ? state.x : 0
+  const y = state.enabled ? state.y : 0
+  const instant = state.enabled ? state.instant : true
+  for (const model of resolveSubLive2DModels(id)) {
+    model.internalModel.focusController.focus(x, y, instant)
+  }
+}
+
+/** 把 BlinkState 同步到子模型：enabled=false 时回退库默认眨眼参数。 */
+function syncBlinkToModels(id: string, state: BlinkState): void {
+  const param = state.enabled
+    ? {
+        blinkInterval: state.blinkInterval,
+        blinkIntervalRandom: state.blinkIntervalRandom,
+        closingDuration: state.closingDuration,
+        closedDuration: state.closedDuration,
+        openingDuration: state.openingDuration,
+      }
+    : baseBlinkParam
+  for (const model of resolveSubLive2DModels(id)) {
+    model.internalModel.setBlinkParam(param)
+  }
 }

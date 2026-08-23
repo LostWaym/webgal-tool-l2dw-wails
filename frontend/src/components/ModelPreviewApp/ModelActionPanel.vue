@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
 import * as PIXI from 'pixi.js'
 import { useModelStore, DEFAULT_TRANSFORM_STATE } from '../../stores/previewStore'
-import type { TransformState, FilterState } from '../../stores/previewStore'
+import type { TransformState, FilterState, FocusState, BlinkState } from '../../stores/previewStore'
 import { DEFAULT_FILTER_STATE } from '../../stores/previewStore'
 import {
   DEFAULT_BG_TEMPLATE,
@@ -30,6 +30,8 @@ const snapshotModal = useTransformSnapshotModal()
 const motionScroll = useDraggableScroll()
 const expressionScroll = useDraggableScroll()
 const filterScroll = useDraggableScroll()
+const focusScroll = useDraggableScroll()
+const blinkScroll = useDraggableScroll()
 
 type TabKey = 'motionExpression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo'
 const activeTab = ref<TabKey>('motionExpression') // 页签
@@ -197,6 +199,45 @@ function onFilterToggle(key: keyof FilterState, checked: boolean) {
 
 function resetFilters() {
   store.resetFilterState(store.selectedId)
+}
+
+// ───────── 注视 / 眨眼状态（仅 live2d 立绘） ─────────
+const focusState = computed<FocusState>(
+  () => store.getFocusState(store.selectedId),
+)
+const blinkState = computed<BlinkState>(
+  () => store.getBlinkState(store.selectedId),
+)
+const focusCollapsed = ref(true)
+const blinkCollapsed = ref(true)
+
+/** 仅 live2d 立绘显示注视/眨眼折叠块 */
+const showLive2dParams = computed(
+  () => !isSpecial.value && store.selectedModel?.kind === 'live2d',
+)
+
+function onFocusInput(key: 'x' | 'y', value: number) {
+  store.setFocusState(store.selectedId, { [key]: value } as Partial<FocusState>)
+}
+
+function onFocusToggle(key: 'instant' | 'enabled', checked: boolean) {
+  store.setFocusState(store.selectedId, { [key]: checked } as Partial<FocusState>)
+}
+
+function resetFocus() {
+  store.resetFocusState(store.selectedId)
+}
+
+function onBlinkInput(key: keyof Omit<BlinkState, 'enabled'>, value: number) {
+  store.setBlinkState(store.selectedId, { [key]: value } as Partial<BlinkState>)
+}
+
+function onBlinkToggle(checked: boolean) {
+  store.setBlinkState(store.selectedId, { enabled: checked })
+}
+
+function resetBlink() {
+  store.resetBlinkState(store.selectedId)
 }
 
 // 拖拽调参步幅
@@ -982,6 +1023,188 @@ function onLabelDragEnd() {
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
                 <button class="reset-btn" @click="resetFilters">重置滤镜</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 下：注视（可折叠，仅 live2d 立绘） -->
+      <div
+        v-if="showLive2dParams"
+        class="panel__list-region"
+        :class="{ 'is-collapsed': focusCollapsed }"
+      >
+        <div class="list-region-header">
+          <span class="list-region-title">注视</span>
+          <label class="form-row__check-label">
+            <input
+              type="checkbox"
+              class="form-row__check"
+              :checked="focusState.enabled"
+              @change="(e: any) => onFocusToggle('enabled', e.target.checked)"
+            />
+            <span>启用</span>
+          </label>
+          <button
+            type="button"
+            class="list-region-toggle"
+            :aria-expanded="!focusCollapsed"
+            :aria-label="focusCollapsed ? '展开注视' : '折叠注视'"
+            @click="focusCollapsed = !focusCollapsed"
+          >
+            <span aria-hidden="true">{{ focusCollapsed ? '▸' : '▾' }}</span>
+          </button>
+        </div>
+        <div v-show="!focusCollapsed" class="list-region-body">
+          <ul class="panel__list" v-bind="focusScroll.scrollHandlers">
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>X</label>
+                <input
+                  :value="focusState.x"
+                  type="number"
+                  class="form-input"
+                  step="0.01"
+                  min="-1"
+                  max="1"
+                  @input="(e: any) => onFocusInput('x', Number(e.target.value))"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>Y</label>
+                <input
+                  :value="focusState.y"
+                  type="number"
+                  class="form-input"
+                  step="0.01"
+                  min="-1"
+                  max="1"
+                  @input="(e: any) => onFocusInput('y', Number(e.target.value))"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row form-row--check">
+                <label class="form-row__check-label">
+                  <input
+                    type="checkbox"
+                    class="form-row__check"
+                    :checked="focusState.instant"
+                    @change="(e: any) => onFocusToggle('instant', e.target.checked)"
+                  />
+                  <span>瞬间生效</span>
+                </label>
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row form-row--btn">
+                <button class="reset-btn" @click="resetFocus">重置注视</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 下：眨眼（可折叠，仅 live2d 立绘） -->
+      <div
+        v-if="showLive2dParams"
+        class="panel__list-region"
+        :class="{ 'is-collapsed': blinkCollapsed }"
+      >
+        <div class="list-region-header">
+          <span class="list-region-title">眨眼</span>
+          <label class="form-row__check-label">
+            <input
+              type="checkbox"
+              class="form-row__check"
+              :checked="blinkState.enabled"
+              @change="(e: any) => onBlinkToggle(e.target.checked)"
+            />
+            <span>启用</span>
+          </label>
+          <button
+            type="button"
+            class="list-region-toggle"
+            :aria-expanded="!blinkCollapsed"
+            :aria-label="blinkCollapsed ? '展开眨眼' : '折叠眨眼'"
+            @click="blinkCollapsed = !blinkCollapsed"
+          >
+            <span aria-hidden="true">{{ blinkCollapsed ? '▸' : '▾' }}</span>
+          </button>
+        </div>
+        <div v-show="!blinkCollapsed" class="list-region-body">
+          <ul class="panel__list" v-bind="blinkScroll.scrollHandlers">
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>间隔</label>
+                <input
+                  :value="blinkState.blinkInterval"
+                  type="number"
+                  class="form-input"
+                  step="100"
+                  min="0"
+                  @input="(e: any) => onBlinkInput('blinkInterval', Number(e.target.value))"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>随机偏移</label>
+                <input
+                  :value="blinkState.blinkIntervalRandom"
+                  type="number"
+                  class="form-input"
+                  step="10"
+                  min="0"
+                  @input="(e: any) => onBlinkInput('blinkIntervalRandom', Number(e.target.value))"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>闭眼时长</label>
+                <input
+                  :value="blinkState.closingDuration"
+                  type="number"
+                  class="form-input"
+                  step="10"
+                  min="0"
+                  @input="(e: any) => onBlinkInput('closingDuration', Number(e.target.value))"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>闭合停留</label>
+                <input
+                  :value="blinkState.closedDuration"
+                  type="number"
+                  class="form-input"
+                  step="10"
+                  min="0"
+                  @input="(e: any) => onBlinkInput('closedDuration', Number(e.target.value))"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row">
+                <label>睁眼时长</label>
+                <input
+                  :value="blinkState.openingDuration"
+                  type="number"
+                  class="form-input"
+                  step="10"
+                  min="0"
+                  @input="(e: any) => onBlinkInput('openingDuration', Number(e.target.value))"
+                />
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row form-row--btn">
+                <button class="reset-btn" @click="resetBlink">重置眨眼</button>
               </div>
             </li>
           </ul>

@@ -118,6 +118,22 @@ const handler = {
     // 解析指令
     const inst = parseInst(line)
 
+    // 注视 / 眨眼：enabled 时输出 -focus / -blink 参数
+    const focus = store.getFocusState(entry.id)
+    if (focus.enabled) {
+      inst.setParamJson('focus', { x: focus.x, y: focus.y, instant: focus.instant })
+    }
+    const blink = store.getBlinkState(entry.id)
+    if (blink.enabled) {
+      inst.setParamJson('blink', {
+        blinkInterval: blink.blinkInterval,
+        blinkIntervalRandom: blink.blinkIntervalRandom,
+        closingDuration: blink.closingDuration,
+        closedDuration: blink.closedDuration,
+        openingDuration: blink.openingDuration,
+      })
+    }
+
     // 输出结果
     console.log('[Shortcut] modelFigure:', { entry, name, motion, expression, figurePath, inst })
     console.log('[Shortcut] modelFigure:', inst.toInstString())

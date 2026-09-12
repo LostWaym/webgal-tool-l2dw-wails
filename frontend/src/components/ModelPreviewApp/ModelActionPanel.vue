@@ -617,10 +617,10 @@ function onFigureGroupCenterChange(axis: 'x' | 'y', value: string) {
   if (!cur) return
   const num = Number(value)
   if (Number.isNaN(num)) return
-  store.updateFigureGroup(cur.id, { [axis]: num })
+  store.applyFigureGroupAnchor(cur.id, axis, num)
 }
 
-function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures', checked: boolean) {
+function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures' | 'editAnchorOnly', checked: boolean) {
   const cur = store.selectedFigureGroup
   if (!cur) return
   store.updateFigureGroup(cur.id, { [key]: checked })
@@ -1481,6 +1481,14 @@ function onLabelDragEnd() {
             type="checkbox"
             :checked="store.selectedFigureGroup.includeAllFigures"
             @change="onFigureGroupFlagChange('includeAllFigures', ($event.target as HTMLInputElement).checked)"
+          />
+        </div>
+        <div class="info-row">
+          <label class="info-label">仅编辑锚点</label>
+          <input
+            type="checkbox"
+            :checked="store.selectedFigureGroup.editAnchorOnly"
+            @change="onFigureGroupFlagChange('editAnchorOnly', ($event.target as HTMLInputElement).checked)"
           />
         </div>
 

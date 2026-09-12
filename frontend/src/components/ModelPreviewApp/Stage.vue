@@ -214,66 +214,71 @@ function startTransform(mode: TransformMode) {
     const group = store.figureGroups.find((g) => g.id === id)
     if (!group) return
 
-    const containers = getFigureGroupTargetContainers()
-    if (containers.length === 0) return
+    // editAnchorOnly 时只改锚点本身：跳过 reparent + snapshot，让 endTransform 走 "仅 reset groupContainer" 分支
+    const lockTarget = group.editAnchorOnly === true
+
+    const containers = lockTarget ? [] : getFigureGroupTargetContainers()
+    if (!lockTarget && containers.length === 0) return
 
     const groupContainer = ensureGroupContainer(group)
 
     // 先让所有 worldTransform 是新的（保证原父变换是最新的）
     stageMain?.updateTransform()
 
-    // 缓存每个目标"reparent 前的父 / index / 本地 rts"
-    // 关键：PIXI.addChild 不会处理 child 的本地坐标，reparent 后 c.position
-    // 仍按原父坐标系解释，所以视觉位置 = groupContainer.localToWorld(c.position)。
-    // groupContainer 此刻带 rts（identity，但 world position != 0），c.worldPos 不等于 c.position。
-    // 因此 reparent 前必须把 c.position 转成"在 groupContainer 局部下、抵消 groupContainer 当前 rts"的坐标，
-    // 这样 addChild 后视觉位置才保持不变。
-    groupTargetSnapshots = containers.map((c) => {
-      const parent = c.parent
-      const parentIndex = parent ? parent.getChildIndex(c) : 0
+    if (!lockTarget) {
+      // 缓存每个目标"reparent 前的父 / index / 本地 rts"
+      // 关键：PIXI.addChild 不会处理 child 的本地坐标，reparent 后 c.position
+      // 仍按原父坐标系解释，所以视觉位置 = groupContainer.localToWorld(c.position)。
+      // groupContainer 此刻带 rts（identity，但 world position != 0），c.worldPos 不等于 c.position。
+      // 因此 reparent 前必须把 c.position 转成"在 groupContainer 局部下、抵消 groupContainer 当前 rts"的坐标，
+      // 这样 addChild 后视觉位置才保持不变。
+      groupTargetSnapshots = containers.map((c) => {
+        const parent = c.parent
+        const parentIndex = parent ? parent.getChildIndex(c) : 0
 
-      // 用 c.position 读真实 local（绕开 L2dwContainer.x getter 的 base 偏移）
-      const oldX = c.position.x
-      const oldY = c.position.y
+        // 用 c.position 读真实 local（绕开 L2dwContainer.x getter 的 base 偏移）
+        const oldX = c.position.x
+        const oldY = c.position.y
 
-      // 把 c.position 转成"抵消 groupContainer 当前世界变换"的新局部坐标
-      // 用 position 而非 x/y，绕开 L2dwContainer 的 base 偏移重写
-      c.position.x = oldX - groupContainer.position.x
-      c.position.y = oldY - groupContainer.position.y
+        // 把 c.position 转成"抵消 groupContainer 当前世界变换"的新局部坐标
+        // 用 position 而非 x/y，绕开 L2dwContainer 的 base 偏移重写
+        c.position.x = oldX - groupContainer.position.x
+        c.position.y = oldY - groupContainer.position.y
 
-      const snap: GroupTargetSnap = {
-        container: c,
-        parent: parent!,
-        parentIndex,
-        localX: oldX,
-        localY: oldY,
-        scaleX: c.scale.x,
-        scaleY: c.scale.y,
-        rotation: c.rotation,
+        const snap: GroupTargetSnap = {
+          container: c,
+          parent: parent!,
+          parentIndex,
+          localX: oldX,
+          localY: oldY,
+          scaleX: c.scale.x,
+          scaleY: c.scale.y,
+          rotation: c.rotation,
+        }
+
+        groupContainer.addChild(c)
+        return snap
+      })
+
+      groupTargetSnapshots.sort((a, b) => a.parentIndex - b.parentIndex)
+
+      // 组内排序：backgroundContainer 排最底，立绘 wrapper 按当前顺序递增，
+      // crosshair（PIXI.Graphics）排最顶层。
+      // 即便 groupContainer 整体被 bringGroupContainerToTop 提到最高，
+      // 组内仍保持"背景在下、立绘在中、准心在上"的关系。
+      let z = 0
+      for (const c of groupContainer.children) {
+        if (c === backgroundContainer) {
+          c.zIndex = 0
+        } else if (c instanceof PIXI.Graphics) {
+          // crosshair：排最顶层，避免被立绘盖住
+          c.zIndex = Number.MAX_SAFE_INTEGER
+        } else {
+          c.zIndex = ++z
+        }
       }
-
-      groupContainer.addChild(c)
-      return snap
-    })
-
-    groupTargetSnapshots.sort((a, b) => a.parentIndex - b.parentIndex)
-
-    // 组内排序：backgroundContainer 排最底，立绘 wrapper 按当前顺序递增，
-    // crosshair（PIXI.Graphics）排最顶层。
-    // 即便 groupContainer 整体被 bringGroupContainerToTop 提到最高，
-    // 组内仍保持"背景在下、立绘在中、准心在上"的关系。
-    let z = 0
-    for (const c of groupContainer.children) {
-      if (c === backgroundContainer) {
-        c.zIndex = 0
-      } else if (c instanceof PIXI.Graphics) {
-        // crosshair：排最顶层，避免被立绘盖住
-        c.zIndex = Number.MAX_SAFE_INTEGER
-      } else {
-        c.zIndex = ++z
-      }
+      groupContainer.sortChildren()
     }
-    groupContainer.sortChildren()
 
     // 组容器 reset：scale=1/rotation=0，x/y 同步为 group.x/y - 中心
     resetGroupContainer(id)
@@ -662,25 +667,36 @@ function destroyGroupContainer(groupId: string): void {
   groupContainers.delete(groupId)
 }
 
-/** 构建立绘组准心 graphics：十字线 + 圆 + 中心点 */
 /**
- * 创建立绘组准心图形（挂在 groupContainer 原点，随容器变换）
+ * 构建立绘组准心 graphics：CS1.6 风十字准心（淡黄主线 + 黑描边，中间空心）
+ * @param mainWidth 主线线宽
+ * @param extraWidth 描边比主线粗多少（描边线宽 = mainWidth + extraWidth）
  */
-function buildFigureGroupCrosshair(): PIXI.Graphics {
+function buildFigureGroupCrosshair(
+  mainWidth = 8,
+  extraWidth = 8,
+): PIXI.Graphics {
   const g = new PIXI.Graphics()
-  const COLOR = 0xff5577
-  g.lineStyle(2, COLOR)
-  // 十字线
-  g.moveTo(-30, 0); g.lineTo(-6, 0)
-  g.moveTo(6, 0); g.lineTo(30, 0)
-  g.moveTo(0, -30); g.lineTo(0, -6)
-  g.moveTo(0, 6); g.lineTo(0, 30)
-  // 圆圈
-  g.drawCircle(0, 0, 12)
-  // 中心点
-  g.beginFill(COLOR)
-  g.drawCircle(0, 0, 3)
-  g.endFill()
+  const COLOR = 0xFFFF66   // 淡黄主线
+  const OUTLINE = 0x000000 // 黑描边
+  const W = 32              // 半长
+  const GAP = 16             // 中间空隙
+  const outlineWidth = mainWidth + extraWidth
+
+  // 黑描边：与主线同样的四段，先画粗底
+  g.lineStyle(outlineWidth, OUTLINE)
+  g.moveTo(-W-4, 0); g.lineTo(-GAP+4, 0)
+  g.moveTo(GAP-4, 0); g.lineTo(W+4, 0)
+  g.moveTo(0, -W-4); g.lineTo(0, -GAP+4)
+  g.moveTo(0, GAP-4); g.lineTo(0, W+4)
+
+  // 淡黄主线：叠在描边中央
+  g.lineStyle(mainWidth, COLOR)
+  g.moveTo(-W, 0); g.lineTo(-GAP, 0)
+  g.moveTo(GAP, 0); g.lineTo(W, 0)
+  g.moveTo(0, -W); g.lineTo(0, -GAP)
+  g.moveTo(0, GAP); g.lineTo(0, W)
+
   return g
 }
 

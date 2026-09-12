@@ -184,6 +184,8 @@ export interface FigureGroupEntry {
   includeBackground: boolean
   /** 是否在复制指令时包含当前所有立绘 */
   includeAllFigures: boolean
+  /** 是否仅编辑锚点（X/Y 与 G 拖拽只改锚点本身，不动目标与背景） */
+  editAnchorOnly: boolean
 }
 
 export const useModelStore = defineStore('models', {
@@ -711,6 +713,7 @@ export const useModelStore = defineStore('models', {
         targetGroupIds: [],
         includeBackground: false,
         includeAllFigures: false,
+        editAnchorOnly: false,
       }
       this.figureGroups.push(group)
       return group
@@ -735,6 +738,37 @@ export const useModelStore = defineStore('models', {
       const group = this.figureGroups.find((g) => g.id === id)
       if (!group) return
       Object.assign(group, patch)
+    },
+
+    /**
+     * 修改立绘组锚点坐标：把整组连同目标立绘（含可选背景）一起平移到新锚点。
+     * 等价于 G 模式拖动后再 endTransform commit。
+     * 当 group.editAnchorOnly=true 时，只更新锚点本身，不动目标与背景。
+     */
+    applyFigureGroupAnchor(groupId: string, axis: 'x' | 'y', value: number): void {
+      const group = this.figureGroups.find((g) => g.id === groupId)
+      if (!group) return
+      const delta = value - group[axis]
+      // 总是先把锚点数值更新到新值（groupContainer 会通过 watcher 跟随移动）
+      this.updateFigureGroup(groupId, { [axis]: value })
+      if (group.editAnchorOnly) return
+
+      const ids: string[] = this.flattenFigureGroupTargets(groupId)
+      if (group.includeBackground) ids.push(SpecialId.BgContainer)
+      for (const id of ids) {
+        if (isSpecialId(id)) {
+          const current = this.getTransformState(id)
+          const next: TransformState = { ...current, [axis]: current[axis] + delta }
+          this.setTransformState(id, next)
+          syncTransformToPixi(id, next)
+          continue
+        }
+        const model = this.models.find((m) => m.id === id)
+        if (!model) continue
+        const next: TransformState = { ...model.state, [axis]: model.state[axis] + delta }
+        model.state = next
+        syncTransformToPixi(id, next)
+      }
     },
 
     /** 切换立绘组里某个立绘目标（已存在则移除，不存在则追加） */

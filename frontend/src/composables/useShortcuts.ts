@@ -10,11 +10,29 @@ import { FILTER_PROPERTY_KEYS, DEFAULT_FILTER_PROPERTY_VALUES } from '../live2d/
 /** 快捷键适用的目标类型；与 useShortcuts 内的 store.selectedId 判定保持一致 */
 export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'figureGroup' | 'none'
 
+export interface ShortcutEntry {
+  key: string
+  keys: string
+  description: string
+  targets: ShortcutTargetType[]
+  /** handler key，用于立绘组分发时根据目标类型找正确 handler */
+  handlerKey: ShortcutHandlerKey
+  /** 执行入口：返回需要复制到剪贴板的指令，或 void（用于打开编辑器等不复制指令的动作） */
+  run: () => Inst | string | string[] | null | void
+}
+
+type ShortcutHandlerKey =
+  | 'modelFigure' | 'modelTransform' | 'modelSplit' | 'modelMerge' | 'modelHide'
+  | 'bgSetImage' | 'bgTransform' | 'stageTransform'
+  | 'openEditor'
+
 export interface ShortcutHint {
   /** 鼠标/键盘触发键，例如 'Ctrl + F'、'左键拖动' */
   keys: string
   /** 给用户看的简短操作说明 */
   description: string
+  /** 对应的可执行 entry；快捷键展示项点击时复用其 run() */
+  entry: ShortcutEntry
 }
 
 /** 资源路径转相对路径（background/figure文件夹为基准） */
@@ -72,7 +90,7 @@ function buildTransformData(
 
 // 快捷键处理（外层独立，方便管理）
 const handler = {
-  modelFigure: (): Inst | null => {
+  modelFigure: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const entry = store.selectedModel
     if (!entry) return null
@@ -80,7 +98,7 @@ const handler = {
     // 图片立绘：用全局图片模板
     if (entry.kind === 'image') {
       if (!entry.imageUrl) {
-        useMessage().error('图片路径为空!!')
+        if (shouldShowToast) useMessage().error('图片路径为空!!')
         return null
       }
       const imgPath = getResourceRelativePath(entry.imageUrl, 'figure')
@@ -90,7 +108,7 @@ const handler = {
 
       console.log('[Shortcut] imageFigure:', { entry, imgPath, inst })
       console.log('[Shortcut] imageFigure:', inst.toInstString())
-      useMessage().success('复制图片立绘指令成功!!')
+      if (shouldShowToast) useMessage().success('复制图片立绘指令成功!!')
       return inst
     }
 
@@ -138,11 +156,11 @@ const handler = {
     // 输出结果
     console.log('[Shortcut] modelFigure:', { entry, name, motion, expression, figurePath, inst })
     console.log('[Shortcut] modelFigure:', inst.toInstString())
-    useMessage().success(`复制立绘指令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制立绘指令成功!!`)
     return inst
   },
 
-  modelTransform: (): Inst | null => {
+  modelTransform: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const entry = store.selectedModel
     if (!entry) return null
@@ -168,7 +186,7 @@ const handler = {
 
       console.log('[Shortcut] imageTransform:', { entry, transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
       console.log('[Shortcut] imageTransform:', inst.toInstString())
-      useMessage().success('复制图片变换指令成功!!')
+      if (shouldShowToast) useMessage().success('复制图片变换指令成功!!')
       return inst
     }
 
@@ -191,36 +209,36 @@ const handler = {
 
     console.log('[Shortcut] modelTransform:', { entry, transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
     console.log('[Shortcut] modelTransform:', inst.toInstString())
-    useMessage().success(`复制立绘变换指令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制立绘变换指令成功!!`)
     return inst
   },
 
-  modelSplit: (): string[] => {
-    const figureInst = handler.modelFigure()
-    const transformInst = handler.modelTransform()
+  modelSplit: (shouldShowToast: boolean = true): string[] => {
+    const figureInst = handler.modelFigure(false)
+    const transformInst = handler.modelTransform(false)
 
     const lines: string[] = []
     if (figureInst) lines.push(figureInst.toInstString())
     if (transformInst) lines.push(transformInst.toInstString())
 
     console.log('[Shortcut] modelSplit:', lines)
-    useMessage().success(`复制拆分布令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制拆分布令成功!!`)
     return lines
   },
 
-  modelMerge: (): string | null => {
-    const figureInst = handler.modelFigure()
-    const transformInst = handler.modelTransform()
+  modelMerge: (shouldShowToast: boolean = true): string | null => {
+    const figureInst = handler.modelFigure(false)
+    const transformInst = handler.modelTransform(false)
     if (!figureInst) return null
 
     figureInst.setParamValue('transform', transformInst?.content ?? '')
 
     console.log('[Shortcut] modelMerge:', figureInst.toInstString())
-    useMessage().success(`复制合并立绘指令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制合并立绘指令成功!!`)
     return figureInst.toInstString()
   },
 
-  modelHide: (): Inst | null => {
+  modelHide: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const entry = store.selectedModel
     const name = entry?.name ?? null
@@ -234,18 +252,18 @@ const handler = {
 
     console.log('[Shortcut] modelHide:', { entry, inst })
     console.log('[Shortcut] modelHide:', inst.toInstString())
-    useMessage().success(`复制隐藏立绘指令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制隐藏立绘指令成功!!`)
     return inst
   },
 
-  bgSetImage: (): Inst | null => {
+  bgSetImage: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const bgUrl = store.backgroundUrl
     const bgPath = bgUrl ? getResourceRelativePath(bgUrl, 'background') : null
 
     if (!bgPath)
     {
-      useMessage().error(`背景路径为空!!`)
+      if (shouldShowToast) useMessage().error(`背景路径为空!!`)
       return null
     }
 
@@ -257,11 +275,11 @@ const handler = {
 
     console.log('[Shortcut] bgSetImage:', { bgPath, inst })
     console.log('[Shortcut] bgSetImage:', inst.toInstString())
-    useMessage().success(`复制背景切换指令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制背景切换指令成功!!`)
     return inst
   },
 
-  bgTransform: (): Inst | null => {
+  bgTransform: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const container = previewRuntime.specialContainers.get(SpecialId.BgContainer)
     const x = container?.x ?? 0
@@ -281,11 +299,11 @@ const handler = {
 
     console.log('[Shortcut] bgTransform:', { transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
     console.log('[Shortcut] bgTransform:', inst.toInstString())
-    useMessage().success(`复制背景变换指令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制背景变换指令成功!!`)
     return inst
   },
 
-  stageTransform: (): Inst | null => {
+  stageTransform: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const container = previewRuntime.specialContainers.get(SpecialId.StageMain)
     const x = container?.x ?? 0
@@ -305,7 +323,7 @@ const handler = {
 
     console.log('[Shortcut] stageTransform:', { transform: { x, y, scaleX, scaleY, rotation }, filters, inst })
     console.log('[Shortcut] stageTransform:', inst.toInstString())
-    useMessage().success(`复制主场景变换指令成功!!`)
+    if (shouldShowToast) useMessage().success(`复制主场景变换指令成功!!`)
     return inst
   },
 }
@@ -317,20 +335,6 @@ const handler = {
  * - `description`：用户可读的功能说明
  * - `targets`：适用的目标类型列表，未列入的类型即便按键匹配也不会触发
  */
-interface ShortcutEntry {
-  key: string
-  keys: string
-  description: string
-  targets: ShortcutTargetType[]
-  /** handler key，用于立绘组分发时根据目标类型找正确 handler */
-  handlerKey: ShortcutHandlerKey
-  run: () => Inst | string | string[] | null
-}
-
-type ShortcutHandlerKey =
-  | 'modelFigure' | 'modelTransform' | 'modelSplit' | 'modelMerge' | 'modelHide'
-  | 'bgSetImage' | 'bgTransform' | 'stageTransform'
-
 export const SHORTCUTS: readonly ShortcutEntry[] = [
   {
     key: 'f',
@@ -436,46 +440,66 @@ function resultToLines(result: unknown): string[] {
 }
 
 /**
- * 立绘组快捷键分发：
- *  - 立绘类（modelFigure/modelTransform/...）：循环每个立绘目标，临时切 selectedId 复用 handler
- *  - 背景类（bgSetImage/bgTransform）：当 includeBackground=true 时，按 handlerKey 直接调 handler.bgSetImage/bgTransform，
- *    不再依赖 selectedId = BgContainer（避免"切到 BgContainer 后跑 modelFigure"返回 null 的问题）
- *  - 立绘 + 背景的结果按行拼接
+ * 立绘组快捷键分发（按 key 聚合，按 targets 区分）：
+ *  - 立绘类：SHORTCUTS.filter(s => s.key === key && s.targets.includes('model'))
+ *    （即 modelFigure / modelTransform / modelSplit / modelMerge / modelHide）
+ *  - 背景类：SHORTCUTS.filter(s => s.key === key && s.targets.includes('background'))
+ *    （即 bgSetImage / bgTransform），仅在 includeBackground=true 时执行
+ *  - 立绘类循环每个立绘组目标，临时切 selectedId 复用 handler
+ *  - 背景类直接调 handler，不依赖 selectedId = BgContainer
+ *  - 其他 entry（如 stageTransform，targets 只有 stage）自然不会命中，跳过
+ *  - 所有结果按 SHORTCUTS 声明顺序 + 目标顺序，行拼接后写入剪贴板
  */
-function runShortcutForFigureGroup(entry: ShortcutEntry): void {
+function runShortcutForFigureGroup(key: string): void {
   const store = useModelStore()
   const id = store.selectedId
   if (!id || !isFigureGroupId(id)) return
 
   const group = store.figureGroups.find((g) => g.id === id)
   if (!group) return
-
   store.cleanupInvalidFigureGroupTargets(id)
 
-  const lines: string[] = []
-  const isBackgroundHandler =
-    entry.handlerKey === 'bgSetImage' || entry.handlerKey === 'bgTransform'
+  // 按 key + targets 筛选：
+  //   立绘类：targets 含 'model'（即 model/figureGroup）
+  //   背景类：targets 含 'background'（即 background/figureGroup）
+  const figureEntries = SHORTCUTS.filter(
+    (s) => s.key === key && s.targets.includes('model'),
+  )
+  const backgroundEntries = SHORTCUTS.filter(
+    (s) => s.key === key && s.targets.includes('background'),
+  )
+  if (figureEntries.length === 0 && backgroundEntries.length === 0) return
 
-  // 立绘类：循环每个目标（仅在不是背景专用 handler 时才有意义）
-  if (!isBackgroundHandler) {
-    const figureTargets = store.flattenFigureGroupTargets(id)
+  const figureTargets = store.flattenFigureGroupTargets(id)
+  const lines: string[] = []
+  // const seen = new Set<ShortcutHandlerKey>()
+
+  const tryRun = (entry: ShortcutEntry): void => {
+    // if (seen.has(entry.handlerKey)) return
+    // seen.add(entry.handlerKey)
+    const fn = (handler as Record<string, unknown>)[entry.handlerKey]
+    if (typeof fn !== 'function') return
+    lines.push(...resultToLines((fn as (shouldShowToast?: boolean) => unknown)(false)))
+  }
+
+  // 1) 立绘类：循环每个目标，临时切 selectedId 复用 handler
+  for (const entry of figureEntries) {
     for (const targetId of figureTargets) {
       if (!store.models.some((m) => m.id === targetId)) continue
       const prev = store.selectedId
       store.selectedId = targetId
       try {
-        lines.push(...resultToLines(entry.run()))
+        tryRun(entry)
       } finally {
         store.selectedId = prev
       }
     }
   }
 
-  // 背景：仅背景专用快捷键 + includeBackground 时处理
-  if (group.includeBackground && isBackgroundHandler) {
-    const fn = handler[entry.handlerKey]
-    if (typeof fn === 'function') {
-      lines.push(...resultToLines((fn as () => unknown)()))
+  // 2) 背景类：仅 includeBackground 时执行
+  if (group.includeBackground) {
+    for (const entry of backgroundEntries) {
+      tryRun(entry)
     }
   }
 
@@ -490,26 +514,53 @@ function runShortcutForFigureGroup(entry: ShortcutEntry): void {
   useMessage().success(`复制立绘组指令成功（${lines.length} 行）`)
 }
 
+/** 检测当前焦点是否在输入控件内（input / textarea / contentEditable） */
+export function isInputFocused(): boolean {
+  const active = document.activeElement
+  if (!active) return false
+  const tag = active.tagName.toLowerCase()
+  return tag === 'input' || tag === 'textarea' || (active as HTMLElement).isContentEditable
+}
+
 /**
- * 返回当前目标类型下生效的快捷键展示列表。
+ * 返回当前目标类型下生效的快捷键 entry 列表（保留可执行入口）。
  * 同一按键在不同目标下展示不同的说明，因此返回的是已经按 targets 过滤后的全部条目。
  */
+export function getShortcutEntries(target: ShortcutTargetType): ShortcutEntry[] {
+  return SHORTCUTS.filter((entry) => entry.targets.includes(target))
+}
+
+/**
+ * 返回当前目标类型下生效的快捷键展示列表（仅展示字段）。
+ */
 export function getShortcutHints(target: ShortcutTargetType): ShortcutHint[] {
-  return SHORTCUTS
-    .filter((entry) => entry.targets.includes(target))
-    .map((entry) => ({ keys: entry.keys, description: entry.description }))
+  return getShortcutEntries(target).map((entry) => ({
+    keys: entry.keys,
+    description: entry.description,
+    entry,
+  }))
+}
+
+/**
+ * 根据当前选中状态执行一条快捷键 entry。等价于键盘 handleShortcut 对该 entry 的执行路径。
+ * - figureGroup 走专用分发（多行 + 可选背景）
+ * - 输入框聚焦时不触发
+ * - selectedId 为空（type === 'none'）时静默忽略
+ */
+export function runShortcutEntry(entry: ShortcutEntry): void {
+  const store = useModelStore()
+  const type = resolveShortcutTargetType(store.selectedId)
+  if (type === 'none') return
+  if (isInputFocused()) return
+  if (type === 'figureGroup') {
+    runShortcutForFigureGroup(entry.key)
+    return
+  }
+  copyHandlerResult(entry.run())
 }
 
 export function useShortcuts() {
   const store = useModelStore()
-
-  // 检测输入框焦点
-  const isInputFocused = () => {
-    const active = document.activeElement
-    if (!active) return false
-    const tag = active.tagName.toLowerCase()
-    return tag === 'input' || tag === 'textarea' || (active as HTMLElement).isContentEditable
-  }
 
   // 判断选中对象类型
   const targetType = computed(() => resolveShortcutTargetType(store.selectedId))
@@ -523,18 +574,19 @@ export function useShortcuts() {
     const type = targetType.value
     if (type === 'none') return
 
+    // 立绘组：直接走专用分发（按 key + targets 收集立绘/背景 entry）
+    if (type === 'figureGroup') {
+      runShortcutForFigureGroup(key)
+      e.preventDefault()
+      return
+    }
+
     const entry = SHORTCUTS.find((s) => s.key === key && s.targets.includes(type))
     if (!entry) return
     e.preventDefault()
 
-    // 立绘组：走专用分发（展平所有目标 + 多行拼接 + 可选背景）
-    if (type === 'figureGroup') {
-      runShortcutForFigureGroup(entry)
-      return
-    }
-
     copyHandlerResult(entry.run())
   }
 
-  return { handleShortcut, targetType }
+  return { handleShortcut, targetType, runShortcutEntry, isInputFocused }
 }

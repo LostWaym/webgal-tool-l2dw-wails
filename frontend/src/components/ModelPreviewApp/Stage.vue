@@ -10,7 +10,7 @@ import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
 import { OpenEditor } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
-import { getShortcutHints, resolveShortcutTargetType } from '../../composables/useShortcuts'
+import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint } from '../../composables/useShortcuts'
 import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
@@ -24,6 +24,11 @@ const containerRef = ref<HTMLDivElement | null>(null)
 const hintsExpanded = ref(true)
 function toggleHints() {
   hintsExpanded.value = !hintsExpanded.value
+}
+
+function onShortcutClick(e: MouseEvent, entry: ShortcutEntry) {
+  e.stopPropagation()
+  runShortcutEntry(entry)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -380,7 +385,7 @@ interface MouseHint { keys: string; description: string }
 interface HintsView {
   title: string
   mouse: MouseHint[]
-  shortcuts: MouseHint[]
+  shortcuts: ShortcutHint[]
 }
 
 const TARGET_LABELS: Record<ReturnType<typeof resolveShortcutTargetType>, string> = {
@@ -396,8 +401,23 @@ const COMMON_MOUSE_HINTS: MouseHint[] = [
   { keys: '中键拖动', description: '平移舞台视图' },
   { keys: '鼠标滚轮', description: '缩放舞台视图' },
 ]
-const COMMON_SHORTCUT_HINTS: MouseHint[] = [
-  { keys: 'F1', description: '打开模型编辑器窗口' },
+// F1 是真快捷键（舞台上独立监听），点击触发等价行为
+const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
+  {
+    keys: 'F1',
+    description: '打开模型编辑器窗口',
+    entry: {
+      key: 'F1',
+      keys: 'F1',
+      description: '打开模型编辑器窗口',
+      targets: ['model', 'background', 'stage', 'figureGroup', 'none'],
+      handlerKey: 'openEditor',
+      run: () => {
+        const wmdlPath = store.selectedModel?.wmdlConfig?.wmdlFilePath ?? ''
+        OpenEditor(wmdlPath).catch((err) => console.error('OpenEditor failed:', err))
+      },
+    },
+  },
 ]
 
 // 各类型专属的鼠标提示
@@ -1497,11 +1517,18 @@ function dispose() {
           </ul>
         </section>
         <section v-if="hints.shortcuts.length" class="stage__hints-group">
-          <h4 class="stage__hints-heading">快捷键</h4>
+          <h4 class="stage__hints-heading">快捷键  - 可点击触发</h4>
           <ul class="stage__hints-list">
-            <li v-for="item in hints.shortcuts" :key="`s-${item.keys}`">
-              <span class="stage__hints-keys">{{ item.keys }}</span>
-              <span class="stage__hints-desc">{{ item.description }}</span>
+            <li v-for="item in hints.shortcuts" :key="item.entry.handlerKey + '-' + item.keys">
+              <button
+                type="button"
+                class="stage__hints-item"
+                :title="`点击触发 ${item.keys}`"
+                @click="onShortcutClick($event, item.entry)"
+              >
+                <span class="stage__hints-keys">{{ item.keys }}</span>
+                <span class="stage__hints-desc">{{ item.description }}</span>
+              </button>
             </li>
           </ul>
         </section>
@@ -1655,6 +1682,29 @@ function dispose() {
   gap: 8px;
   align-items: baseline;
   white-space: nowrap;
+}
+
+.stage__hints-item {
+  pointer-events: auto;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  border-radius: 3px;
+  cursor: pointer;
+  text-shadow: inherit;
+}
+
+.stage__hints-item:hover,
+.stage__hints-item:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
 }
 
 .stage__hints-keys {

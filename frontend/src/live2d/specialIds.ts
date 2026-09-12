@@ -23,3 +23,16 @@ export function isSpecialId(id: string | null | undefined): id is SpecialIdValue
 export function getSpecialName(id: SpecialIdValue): string {
   return id === SpecialId.StageMain ? '*主场景*' : '*背景*'
 }
+
+/** 立绘组 ID 前缀：与 ModelEntry id 区分（避免冲突） */
+export const FIGURE_GROUP_ID_PREFIX = 'group:'
+
+/** 生成新的立绘组 ID */
+export function makeFigureGroupId(): string {
+  return FIGURE_GROUP_ID_PREFIX + crypto.randomUUID()
+}
+
+/** 判断给定 id 是否为立绘组 */
+export function isFigureGroupId(id: string | null | undefined): id is string {
+  return !!id && id.startsWith(FIGURE_GROUP_ID_PREFIX)
+}

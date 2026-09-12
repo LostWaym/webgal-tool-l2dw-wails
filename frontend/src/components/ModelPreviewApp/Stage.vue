@@ -4,13 +4,14 @@ import * as PIXI from 'pixi.js'
 import { LoaderResource } from 'pixi.js'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
 import { useModelStore } from '../../stores/previewStore'
+import type { FigureGroupEntry } from '../../stores/previewStore'
 import { toFileUrl } from '../../path_utils'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
 import { OpenEditor } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
 import { getShortcutHints, resolveShortcutTargetType } from '../../composables/useShortcuts'
-import { isSpecialId } from '../../live2d/specialIds'
+import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
@@ -55,6 +56,31 @@ let startScreenMP = new PIXI.Point(0, 0)
 // 鼠标起点/起点距离/方向是否已记录（首次 onPointerMove 时记录）
 let baseInitialized = false
 
+// 立绘组变换用的"逐目标初始状态"快照
+interface GroupTargetSnap {
+  container: PIXI.Container
+  /** reparent 前的父容器（结束时要扔回去） */
+  parent: PIXI.Container
+  /** reparent 前在父容器 children 中的索引（addChildAt 还原 zIndex） */
+  parentIndex: number
+  /** child 在原父坐标系下的真值 local x/y/scaleX/scaleY/rotation（cancel/commit 时写回） */
+  localX: number
+  localY: number
+  scaleX: number
+  scaleY: number
+  rotation: number
+}
+let groupTargetSnapshots: GroupTargetSnap[] = []
+// 立绘组变换开始的组中心（用于以中心为基准的旋转/缩放）
+let groupStartCenterX = 0
+let groupStartCenterY = 0
+// 立绘组中心对应的屏幕坐标（用于 s/r 模式计算距离/方向）
+let groupStartScreenMP = new PIXI.Point(0, 0)
+// 立绘组变换开始时 groupContainer 的初始 scale/rotation（g 模式保持 identity）
+let groupStartScaleX = 1
+let groupStartScaleY = 1
+let groupStartRotation = 0
+
 function getTransformTarget(): PIXI.Container | undefined {
   const id = store.selectedId
   if (!id) return undefined
@@ -62,6 +88,37 @@ function getTransformTarget(): PIXI.Container | undefined {
     return previewRuntime.specialContainers.get(id)
   }
   return previewRuntime.modelWrappers.get(id)
+}
+
+/** 当前选中是否为立绘组 */
+function isCurrentFigureGroup(): boolean {
+  return !!store.selectedId && isFigureGroupId(store.selectedId)
+}
+
+/**
+ * 取立绘组所有目标 wrapper（含嵌套立绘组展平）。
+ * - includeBackground=true 时把背景容器也纳入
+ * - 跳过未找到的 wrapper（已删除/加载失败）
+ */
+function getFigureGroupTargetContainers(): PIXI.Container[] {
+  const id = store.selectedId
+  if (!id || !isFigureGroupId(id)) return []
+  const group = store.figureGroups.find((g) => g.id === id)
+  if (!group) return []
+
+  const figureIds = store.flattenFigureGroupTargets(id)
+  const containers: PIXI.Container[] = []
+  for (const fid of figureIds) {
+    const c = previewRuntime.modelWrappers.get(fid)
+    if (c) containers.push(c)
+  }
+
+  // includeBackground 时把背景容器也加进去（Bug 2 修复）
+  if (group.includeBackground && backgroundContainer) {
+    containers.push(backgroundContainer)
+  }
+
+  return containers
 }
 
 function pixiToClientCoords(displayObject: PIXI.DisplayObject, localPoint: { x: number; y: number }, app: PIXI.Application): PIXI.Point {
@@ -105,6 +162,21 @@ function refreshTransformHint() {
     transformHint.modeName = ''
     return
   }
+  const id = store.selectedId
+  if (id && isFigureGroupId(id)) {
+    // 立绘组：显示组中心
+    const group = store.figureGroups.find((g) => g.id === id)
+    if (group) {
+      transformHint.x = group.x.toFixed(1)
+      transformHint.y = group.y.toFixed(1)
+    }
+    transformHint.modeName =
+      transformMode.value === 'g' ? '拖拽'
+      : transformMode.value === 's' ? '缩放'
+      : '旋转'
+    transformHint.axis = axisLock.value === 'none' ? '无' : axisLock.value + ' 轴'
+    return
+  }
   const target = getTransformTarget()
   if (!target) return
 
@@ -121,11 +193,100 @@ function refreshTransformHint() {
 }
 
 function startTransform(mode: TransformMode) {
-  const target = getTransformTarget()
-  if (!target) return
-
   transformMode.value = mode
   axisLock.value = 'none'
+  baseInitialized = false
+
+  const id = store.selectedId
+
+  if (id && isFigureGroupId(id)) {
+    // 立绘组：先清理无效目标
+    store.cleanupInvalidFigureGroupTargets(id)
+
+    const group = store.figureGroups.find((g) => g.id === id)
+    if (!group) return
+
+    const containers = getFigureGroupTargetContainers()
+    if (containers.length === 0) return
+
+    const groupContainer = ensureGroupContainer(group)
+
+    // 先让所有 worldTransform 是新的（保证原父变换是最新的）
+    stageMain?.updateTransform()
+
+    // 缓存每个目标"reparent 前的父 / index / 本地 rts"
+    // 关键：PIXI.addChild 不会处理 child 的本地坐标，reparent 后 c.position
+    // 仍按原父坐标系解释，所以视觉位置 = groupContainer.localToWorld(c.position)。
+    // groupContainer 此刻带 rts（identity，但 world position != 0），c.worldPos 不等于 c.position。
+    // 因此 reparent 前必须把 c.position 转成"在 groupContainer 局部下、抵消 groupContainer 当前 rts"的坐标，
+    // 这样 addChild 后视觉位置才保持不变。
+    groupTargetSnapshots = containers.map((c) => {
+      const parent = c.parent
+      const parentIndex = parent ? parent.getChildIndex(c) : 0
+
+      // 用 c.position 读真实 local（绕开 L2dwContainer.x getter 的 base 偏移）
+      const oldX = c.position.x
+      const oldY = c.position.y
+
+      // 把 c.position 转成"抵消 groupContainer 当前世界变换"的新局部坐标
+      // 用 position 而非 x/y，绕开 L2dwContainer 的 base 偏移重写
+      c.position.x = oldX - groupContainer.position.x
+      c.position.y = oldY - groupContainer.position.y
+
+      const snap: GroupTargetSnap = {
+        container: c,
+        parent: parent!,
+        parentIndex,
+        localX: oldX,
+        localY: oldY,
+        scaleX: c.scale.x,
+        scaleY: c.scale.y,
+        rotation: c.rotation,
+      }
+
+      groupContainer.addChild(c)
+      return snap
+    })
+
+    groupTargetSnapshots.sort((a, b) => a.parentIndex - b.parentIndex)
+
+    // 组容器 reset：scale=1/rotation=0，x/y 同步为 group.x/y - 中心
+    resetGroupContainer(id)
+    // 把组容器推到 zIndex 最高，避免被其他立绘覆盖
+    bringGroupContainerToTop(id)
+
+    // 记录 g 模式起点（轴锁定重置时使用）
+    groupStartCenterX = group.x
+    groupStartCenterY = group.y
+    // s/r 模式的起点：scale=1/rotation=0
+    groupStartScaleX = 1
+    groupStartScaleY = 1
+    groupStartRotation = 0
+
+    // 把"舞台中心"从 stageMain 局部坐标转到屏幕坐标（s/r 模式算距离/方向以此为中心）
+    if (app && stageMain) {
+      groupStartScreenMP = pixiToClientCoords(
+        stageMain,
+        { x: STAGE_WIDTH / 2, y: STAGE_HEIGHT / 2 },
+        app,
+      )
+    }
+
+    emitter.emit(StageEvents.TransformStart, true)
+    emitter.emit(StageEvents.TransformChange, store.selectedId)
+    refreshTransformHint()
+    updateFigureGroupCrosshair()
+
+    groupStartScreenMP = pixiToClientCoords(
+      groupContainer,
+      { x: 0, y: 0 },
+      app!,
+    )
+    return
+  }
+
+  const target = getTransformTarget()
+  if (!target) return
 
   // 缓存模型的初始状态
   startX = target.x
@@ -135,15 +296,32 @@ function startTransform(mode: TransformMode) {
   startRotation = target.rotation
   startScreenMP = pixiToClientCoords(target, { x: 0, y: 0 }, app!)
 
-  // 标记鼠标起点尚未记录，首次 onPointerMove 时记录
-  baseInitialized = false
-
   emitter.emit(StageEvents.TransformStart, true)
   emitter.emit(StageEvents.TransformChange, store.selectedId)
   refreshTransformHint()
 }
 
 function cancelTransform() {
+  const id = store.selectedId
+  if (id && isFigureGroupId(id)) {
+    // 立绘组：还原每个目标到原父原 local rts
+    for (const snap of groupTargetSnapshots) {
+      snap.parent.addChildAt(snap.container, snap.parentIndex)
+      snap.container.position.set(snap.localX, snap.localY)
+      snap.container.scale.set(snap.scaleX, snap.scaleY)
+      snap.container.rotation = snap.rotation
+    }
+    // g 模式：把 store.group.x/y 还原到 start 前的值
+    if (transformMode.value === 'g') {
+      store.updateFigureGroup(id, { x: groupStartCenterX, y: groupStartCenterY })
+    }
+    // 重置 groupContainer（identity + 当前 store.group.x/y 作为 base）
+    resetGroupContainer(id)
+    groupTargetSnapshots = []
+    endTransform()
+    return
+  }
+
   const target = getTransformTarget()
   if (target) {
     if (transformMode.value === 'g') {
@@ -160,12 +338,42 @@ function cancelTransform() {
 }
 
 function endTransform() {
+  const id = store.selectedId
+  if (id && isFigureGroupId(id) && groupTargetSnapshots.length > 0) {
+    const groupContainer = groupContainers.get(id)
+
+    // 立绘组结束变换（commit）：把 groupContainer 当前 rts"正向叠加"到每个 child 上，
+    // 然后把 child 扔回原父。因为原父是 stageMain（identity），child 在 groupContainer 局部下的
+    // 新 rts 直接就是它在 stageMain 局部下的最终 rts，视觉与变换结束时一致。
+    //
+    // 注意：要用 position 而非 x/y 操作位置，绕开 L2dwContainer 的 base 偏移重写。
+    stageMain?.updateTransform()
+    for (const snap of groupTargetSnapshots) {
+      if (groupContainer) {
+        snap.container.scale.x *= groupContainer.scale.x
+        snap.container.scale.y *= groupContainer.scale.y
+        snap.container.rotation += groupContainer.rotation
+        // 位置：用 toGlobal 读真世界位置（自动应用 groupContainer 的 s/r/p），
+        // 再 toLocal 转回 snap.parent（原父）局部，保证 addChildAt 后视觉位置不变。
+        const worldPos = groupContainer.toGlobal(snap.container.position)
+        snap.container.position.copyFrom(snap.parent.toLocal(worldPos))
+      }
+      snap.parent.addChildAt(snap.container, snap.parentIndex)
+    }
+
+    // 重置 groupContainer（identity + 当前 store.group.x/y 作为 base）
+    resetGroupContainer(id)
+    void sortFigures()
+  }
+
   transformMode.value = 'none'
   axisLock.value = 'none'
   baseInitialized = false
+  groupTargetSnapshots = []
   emitter.emit(StageEvents.TransformStart, false)
   emitter.emit(StageEvents.TransformChange, store.selectedId)
   refreshTransformHint()
+  updateFigureGroupCrosshair()
 }
 
 interface MouseHint { keys: string; description: string }
@@ -179,6 +387,7 @@ const TARGET_LABELS: Record<ReturnType<typeof resolveShortcutTargetType>, string
   background: '背景',
   stage: '主场景',
   model: '立绘',
+  figureGroup: '立绘组',
   none: '未选中',
 }
 
@@ -196,6 +405,7 @@ const MOUSE_HINTS_BY_TYPE: Record<ReturnType<typeof resolveShortcutTargetType>, 
   background: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
   stage: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
   model: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
+  figureGroup: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转（按组中心）'}],
   none: [],
 }
 
@@ -228,6 +438,8 @@ let stageMain: PIXI.Container | null = null
 let backgroundContainer: L2dwContainer | null = null
 let figureContainer: PIXI.Container | null = null
 let frameContainer: PIXI.Container | null = null
+/** groupId -> 该立绘组专属 L2dwContainer（始终挂在 stageMain 下） */
+const groupContainers = new Map<string, L2dwContainer>()
 
 let isMiddleDown = false
 let lastMouseX = 0
@@ -325,7 +537,128 @@ async function init() {
   previewRuntime.specialContainers.set(SpecialId.StageMain, stageMain!)
   previewRuntime.specialContainers.set(SpecialId.BgContainer, backgroundContainer!)
 
+  // 为已存在的立绘组创建对应的 groupContainer（若 init 前 watcher 已创建 orphan，需挂上）
+  for (const g of store.figureGroups) {
+    const existing = groupContainers.get(g.id)
+    if (!existing) {
+      const c = new L2dwContainer()
+      c.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+      c.x = g.x
+      c.y = g.y
+      c.scale.set(1, 1)
+      c.rotation = 0
+      stageMain.addChild(c)
+      groupContainers.set(g.id, c)
+    } else if (!existing.parent) {
+      // init 前 watcher 创建的 orphan，挂到 stageMain
+      stageMain.addChild(existing)
+    }
+  }
+
   void loadDefaultBackground()
+}
+
+/**
+ * 取（或懒创建）立绘组专属 L2dwContainer。
+ * 始终挂在 stageMain 下，与 figureContainer/backgroundContainer 同级，zIndex 最高。
+ * base 位置 = 舞台中心 (STAGE_WIDTH/2, STAGE_HEIGHT/2)；groupContainer.x/y 存的就是组的世界坐标，
+ * 这样 s/r 模式天然围绕舞台中心，g 模式改 x/y 即可。
+ */
+function ensureGroupContainer(group: FigureGroupEntry): L2dwContainer {
+  const existing = groupContainers.get(group.id)
+  if (existing) return existing
+  const c = new L2dwContainer()
+  c.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  c.x = group.x
+  c.y = group.y
+  c.scale.set(1, 1)
+  c.rotation = 0
+
+  // 准心作为 groupContainer 的子节点，始终在原点（随容器同步变换）
+  const crosshair = buildFigureGroupCrosshair()
+  crosshair.visible = false
+  c.addChild(crosshair)
+
+  if (!stageMain) {
+    // init 尚未完成；直接存一个孤儿容器，等 init 完再挂上
+    groupContainers.set(group.id, c)
+    return c
+  }
+  stageMain.addChild(c)
+  groupContainers.set(group.id, c)
+  return c
+}
+
+/** 把 groupContainer 的本地 rts 重置为 identity（rotation=0, scale=1）并把 x/y 同步到 group.x/y */
+function resetGroupContainer(groupId: string): void {
+  const c = groupContainers.get(groupId)
+  if (!c) return
+  c.scale.set(1, 1)
+  c.rotation = 0
+  const g = store.figureGroups.find((x) => x.id === groupId)
+  if (g) {
+    c.x = g.x
+    c.y = g.y
+  } else {
+    c.x = 0
+    c.y = 0
+  }
+}
+
+/** 把 groupContainer 移到 stageMain 中 zIndex 最高位置 */
+function bringGroupContainerToTop(groupId: string): void {
+  if (!stageMain) return
+  const c = groupContainers.get(groupId)
+  if (!c) return
+  c.zIndex = 9999
+  stageMain.sortChildren()
+}
+
+/** 销毁 groupContainer（store 删除组时调用） */
+function destroyGroupContainer(groupId: string): void {
+  const c = groupContainers.get(groupId)
+  if (!c) return
+  c.destroy({ children: true })
+  groupContainers.delete(groupId)
+}
+
+/** 构建立绘组准心 graphics：十字线 + 圆 + 中心点 */
+/**
+ * 创建立绘组准心图形（挂在 groupContainer 原点，随容器变换）
+ */
+function buildFigureGroupCrosshair(): PIXI.Graphics {
+  const g = new PIXI.Graphics()
+  const COLOR = 0xff5577
+  g.lineStyle(2, COLOR)
+  // 十字线
+  g.moveTo(-30, 0); g.lineTo(-6, 0)
+  g.moveTo(6, 0); g.lineTo(30, 0)
+  g.moveTo(0, -30); g.lineTo(0, -6)
+  g.moveTo(0, 6); g.lineTo(0, 30)
+  // 圆圈
+  g.drawCircle(0, 0, 12)
+  // 中心点
+  g.beginFill(COLOR)
+  g.drawCircle(0, 0, 3)
+  g.endFill()
+  return g
+}
+
+/** 同步准心：选中立绘组时显示其 groupContainer 上的准心；g/s/r 过程中准心跟随组同步变换 */
+function updateFigureGroupCrosshair() {
+  // 先全部隐藏
+  for (const c of groupContainers.values()) {
+    const ch = c.children.find((ch) => ch instanceof PIXI.Graphics) as PIXI.Graphics | undefined
+    if (ch) ch.visible = false
+  }
+  const id = store.selectedId
+  if (id && isFigureGroupId(id)) {
+    const c = groupContainers.get(id)
+    if (c) {
+      const ch = c.children.find((ch) => ch instanceof PIXI.Graphics) as PIXI.Graphics | undefined
+      if (ch) ch.visible = true
+    }
+  }
 }
 
 watch(
@@ -365,6 +698,16 @@ watch(
   },
 )
 
+function sortFigures() {
+  if (!figureContainer) return;
+  let index = 0
+  containersById.forEach((wrapper, id) => {
+    wrapper.zIndex = index
+    index++
+  })
+  figureContainer.sortChildren()
+}
+
 // 监听模型可见性变化
 watch(
   () => store.models.map((m) => ({ id: m.id, visible: m.visible })),
@@ -384,8 +727,58 @@ watch(
   () => store.selectedId,
   (id) => {
     setCursor('default')
+    updateFigureGroupCrosshair()
   },
   { immediate: true },
+)
+
+// 监听选中立绘组的 x/y 变化（用户在面板编辑锚点时实时更新准心）
+watch(
+  () => {
+    const id = store.selectedId
+    if (!id || !isFigureGroupId(id)) return null
+    const g = store.figureGroups.find((x) => x.id === id)
+    return g ? { x: g.x, y: g.y } : null
+  },
+  () => updateFigureGroupCrosshair(),
+  { immediate: true, deep: true },
+)
+
+// 监听立绘组增删（同步 groupContainer 池）
+watch(
+  () => store.figureGroups.map((g) => g.id),
+  (newIds) => {
+    const newSet = new Set(newIds)
+    for (const id of newIds) {
+      const g = store.figureGroups.find((x) => x.id === id)
+      if (!g) continue
+      const existing = groupContainers.get(id)
+      if (!existing) {
+        ensureGroupContainer(g)
+      } else {
+        existing.x = g.x
+        existing.y = g.y
+      }
+    }
+    for (const id of [...groupContainers.keys()]) {
+      if (!newSet.has(id)) destroyGroupContainer(id)
+    }
+  },
+  { immediate: true },
+)
+
+// 监听所有立绘组 x/y 变化（同步 groupContainer 的 x/y；base 始终为舞台中心）
+watch(
+  () => store.figureGroups.map((g) => ({ id: g.id, x: g.x, y: g.y })),
+  (entries) => {
+    for (const { id, x, y } of entries) {
+      const c = groupContainers.get(id)
+      if (!c) continue
+      c.x = x
+      c.y = y
+    }
+  },
+  { deep: true, immediate: true },
 )
 
 // baseX/baseY 锚定的是 stageMain 内部坐标系的中心，与画布像素无关，
@@ -603,8 +996,18 @@ function attachDomHandlers() {
     }
     // Blender 风格变换操作中：鼠标移动实时应用
     if (isTransforming.value) {
+      if (!rootContainer) return
+
+      // 立绘组：按"组中心为基准"应用 GRS 到所有目标
+      if (isCurrentFigureGroup()) {
+        handleFigureGroupPointerMove(e)
+        emitter.emit(StageEvents.TransformChange, store.selectedId)
+        refreshTransformHint()
+        return
+      }
+
       const target = getTransformTarget()
-      if (target && rootContainer) {
+      if (target) {
         // 首次移动时记录起点 / 起点距离 / 起点方向
         if (!baseInitialized) {
           tStartMouseX = e.clientX
@@ -669,21 +1072,100 @@ function attachDomHandlers() {
           const sinA = startDirX * curDirY - startDirY * curDirX
           const deltaAngle = Math.atan2(sinA, cosA)
           target.rotation = startRotation + deltaAngle
-
-          // 计算 startDir 和 curDir 的角度（以弧度为单位，转为角度）
-          const startAngle = Math.atan2(startDirY, startDirX) * 180 / Math.PI
-          const curAngle = Math.atan2(curDirY, curDirX) * 180 / Math.PI
-          console.log('mp:', startScreenMP)
-          console.log('p:', p)
-          console.log('startDir:', startDirX, startDirY, 'angle:', startAngle)
-          console.log('curDir:', curDirX, curDirY, 'angle:', curAngle)
-          console.log('deltaAngle:', deltaAngle)
-     
         }
         emitter.emit(StageEvents.TransformChange, store.selectedId)
         refreshTransformHint()
       }
       return
+    }
+  }
+
+  /**
+   * 立绘组模式下的鼠标移动处理：只改 groupContainer 的 rts，所有目标自动跟随。
+   *
+   * - g：groupContainer.x/y += dx；同步更新 store.group.x/y 和 base
+   * - s：groupContainer.scale *= factor（围绕 base 锚点放大）
+   * - r：groupContainer.rotation += deltaAngle（围绕 base 锚点旋转）
+   */
+  function handleFigureGroupPointerMove(e: PointerEvent) {
+    if (!rootContainer) return
+
+    const id = store.selectedId
+    if (!id || !isFigureGroupId(id)) return
+    const groupContainer = groupContainers.get(id)
+    if (!groupContainer) return
+
+    // 首次移动时记录 s/r 模式用的"起点距离 / 方向"
+    if (!baseInitialized) {
+      tStartMouseX = e.clientX
+      tStartMouseY = e.clientY
+      if (transformMode.value === 's') {
+        const p = toScreen(e.clientX, e.clientY)
+        const dx = p.x - groupStartScreenMP.x
+        const dy = p.y - groupStartScreenMP.y
+        startDist = Math.sqrt(dx * dx + dy * dy) || 1
+      } else if (transformMode.value === 'r') {
+        const p = toScreen(e.clientX, e.clientY)
+        const dx = p.x - groupStartScreenMP.x
+        const dy = p.y - groupStartScreenMP.y
+        const len = Math.sqrt(dx * dx + dy * dy) || 1
+        startDirX = dx / len
+        startDirY = dy / len
+      }
+      baseInitialized = true
+    }
+
+    const scale = rootContainer.scale.x
+
+    if (transformMode.value === 'g') {
+      const dx = (e.clientX - tStartMouseX) / scale
+      const dy = (e.clientY - tStartMouseY) / scale
+      // g 模式：把 dx/dy 加到 groupContainer.x/y + 同步 store.group.x/y
+      // base 始终固定为舞台中心，s/r 基准不受影响
+      const g = store.figureGroups.find((gg) => gg.id === id)
+      if (!g) return
+      if (axisLock.value === 'x') {
+        groupContainer.x = groupStartCenterX + dx
+        store.updateFigureGroup(id, { x: groupContainer.x, y: groupStartCenterY })
+      } else if (axisLock.value === 'y') {
+        groupContainer.y = groupStartCenterY + dy
+        store.updateFigureGroup(id, { x: groupStartCenterX, y: groupContainer.y })
+      } else {
+        groupContainer.x = groupStartCenterX + dx
+        groupContainer.y = groupStartCenterY + dy
+        store.updateFigureGroup(id, { x: groupContainer.x, y: groupContainer.y })
+      }
+      return
+    }
+
+    if (transformMode.value === 's') {
+      const p = toScreen(e.clientX, e.clientY)
+      const dx = p.x - groupStartScreenMP.x
+      const dy = p.y - groupStartScreenMP.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const factor = dist > 0 ? dist / startDist : 1
+      if (axisLock.value === 'x') {
+        groupContainer.scale.x = groupStartScaleX * factor
+      } else if (axisLock.value === 'y') {
+        groupContainer.scale.y = groupStartScaleY * factor
+      } else {
+        groupContainer.scale.x = groupStartScaleX * factor
+        groupContainer.scale.y = groupStartScaleY * factor
+      }
+      return
+    }
+
+    if (transformMode.value === 'r') {
+      const p = toScreen(e.clientX, e.clientY)
+      const dx = p.x - groupStartScreenMP.x
+      const dy = p.y - groupStartScreenMP.y
+      const len = Math.sqrt(dx * dx + dy * dy) || 1
+      const curDirX = dx / len
+      const curDirY = dy / len
+      const cosA = startDirX * curDirX + startDirY * curDirY
+      const sinA = startDirX * curDirY - startDirY * curDirX
+      const deltaAngle = Math.atan2(sinA, cosA)
+      groupContainer.rotation = groupStartRotation + deltaAngle
     }
   }
 
@@ -747,13 +1229,36 @@ function attachDomHandlers() {
 
     // 变换中：x / y 锁定轴，并把未锁轴回滚到起点
     if (isTransforming.value && (e.key === 'x' || e.key === 'y')) {
+      if (axisLock.value === e.key) {
+        axisLock.value = 'none'
+      } else {
+        axisLock.value = e.key as AxisLock
+      }
+      if (isCurrentFigureGroup()) {
+        // 立绘组模式：把 groupContainer 的"未锁定轴"回滚到起点
+        const gid = store.selectedId
+        if (gid && isFigureGroupId(gid)) {
+          const gc = groupContainers.get(gid)
+          if (gc) {
+            // 回滚后强制让 PIXI 重新计算 child 的世界矩阵，方便后续 mouse move 继续作用
+            if (transformMode.value === 'g') {
+              // 把 groupContainer.x/y 重置回拖动开始时的位置
+              gc.x = groupStartCenterX
+              gc.y = groupStartCenterY
+            } else if (transformMode.value === 's') {
+              gc.scale.x = groupStartScaleX
+              gc.scale.y = groupStartScaleY
+            } else if (transformMode.value === 'r') {
+              gc.rotation = groupStartRotation
+            }
+            if (stageMain) stageMain.updateTransform()
+          }
+        }
+        e.preventDefault()
+        return
+      }
       const target = getTransformTarget()
       if (target) {
-        if (axisLock.value === e.key) {
-          axisLock.value = 'none'
-        } else {
-          axisLock.value = e.key as AxisLock
-        }
         if (transformMode.value === 'g') {
           if (axisLock.value === 'x') target.y = startY
           else if (axisLock.value === 'y') target.x = startX
@@ -936,6 +1441,10 @@ function dispose() {
     frameContainer.destroy({ children: true })
     frameContainer = null
   }
+  for (const c of groupContainers.values()) {
+    c.destroy({ children: true })
+  }
+  groupContainers.clear()
   isMiddleDown = false
 
   previewRuntime.specialContainers.clear()

@@ -13,7 +13,7 @@ import {
   DEFAULT_IMAGE_FIGURE_TEMPLATE,
   DEFAULT_IMAGE_TRANSFORM_TEMPLATE,
 } from '../utils/consts'
-import { SpecialId, isSpecialId } from '../live2d/specialIds'
+import { SpecialId, isSpecialId, isFigureGroupId, makeFigureGroupId } from '../live2d/specialIds'
 import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
 import { previewRuntime } from '../utils/runtimeRegistry'
 import type { L2dwContainer } from '../live2d/L2dwContainer'
@@ -162,9 +162,34 @@ export interface ModelEntry {
   isMoc3: boolean
 }
 
+/**
+ * 立绘组：把多个立绘（或嵌套立绘组）组合在一起，共享统一的 GRS 变换。
+ * - id 形如 'group:<uuid>'，通过 isFigureGroupId 识别
+ * - 变换中心 (x, y) 是 GRS 操作的基准点
+ * - targetIds 指向具体立绘；targetGroupIds 指向嵌套立绘组（递归展平）
+ * - includeBackground / includeAllFigures 用于复制指令时的扩展范围
+ */
+export interface FigureGroupEntry {
+  id: string
+  name: string
+  /** 变换中心 x */
+  x: number
+  /** 变换中心 y */
+  y: number
+  /** 目标立绘 ID 列表 */
+  targetIds: string[]
+  /** 目标立绘组 ID 列表（支持嵌套） */
+  targetGroupIds: string[]
+  /** 是否在复制指令时也复制背景 */
+  includeBackground: boolean
+  /** 是否在复制指令时包含当前所有立绘 */
+  includeAllFigures: boolean
+}
+
 export const useModelStore = defineStore('models', {
   state: () => ({
     models: [] as ModelEntry[],
+    figureGroups: [] as FigureGroupEntry[],
     selectedId: null as string | null,
     backgroundUrl: null as string | null,
     bgTemplate: DEFAULT_BG_TEMPLATE,
@@ -195,6 +220,11 @@ export const useModelStore = defineStore('models', {
     selectedModel(state): ModelEntry | null {
       if (!state.selectedId) return null
       return state.models.find((m) => m.id === state.selectedId) ?? null
+    },
+    selectedFigureGroup(state): FigureGroupEntry | null {
+      const id = state.selectedId
+      if (!id || !isFigureGroupId(id)) return null
+      return state.figureGroups.find((g) => g.id === id) ?? null
     },
     getPlayingState: (state) => (modelId: string): PlayingState => {
       return state.models.find((m) => m.id === modelId)?.playing ?? { motion: null, expression: null }
@@ -664,6 +694,99 @@ export const useModelStore = defineStore('models', {
       if (id == null) return
       this.figureBlinkStates[id] = { ...DEFAULT_BLINK_STATE }
       syncBlinkToModels(id, this.figureBlinkStates[id])
+    },
+
+    // ───────── 立绘组 CRUD ─────────
+
+    /** 新建立绘组，返回新条目；name 默认为"立绘组 N" */
+    addFigureGroup(name?: string): FigureGroupEntry {
+      const id = makeFigureGroupId()
+      const sameNameCount = this.figureGroups.filter((g) => g.name.startsWith('立绘组')).length
+      const group: FigureGroupEntry = {
+        id,
+        name: name ?? `立绘组 ${sameNameCount + 1}`,
+        x: 0,
+        y: 0,
+        targetIds: [],
+        targetGroupIds: [],
+        includeBackground: false,
+        includeAllFigures: false,
+      }
+      this.figureGroups.push(group)
+      return group
+    },
+
+    /** 移除立绘组 */
+    removeFigureGroup(id: string): void {
+      // 同步清理其它立绘组对它的引用
+      for (const g of this.figureGroups) {
+        g.targetGroupIds = g.targetGroupIds.filter((gid) => gid !== id)
+      }
+      this.figureGroups = this.figureGroups.filter((g) => g.id !== id)
+      if (this.selectedId === id) {
+        this.selectedId = this.figureGroups.length > 0
+          ? this.figureGroups[this.figureGroups.length - 1].id
+          : null
+      }
+    },
+
+    /** 更新立绘组的部分字段（patch 中可包含 name / x / y / targetIds / targetGroupIds / includeBackground / includeAllFigures） */
+    updateFigureGroup(id: string, patch: Partial<Omit<FigureGroupEntry, 'id'>>): void {
+      const group = this.figureGroups.find((g) => g.id === id)
+      if (!group) return
+      Object.assign(group, patch)
+    },
+
+    /** 切换立绘组里某个立绘目标（已存在则移除，不存在则追加） */
+    toggleFigureGroupTarget(groupId: string, figureId: string): void {
+      const group = this.figureGroups.find((g) => g.id === groupId)
+      if (!group) return
+      const idx = group.targetIds.indexOf(figureId)
+      if (idx >= 0) group.targetIds.splice(idx, 1)
+      else group.targetIds.push(figureId)
+    },
+
+    /** 切换立绘组里某个立绘组目标 */
+    toggleFigureGroupNestedTarget(groupId: string, nestedGroupId: string): void {
+      const group = this.figureGroups.find((g) => g.id === groupId)
+      if (!group || nestedGroupId === groupId) return
+      const idx = group.targetGroupIds.indexOf(nestedGroupId)
+      if (idx >= 0) group.targetGroupIds.splice(idx, 1)
+      else group.targetGroupIds.push(nestedGroupId)
+    },
+
+    /**
+     * 清理立绘组中已不存在的目标。
+     * 用于变换前后、复制指令前调用，避免空指针/无效引用。
+     */
+    cleanupInvalidFigureGroupTargets(groupId: string): void {
+      const group = this.figureGroups.find((g) => g.id === groupId)
+      if (!group) return
+      const modelIds = new Set(this.models.map((m) => m.id))
+      const groupIds = new Set(this.figureGroups.map((g) => g.id))
+      group.targetIds = group.targetIds.filter((id) => modelIds.has(id))
+      group.targetGroupIds = group.targetGroupIds.filter((gid) => gid !== groupId && groupIds.has(gid))
+    },
+
+    /**
+     * 递归展平立绘组的所有目标立绘 ID（含嵌套立绘组）。
+     * includeAllFigures=true 时直接返回当前所有立绘。
+     */
+    flattenFigureGroupTargets(groupId: string, visited: Set<string> = new Set()): string[] {
+      if (visited.has(groupId)) return []
+      visited.add(groupId)
+      const group = this.figureGroups.find((g) => g.id === groupId)
+      if (!group) return []
+
+      if (group.includeAllFigures) {
+        return this.models.map((m) => m.id)
+      }
+
+      const result: string[] = [...group.targetIds]
+      for (const nestedId of group.targetGroupIds) {
+        result.push(...this.flattenFigureGroupTargets(nestedId, visited))
+      }
+      return result
     },
   },
 })

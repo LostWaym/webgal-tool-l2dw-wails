@@ -1,6 +1,6 @@
 import { computed } from 'vue'
 import { useModelStore, type FilterState } from '../stores/previewStore'
-import { SpecialId, isSpecialId } from '../live2d/specialIds'
+import { SpecialId, isSpecialId, isFigureGroupId } from '../live2d/specialIds'
 import { parseInst, createEmptyInst, Inst } from '../utils/inst_utils'
 import { SetClipboardText } from '../../wailsjs/go/main/App'
 import { useMessage } from './useMessage'
@@ -8,7 +8,7 @@ import { previewRuntime } from '../utils/runtimeRegistry'
 import { FILTER_PROPERTY_KEYS, DEFAULT_FILTER_PROPERTY_VALUES } from '../live2d/L2dwContainer'
 
 /** 快捷键适用的目标类型；与 useShortcuts 内的 store.selectedId 判定保持一致 */
-export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'none'
+export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'figureGroup' | 'none'
 
 export interface ShortcutHint {
   /** 鼠标/键盘触发键，例如 'Ctrl + F'、'左键拖动' */
@@ -31,6 +31,7 @@ function getResourceRelativePath(absPath: string, markerFolder: 'background' | '
 /** 根据 selectedId 解析快捷键目标类型（纯函数，便于复用于执行与展示） */
 export function resolveShortcutTargetType(selectedId: string | null): ShortcutTargetType {
   if (!selectedId) return 'none'
+  if (isFigureGroupId(selectedId)) return 'figureGroup'
   if (isSpecialId(selectedId)) {
     return selectedId === SpecialId.BgContainer ? 'background' : 'stage'
   }
@@ -321,57 +322,70 @@ interface ShortcutEntry {
   keys: string
   description: string
   targets: ShortcutTargetType[]
+  /** handler key，用于立绘组分发时根据目标类型找正确 handler */
+  handlerKey: ShortcutHandlerKey
   run: () => Inst | string | string[] | null
 }
+
+type ShortcutHandlerKey =
+  | 'modelFigure' | 'modelTransform' | 'modelSplit' | 'modelMerge' | 'modelHide'
+  | 'bgSetImage' | 'bgTransform' | 'stageTransform'
 
 export const SHORTCUTS: readonly ShortcutEntry[] = [
   {
     key: 'f',
     keys: 'Ctrl + F',
     description: '复制立绘显示/切换指令 (changeFigure)',
-    targets: ['model'],
+    targets: ['model', 'figureGroup'],
+    handlerKey: 'modelFigure',
     run: () => handler.modelFigure(),
   },
   {
     key: 't',
     keys: 'Ctrl + T',
     description: '复制立绘变换指令 (setTransform)',
-    targets: ['model'],
+    targets: ['model', 'figureGroup'],
+    handlerKey: 'modelTransform',
     run: () => handler.modelTransform(),
   },
   {
     key: 'x',
     keys: 'Ctrl + X',
     description: '复制拆分的立绘 + 变换指令（两行）',
-    targets: ['model'],
+    targets: ['model', 'figureGroup'],
+    handlerKey: 'modelSplit',
     run: () => handler.modelSplit(),
   },
   {
     key: 'a',
     keys: 'Ctrl + A',
     description: '复制合并后的立绘指令（含 transform 参数）',
-    targets: ['model'],
+    targets: ['model', 'figureGroup'],
+    handlerKey: 'modelMerge',
     run: () => handler.modelMerge(),
   },
   {
     key: 'h',
     keys: 'Ctrl + H',
     description: '复制隐藏立绘指令',
-    targets: ['model'],
+    targets: ['model', 'figureGroup'],
+    handlerKey: 'modelHide',
     run: () => handler.modelHide(),
   },
   {
     key: 'f',
     keys: 'Ctrl + F',
     description: '复制背景切换指令 (changeBg)',
-    targets: ['background'],
+    targets: ['background', 'figureGroup'],
+    handlerKey: 'bgSetImage',
     run: () => handler.bgSetImage(),
   },
   {
     key: 't',
     keys: 'Ctrl + T',
     description: '复制背景变换指令 (setTransform)',
-    targets: ['background'],
+    targets: ['background', 'figureGroup'],
+    handlerKey: 'bgTransform',
     run: () => handler.bgTransform(),
   },
   {
@@ -379,6 +393,7 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
     keys: 'Ctrl + T',
     description: '复制主场景变换指令 (setTransform)',
     targets: ['stage'],
+    handlerKey: 'stageTransform',
     run: () => handler.stageTransform(),
   },
 ]
@@ -399,6 +414,80 @@ function copyHandlerResult(result: unknown): void {
   SetClipboardText(text).catch((err) => {
     console.error('[Shortcut] SetClipboardText failed:', err)
   })
+}
+
+/**
+ * 把单条 handler 的返回值转成"行"数组（用于多行拼接）。
+ * - null → []
+ * - string → [string]
+ * - string[] → 过滤非字符串元素
+ * - Inst → [toInstString()]
+ */
+function resultToLines(result: unknown): string[] {
+  if (result == null) return []
+  if (typeof result === 'string') return [result]
+  if (Array.isArray(result)) {
+    return result.filter((v): v is string => typeof v === 'string')
+  }
+  if (typeof result === 'object' && typeof (result as Inst).toInstString === 'function') {
+    return [(result as Inst).toInstString()]
+  }
+  return []
+}
+
+/**
+ * 立绘组快捷键分发：
+ *  - 立绘类（modelFigure/modelTransform/...）：循环每个立绘目标，临时切 selectedId 复用 handler
+ *  - 背景类（bgSetImage/bgTransform）：当 includeBackground=true 时，按 handlerKey 直接调 handler.bgSetImage/bgTransform，
+ *    不再依赖 selectedId = BgContainer（避免"切到 BgContainer 后跑 modelFigure"返回 null 的问题）
+ *  - 立绘 + 背景的结果按行拼接
+ */
+function runShortcutForFigureGroup(entry: ShortcutEntry): void {
+  const store = useModelStore()
+  const id = store.selectedId
+  if (!id || !isFigureGroupId(id)) return
+
+  const group = store.figureGroups.find((g) => g.id === id)
+  if (!group) return
+
+  store.cleanupInvalidFigureGroupTargets(id)
+
+  const lines: string[] = []
+  const isBackgroundHandler =
+    entry.handlerKey === 'bgSetImage' || entry.handlerKey === 'bgTransform'
+
+  // 立绘类：循环每个目标（仅在不是背景专用 handler 时才有意义）
+  if (!isBackgroundHandler) {
+    const figureTargets = store.flattenFigureGroupTargets(id)
+    for (const targetId of figureTargets) {
+      if (!store.models.some((m) => m.id === targetId)) continue
+      const prev = store.selectedId
+      store.selectedId = targetId
+      try {
+        lines.push(...resultToLines(entry.run()))
+      } finally {
+        store.selectedId = prev
+      }
+    }
+  }
+
+  // 背景：仅背景专用快捷键 + includeBackground 时处理
+  if (group.includeBackground && isBackgroundHandler) {
+    const fn = handler[entry.handlerKey]
+    if (typeof fn === 'function') {
+      lines.push(...resultToLines((fn as () => unknown)()))
+    }
+  }
+
+  if (lines.length === 0) {
+    useMessage().warning('无可用指令')
+    return
+  }
+  const text = lines.join('\n')
+  SetClipboardText(text).catch((err) => {
+    console.error('[Shortcut] SetClipboardText failed:', err)
+  })
+  useMessage().success(`复制立绘组指令成功（${lines.length} 行）`)
 }
 
 /**
@@ -437,6 +526,13 @@ export function useShortcuts() {
     const entry = SHORTCUTS.find((s) => s.key === key && s.targets.includes(type))
     if (!entry) return
     e.preventDefault()
+
+    // 立绘组：走专用分发（展平所有目标 + 多行拼接 + 可选背景）
+    if (type === 'figureGroup') {
+      runShortcutForFigureGroup(entry)
+      return
+    }
+
     copyHandlerResult(entry.run())
   }
 

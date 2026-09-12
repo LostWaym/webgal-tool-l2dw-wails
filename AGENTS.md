@@ -125,6 +125,9 @@ l2dw-wails/
 - 相关PiniaStore = "frontend/src/stores/previewStore.ts"（注册名 `models`，通过 `useModelStore()` 获取）
 - 相关术语：
   - grs（Stage.vue对立绘的快捷键操作）
+  - 立绘列表（一般指"frontend\src\components\ModelPreviewApp\ModelList.vue"）
+  - 操作区（一般指"frontend\src\components\ModelPreviewApp\ModelActionPanel.vue"）
+  - 页签（一般指操作区上方的页签），页签内容（一般指选择页签后，操作区里展示的panel内容。
 
 ### 改模编辑器相关
 
@@ -153,3 +156,7 @@ l2dw-wails/
 
 - 事件分发 = "frontend/src/stores/emitter.ts"（mitt 封装）。避免从 window 注入方法，避免使用匿名函数，需考虑 on off 生命周期，尽量避免在列表项组件里使用。事件名统一在 `StageEvents` 常量中维护（避免散落字符串）。
 - 运行时共享 = "frontend/src/utils/runtimeRegistry.ts"。跨组件共享 Pixi app、模型 / 特殊容器、清理回调等运行时引用。
+
+### 通用术语
+
+- rts = 如果没有特殊说明，则一般指代 rotation（旋转） translate（位置） scale（缩放）

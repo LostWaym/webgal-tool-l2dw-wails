@@ -13,7 +13,7 @@ import {
   DEFAULT_TRANSFORM_TEMPLATE,
 } from '../../utils/consts'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
-import { isSpecialId, getSpecialName, SpecialId } from '../../live2d/specialIds'
+import { isSpecialId, getSpecialName, SpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import { PickImageFile } from '../../../wailsjs/go/main/App'
 import { filterBySearch } from '../../utils/searchUtils'
 import emitter, { StageEvents } from '../../stores/emitter'
@@ -34,7 +34,7 @@ const filterScroll = useDraggableScroll()
 const focusScroll = useDraggableScroll()
 const blinkScroll = useDraggableScroll()
 
-type TabKey = 'motionExpression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo'
+type TabKey = 'motionExpression' | 'transform' | 'bgInfo' | 'stageInfo' | 'figureInfo' | 'figureGroupInfo'
 const activeTab = ref<TabKey>('motionExpression') // 页签
 
 interface TabConfig {
@@ -48,6 +48,7 @@ const TAB_CONFIGS: Record<TabKey, TabConfig> = {
   bgInfo:     { key: 'bgInfo',     label: '场景信息' },
   stageInfo:  { key: 'stageInfo',  label: '主场景信息' },
   figureInfo: { key: 'figureInfo', label: '立绘信息' },
+  figureGroupInfo: { key: 'figureGroupInfo', label: '立绘组信息' },
 }
 const motionSearch = ref('')
 const expressionSearch = ref('')
@@ -63,6 +64,11 @@ const visibleTabs = ref<TabConfig[]>([])
 watch(() => store.selectedId, (newId) => {
   if (!newId) {
     visibleTabs.value = []
+    return
+  }
+  if (isFigureGroupId(newId)) {
+    // 立绘组：仅 figureGroupInfo + transform
+    visibleTabs.value = [TAB_CONFIGS.figureGroupInfo]
     return
   }
   if (newId === SpecialId.BgContainer) {
@@ -254,6 +260,8 @@ function clamp(value: number, min: number, max: number): number {
 // 从模型同步变换数据到 store
 function syncTransformFromModel() {
   if (!store.selectedId) return
+  // 立绘组：容器由 Stage 直接维护，无需同步单个容器的变换到 store
+  if (isFigureGroupId(store.selectedId)) return
   const container = getL2dwContainer()
   if (!container) return
 
@@ -382,6 +390,19 @@ const figureTransformTemplateInput = computed({
 watch(() => store.selectedId, async (newId, oldId) => {
   console.log('selectedId changed:', newId, oldId)
 
+  // 立绘组：清理无效目标，并切到 figureGroupInfo
+  if (newId && isFigureGroupId(newId)) {
+    store.cleanupInvalidFigureGroupTargets(newId)
+    if (activeTab.value !== 'figureGroupInfo') {
+      activeTab.value = 'figureGroupInfo'
+    }
+    motions.value = []
+    expressions.value = []
+    await nextTick()
+    syncFilterFromContainer()
+    return
+  }
+
   // 占位项：通用页签（transform）保留，否则切到默认页签
   if (isSpecialId(newId)) {
     const targetTab =
@@ -413,7 +434,7 @@ watch(() => store.selectedId, async (newId, oldId) => {
   // 仅当上一次选中的是占位项（或停留在不可用的页签）时才重置为 motionExpression
   // 立绘之间切换时保留当前页签
   const cameFromSpecial = isSpecialId(oldId)
-  if (activeTab.value !== 'transform' && (cameFromSpecial || activeTab.value === 'bgInfo' || activeTab.value === 'stageInfo')) {
+  if (isFigureGroupId(oldId) || activeTab.value !== 'transform' && (cameFromSpecial || activeTab.value === 'bgInfo' || activeTab.value === 'stageInfo')) {
     activeTab.value = 'motionExpression'
   }
 
@@ -553,6 +574,42 @@ function generateFigureTemplate() {
 function generateFigureTransformTemplate() {
   figureTransformTemplateInput.value = DEFAULT_TRANSFORM_TEMPLATE
   commitFigureTemplates()
+}
+
+// ───────── 立绘组信息页签处理器 ─────────
+
+/** 当前可选的"其它立绘组"列表（排除自身），用于嵌套目标勾选 */
+const availableNestedGroups = computed(() => {
+  const cur = store.selectedFigureGroup
+  if (!cur) return []
+  return store.figureGroups.filter((g) => g.id !== cur.id)
+})
+
+function onFigureGroupNameChange(name: string) {
+  const cur = store.selectedFigureGroup
+  if (!cur) return
+  store.updateFigureGroup(cur.id, { name })
+}
+
+function onFigureGroupCenterChange(axis: 'x' | 'y', value: string) {
+  const cur = store.selectedFigureGroup
+  if (!cur) return
+  const num = Number(value)
+  if (Number.isNaN(num)) return
+  store.updateFigureGroup(cur.id, { [axis]: num })
+}
+
+function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures', checked: boolean) {
+  const cur = store.selectedFigureGroup
+  if (!cur) return
+  store.updateFigureGroup(cur.id, { [key]: checked })
+}
+
+function onFigureGroupCleanup() {
+  const cur = store.selectedFigureGroup
+  if (!cur) return
+  store.cleanupInvalidFigureGroupTargets(cur.id)
+  msg.success('已清理无效目标')
 }
 
 function generateBgTemplate() {
@@ -1308,6 +1365,110 @@ function onLabelDragEnd() {
         </div>
       </div>
     </div>
+
+    <!-- 立绘组信息 -->
+    <div v-else-if="activeTab === 'figureGroupInfo'" class="panel__info">
+      <div v-if="store.selectedFigureGroup" class="info-section">
+        <!-- 名称 -->
+        <div class="info-row">
+          <label class="info-label">名称</label>
+          <input
+            class="form-input"
+            :value="store.selectedFigureGroup.name"
+            @change="onFigureGroupNameChange(($event.target as HTMLInputElement).value)"
+          />
+        </div>
+
+        <!-- 锚点坐标 -->
+        <div class="info-row">
+          <label class="info-label">锚点 X</label>
+          <input
+            type="number"
+            class="form-input"
+            :value="store.selectedFigureGroup.x"
+            step="1"
+            @input="onFigureGroupCenterChange('x', ($event.target as HTMLInputElement).value)"
+          />
+        </div>
+        <div class="info-row">
+          <label class="info-label">锚点 Y</label>
+          <input
+            type="number"
+            class="form-input"
+            :value="store.selectedFigureGroup.y"
+            step="1"
+            @input="onFigureGroupCenterChange('y', ($event.target as HTMLInputElement).value)"
+          />
+        </div>
+
+        <!-- 是否包括背景 / 全部立绘 -->
+        <div class="info-row">
+          <label class="info-label">包括背景</label>
+          <input
+            type="checkbox"
+            :checked="store.selectedFigureGroup.includeBackground"
+            @change="onFigureGroupFlagChange('includeBackground', ($event.target as HTMLInputElement).checked)"
+          />
+        </div>
+        <div class="info-row">
+          <label class="info-label">包含所有立绘</label>
+          <input
+            type="checkbox"
+            :checked="store.selectedFigureGroup.includeAllFigures"
+            @change="onFigureGroupFlagChange('includeAllFigures', ($event.target as HTMLInputElement).checked)"
+          />
+        </div>
+
+        <!-- 目标立绘 -->
+        <div class="info-row info-row--stack">
+          <label class="info-label">目标立绘（{{ store.selectedFigureGroup.targetIds.length }}）</label>
+          <div v-if="store.models.length === 0" class="info-empty">暂无立绘</div>
+          <ul v-else class="target-list">
+            <li
+              v-for="m in store.models"
+              :key="m.id"
+              class="target-item"
+            >
+              <label>
+                <input
+                  type="checkbox"
+                  :checked="store.selectedFigureGroup.targetIds.includes(m.id)"
+                  @change="store.toggleFigureGroupTarget(store.selectedFigureGroup.id, m.id)"
+                />
+                {{ m.name }}
+              </label>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 目标立绘组 -->
+        <div class="info-row info-row--stack">
+          <label class="info-label">目标立绘组（{{ store.selectedFigureGroup.targetGroupIds.length }}）</label>
+          <div v-if="availableNestedGroups.length === 0" class="info-empty">暂无其它立绘组</div>
+          <ul v-else class="target-list">
+            <li
+              v-for="g in availableNestedGroups"
+              :key="g.id"
+              class="target-item"
+            >
+              <label>
+                <input
+                  type="checkbox"
+                  :checked="store.selectedFigureGroup.targetGroupIds.includes(g.id)"
+                  @change="store.toggleFigureGroupNestedTarget(store.selectedFigureGroup.id, g.id)"
+                />
+                {{ g.name }}
+              </label>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="info-row">
+          <button class="reset-btn reset-btn--small" @click="onFigureGroupCleanup">清理无效目标</button>
+        </div>
+      </div>
+    </div>
   </aside>
 </template>
 
@@ -1706,6 +1867,38 @@ function onLabelDragEnd() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.info-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.info-empty {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.target-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.target-item {
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.target-item label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
 .info-label {

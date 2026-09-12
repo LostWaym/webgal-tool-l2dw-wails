@@ -20,6 +20,11 @@ async function onLoadWmdl() {
   await store.loadWmdl()
 }
 
+function onAddFigureGroup() {
+  const group = store.addFigureGroup()
+  store.select(group.id)
+}
+
 function onSelect(id: string) {
   if (store.selectedId === id) {
     store.select('')
@@ -31,6 +36,11 @@ function onSelect(id: string) {
 function onRemove(id: string, event: MouseEvent) {
   event.stopPropagation()
   store.remove(id)
+}
+
+function onRemoveFigureGroup(id: string, event: MouseEvent) {
+  event.stopPropagation()
+  store.removeFigureGroup(id)
 }
 
 function onToggleVisible(id: string, event: MouseEvent) {
@@ -72,6 +82,9 @@ function onDragEnd() {
       <button class="add-btn" @click="onAdd">加载模型</button>
       <button class="add-btn" @click="onAddImage">加载图片</button>
       <button class="add-btn" @click="onLoadWmdl">加载 Wmdl</button>
+    </header>
+    <header class="model-list__header model-list__header--secondary">
+      <button class="add-btn add-btn--group" @click="onAddFigureGroup">新建立绘组</button>
     </header>
 
     <ul class="model-list__items model-list__items--special">
@@ -120,6 +133,26 @@ function onDragEnd() {
     </ul>
 
     <p v-else class="model-list__empty">尚未加载任何模型</p>
+
+    <ul v-if="store.figureGroups.length" class="model-list__items model-list__items--groups">
+      <li
+        v-for="g in store.figureGroups"
+        :key="g.id"
+        class="model-row model-row--group"
+        :class="{ 'is-selected': g.id === store.selectedId }"
+        @click="onSelect(g.id)"
+      >
+        <span class="model-row__group-badge" title="立绘组">组</span>
+        <span class="model-row__name" :title="`${g.targetIds.length} 个立绘 / ${g.targetGroupIds.length} 个嵌套组`">{{ g.name }}</span>
+        <button
+          class="model-row__close"
+          aria-label="移除立绘组"
+          @click="onRemoveFigureGroup(g.id, $event)"
+        >
+          ×
+        </button>
+      </li>
+    </ul>
   </aside>
 </template>
 
@@ -292,5 +325,53 @@ function onDragEnd() {
   margin: 4px 0;
   border: none;
   border-top: 1px solid #2c313a;
+}
+
+.model-list__header--secondary {
+  padding-top: 0;
+  border-top: 1px dashed #2c313a;
+}
+
+.add-btn--group {
+  background: #5a4fcf;
+  border-color: #5a4fcf;
+}
+
+.add-btn--group:hover {
+  background: #6e63df;
+}
+
+.add-btn--group:active {
+  background: #4a40b8;
+}
+
+.model-list__items--groups {
+  border-top: 1px solid #2c313a;
+  flex: 0 0 auto;
+  max-height: 35%;
+}
+
+.model-row--group {
+  background: #23273a;
+}
+
+.model-row--group.is-selected {
+  background: #353c5a;
+  border-left-color: #b39bff;
+}
+
+.model-row__group-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  background: #7d6cff;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 </style>

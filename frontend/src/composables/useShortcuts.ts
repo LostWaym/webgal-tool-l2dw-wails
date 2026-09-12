@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useModelStore, type FilterState } from '../stores/previewStore'
 import { SpecialId, isSpecialId, isFigureGroupId } from '../live2d/specialIds'
 import { parseInst, createEmptyInst, Inst } from '../utils/inst_utils'
@@ -6,6 +6,49 @@ import { SetClipboardText } from '../../wailsjs/go/main/App'
 import { useMessage } from './useMessage'
 import { previewRuntime } from '../utils/runtimeRegistry'
 import { FILTER_PROPERTY_KEYS, DEFAULT_FILTER_PROPERTY_VALUES } from '../live2d/L2dwContainer'
+
+/** 复制指令时 `-next` flag 的处理模式 */
+export type NextArgMode = 'none' | 'all' | 'allButLast'
+
+export const NEXT_ARG_MODE_OPTIONS: ReadonlyArray<{ value: NextArgMode; label: string }> = [
+  { value: 'none', label: '不处理' },
+  { value: 'all', label: '全部处理' },
+  { value: 'allButLast', label: '除了最后一个' },
+]
+
+/** 会话内 next 后处理模式：默认除了最后一个 */
+const nextArgMode = ref<NextArgMode>('allButLast')
+
+export function getNextMode(): NextArgMode {
+  return nextArgMode.value
+}
+
+export function setNextMode(mode: NextArgMode): void {
+  nextArgMode.value = mode
+}
+
+/** 给单条指令行追加 `-next` flag（行尾有 `;` 时插在 `;` 前）；无法安全解析则原样返回 */
+function appendNextFlag(line: string): string {
+  const inst = parseInst(line)
+  inst.setParamValue('next', true)
+  return inst.toInstString()
+}
+
+/**
+ * 按当前模式对指令行数组做 -next 后处理。
+ * - none: 原样返回
+ * - all: 全部行追加 -next
+ * - allButLast: 除最后一行外都追加 -next
+ */
+export function applyNextFlag(lines: string[]): string[] {
+  const mode = nextArgMode.value
+  if (mode === 'none' || lines.length === 0) return lines
+  const last = lines.length - 1
+  return lines.map((line, i) => {
+    if (mode === 'allButLast' && i === last) return line
+    return appendNextFlag(line)
+  })
+}
 
 /** 快捷键适用的目标类型；与 useShortcuts 内的 store.selectedId 判定保持一致 */
 export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'figureGroup' | 'none'
@@ -404,18 +447,10 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
 
 // 处理 handler 返回值的归一化：Inst→toInstString; string 保留; string[] 换行合并; null 跳过
 function copyHandlerResult(result: unknown): void {
-  if (result == null) return
-  let text: string | null = null
-  if (typeof result === 'string') {
-    text = result
-  } else if (Array.isArray(result)) {
-    const parts = result.filter((v): v is string => typeof v === 'string')
-    text = parts.length ? parts.join('\n') : null
-  } else if (typeof result === 'object' && typeof (result as Inst).toInstString === 'function') {
-    text = (result as Inst).toInstString()
-  }
-  if (!text) return
-  SetClipboardText(text).catch((err) => {
+  const lines = resultToLines(result)
+  if (lines.length === 0) return
+  const processed = applyNextFlag(lines)
+  SetClipboardText(processed.join('\n')).catch((err) => {
     console.error('[Shortcut] SetClipboardText failed:', err)
   })
 }
@@ -507,11 +542,12 @@ function runShortcutForFigureGroup(key: string): void {
     useMessage().warning('无可用指令')
     return
   }
-  const text = lines.join('\n')
+  const processed = applyNextFlag(lines)
+  const text = processed.join('\n')
   SetClipboardText(text).catch((err) => {
     console.error('[Shortcut] SetClipboardText failed:', err)
   })
-  useMessage().success(`复制立绘组指令成功（${lines.length} 行）`)
+  useMessage().success(`复制立绘组指令成功（${processed.length} 行）`)
 }
 
 /** 检测当前焦点是否在文本输入控件内（input[非 checkbox/radio] / textarea / contentEditable） */

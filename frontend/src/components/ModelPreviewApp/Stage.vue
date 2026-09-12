@@ -10,7 +10,7 @@ import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
 import { OpenEditor } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
-import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint } from '../../composables/useShortcuts'
+import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
 import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
@@ -29,6 +29,14 @@ function toggleHints() {
 function onShortcutClick(e: MouseEvent, entry: ShortcutEntry) {
   e.stopPropagation()
   runShortcutEntry(entry)
+}
+
+// 右上角 next 后处理模式：会话内有效，刷新即重置
+const nextMode = ref<NextArgMode>(getNextMode())
+function onNextModeChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value as NextArgMode
+  setNextMode(v)
+  nextMode.value = v
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1545,6 +1553,20 @@ function dispose() {
       <div class="transform-hint__line" v-if="transformMode !== 'g'">缩放 X={{ transformHint.scaleX }}，Y={{ transformHint.scaleY }}</div>
       <div class="transform-hint__line" v-if="transformMode !== 'g'">旋转 {{ transformHint.rotationDeg }}°</div>
     </div>
+    <!-- 左上角：复制指令的 -next 后处理模式 -->
+    <div v-if="!isTransforming" class="stage__next-mode">
+      <label class="stage__next-mode-label" for="stage-next-mode-select">next 后处理:</label>
+      <select
+        id="stage-next-mode-select"
+        class="stage__next-mode-select"
+        :value="nextMode"
+        @change="onNextModeChange"
+      >
+        <option v-for="opt in NEXT_ARG_MODE_OPTIONS" :key="opt.value" :value="opt.value">
+          {{ opt.label }}
+        </option>
+      </select>
+    </div>
     <!-- <p v-if="!store.models.length && !backgroundSprite" class="stage__hint">
       点击左上角 “加载模型” 按钮选择 Live2D 模型文件 (.model.json 或 .model3.json)
     </p> -->
@@ -1654,6 +1676,55 @@ function dispose() {
   pointer-events: none;
   text-align: center;
   padding: 24px;
+}
+
+.stage__next-mode {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fff;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 0 2px rgba(0, 0, 0, 0.85);
+  user-select: none;
+}
+
+.stage__next-mode-label {
+  font-weight: 600;
+}
+
+.stage__next-mode-select {
+  pointer-events: auto;
+  font: inherit;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.stage__next-mode-select:focus-visible {
+  outline: none;
+  border-color: #b3e5fc;
+}
+
+.stage__next-mode-select option {
+  color: #fff;
+  background: #1f2024;
 }
 
 .stage__hints {

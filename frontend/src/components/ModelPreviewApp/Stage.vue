@@ -429,7 +429,7 @@ const STAGE_HEIGHT = 1440
 
 // Root 容器交互常量
 const DRAG_SENSITIVITY = 1      // 中键拖拽灵敏度
-const ZOOM_SENSITIVITY = 0.0001  // 滚轮缩放灵敏度（每像素 deltaY）
+const ZOOM_FACTOR = 1.08        // 滚轮缩放因子（每次滚动乘/除 ~8%）
 const MIN_SCALE = 0.1           // 最小缩放
 const MAX_SCALE = 10            // 最大缩放
 
@@ -1179,12 +1179,12 @@ function attachDomHandlers() {
   window.addEventListener('pointerup', onPointerUp)
   window.addEventListener('pointercancel', onPointerUp)
 
-  // 滚轮缩放 Root
+  // 滚轮缩放 Root（乘法因子：scale 大小时手感一致）
   const onWheel = (e: WheelEvent) => {
     if (!rootContainer) return
     e.preventDefault()
-    const delta = -e.deltaY * ZOOM_SENSITIVITY
-    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x + delta))
+    const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x * factor))
     rootContainer.scale.set(newScale)
   }
 

@@ -517,6 +517,7 @@ async function init() {
   })
   app.ticker.maxFPS = 60
   previewRuntime.app = app
+  previewRuntime.previewStore = useModelStore()
 
   // The plugin's auto-update reads window.PIXI.Ticker.
   ;(window as any).PIXI = PIXI

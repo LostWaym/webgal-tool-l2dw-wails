@@ -1,6 +1,7 @@
 import type { Application, Container } from 'pixi.js'
 import type { Live2DModel } from 'pixi-live2d-display-webgal'
 import type { L2dwContainer } from '../live2d/L2dwContainer'
+import { useModelStore } from '../stores/previewStore'
 
 export interface PreviewRuntime {
   specialContainers: Map<string, Container>
@@ -8,6 +9,7 @@ export interface PreviewRuntime {
   live2dModels: Map<string, Live2DModel>
   wmdlSubModels: Map<string, { subModelIds: string[]; mainWrapper: L2dwContainer }>
   app: Application | null
+  previewStore: any
   cleanup: () => void
 }
 
@@ -27,6 +29,7 @@ export const previewRuntime: PreviewRuntime = {
   live2dModels: new Map(),
   wmdlSubModels: new Map(),
   app: null,
+  previewStore: null,
   cleanup: () => {},
 }
 

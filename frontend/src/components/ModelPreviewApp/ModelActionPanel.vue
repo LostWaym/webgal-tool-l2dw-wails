@@ -22,6 +22,9 @@ import { useMessage } from '../../composables/useMessage'
 import { useDraggableScroll } from '../../composables/useDraggableScroll'
 import SearchInput from '../common/SearchInput.vue'
 import FocusPicker from '../common/FocusPicker.vue'
+import ColorPicker, { type RGBColor } from '../common/ColorPicker.vue'
+import ColorPickerModal from '../common/ColorPickerModal.vue'
+import { useColorPickerModal, type ColorPickerTarget } from '../../composables/useColorPickerModal'
 import settingsIcon from '../../assets/icons/settings.png'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
@@ -122,14 +125,16 @@ const filterState = computed<FilterState>(
 )
 const filterCollapsed = ref(false)
 
-/** 每个 group: { title, items: { key, label, min?, max?, step?, boolean? }[] } */
+/** 每个 group: { title, items: { key, label, min?, max?, step?, boolean?, colorPicker? }[] } */
 interface FilterItemSpec {
-  key: keyof FilterState
+  key?: keyof FilterState
   label: string
   min?: number
   max?: number
   step?: number
   boolean?: boolean
+  /** 当设置时，该项用 ColorPicker 渲染（绑定的 rKey/gKey/bKey 必须存在于 FilterState） */
+  colorPicker?: ColorPickerTarget
 }
 interface FilterGroupSpec {
   title: string
@@ -150,9 +155,10 @@ const FILTER_GROUPS: FilterGroupSpec[] = [
       { key: 'contrast', label: '对比度', min: 0, max: 2, step: 0.01 },
       { key: 'saturation', label: '饱和度', min: 0, max: 2, step: 0.01 },
       { key: 'gamma', label: '伽马', min: 0, max: 2, step: 0.01 },
-      { key: 'colorRed', label: '红色', min: 0, max: 255, step: 1 },
-      { key: 'colorGreen', label: '绿色', min: 0, max: 255, step: 1 },
-      { key: 'colorBlue', label: '蓝色', min: 0, max: 255, step: 1 },
+      {
+        label: '色彩',
+        colorPicker: { rKey: 'colorRed', gKey: 'colorGreen', bKey: 'colorBlue' },
+      },
     ],
   },
   {
@@ -173,9 +179,10 @@ const FILTER_GROUPS: FilterGroupSpec[] = [
       { key: 'bevelThickness', label: '厚度', min: 0, max: 32, step: 0.1 },
       { key: 'bevelRotation', label: '角度', min: 0, max: 360, step: 1 },
       { key: 'bevelSoftness', label: '柔度', min: 0, max: 1, step: 0.01 },
-      { key: 'bevelRed', label: '光红', min: 0, max: 255, step: 1 },
-      { key: 'bevelGreen', label: '光绿', min: 0, max: 255, step: 1 },
-      { key: 'bevelBlue', label: '光蓝', min: 0, max: 255, step: 1 },
+      {
+        label: '光色',
+        colorPicker: { rKey: 'bevelRed', gKey: 'bevelGreen', bKey: 'bevelBlue' },
+      },
     ],
   },
   {
@@ -206,6 +213,37 @@ function onFilterToggle(key: keyof FilterState, checked: boolean) {
 
 function resetFilters() {
   store.resetFilterState(store.selectedId)
+}
+
+// ───────── 颜色拾取器 ─────────
+const colorModal = useColorPickerModal()
+
+/** 把 store 中三段 R/G/B 字段读出为 {r,g,b}（缺字段时返回 255 兜底） */
+function colorForKey(target: ColorPickerTarget): RGBColor {
+  const s = filterState.value
+  const r = s[target.rKey as keyof FilterState]
+  const g = s[target.gKey as keyof FilterState]
+  const b = s[target.bKey as keyof FilterState]
+  return {
+    r: typeof r === 'number' ? r : 255,
+    g: typeof g === 'number' ? g : 255,
+    b: typeof b === 'number' ? b : 255,
+  }
+}
+
+/** 把 {r,g,b} 拆成三段字段一并写回 store */
+function setColorForKey(target: ColorPickerTarget, color: RGBColor) {
+  const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)))
+  store.setFilterState(store.selectedId, {
+    [target.rKey]: clamp(color.r),
+    [target.gKey]: clamp(color.g),
+    [target.bKey]: clamp(color.b),
+  } as Partial<FilterState>)
+}
+
+function openColorModal(target: ColorPickerTarget) {
+  colorModal.setOnConfirm((color) => setColorForKey(target, color))
+  colorModal.open(target, colorForKey(target))
 }
 
 // ───────── 注视 / 眨眼状态（仅 live2d 立绘） ─────────
@@ -1048,7 +1086,7 @@ function onLabelDragEnd() {
                 <div class="filter-group-title">{{ group.title }}</div>
                 <div
                   v-for="item in group.items"
-                  :key="item.key"
+                  :key="(item.key as string | undefined) ?? `${item.label}-${group.title}`"
                   class="form-row"
                   :class="{ 'form-row--check': item.boolean }"
                 >
@@ -1057,22 +1095,30 @@ function onLabelDragEnd() {
                       <input
                         type="checkbox"
                         class="form-row__check"
-                        :checked="filterState[item.key] === 1"
-                        @change="(e: any) => onFilterToggle(item.key, e.target.checked)"
+                        :checked="filterState[item.key as keyof FilterState] === 1"
+                        @change="(e: any) => onFilterToggle(item.key as keyof FilterState, e.target.checked)"
                       />
                       <span>{{ item.label }}</span>
                     </label>
                   </template>
+                  <template v-else-if="item.colorPicker">
+                    <label class="form-row__color-label">{{ item.label }}</label>
+                    <ColorPicker
+                      :color="colorForKey(item.colorPicker)"
+                      @update:color="(c: RGBColor) => setColorForKey(item.colorPicker!, c)"
+                      @open-modal="openColorModal(item.colorPicker!)"
+                    />
+                  </template>
                   <template v-else>
                     <label>{{ item.label }}</label>
                     <input
-                      :value="filterState[item.key]"
+                      :value="filterState[item.key as keyof FilterState]"
                       type="number"
                       class="form-input"
                       :step="item.step ?? 'any'"
                       :min="item.min"
                       :max="item.max"
-                      @input="(e: any) => onFilterInput(item.key, Number(e.target.value))"
+                      @input="(e: any) => onFilterInput(item.key as keyof FilterState, Number(e.target.value))"
                     />
                   </template>
                 </div>
@@ -2020,5 +2066,18 @@ function onLabelDragEnd() {
   height: 16px;
   cursor: pointer;
   accent-color: #2f80ed;
+}
+
+.form-row__color-label {
+  width: 40px;
+  color: #8a93a3;
+  font-size: 13px;
+  flex-shrink: 0;
+  padding: 4px 6px;
+  cursor: default;
+}
+
+.form-row__color-label:hover {
+  background: transparent;
 }
 </style>

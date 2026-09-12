@@ -4,6 +4,7 @@ import ModelList from './components/ModelPreviewApp/ModelList.vue'
 import Stage from './components/ModelPreviewApp/Stage.vue'
 import ModelActionPanel from './components/ModelPreviewApp/ModelActionPanel.vue'
 import TransformSnapshotModal from './components/ModelPreviewApp/Modal/TransformSnapshotModal.vue'
+import ColorPickerModal from './components/common/ColorPickerModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
 import { useModelStore } from './stores/previewStore'
 import { useShortcuts } from './composables/useShortcuts'
@@ -36,6 +37,7 @@ onBeforeUnmount(() => {
     <Stage class="app__right" />
     <ModelActionPanel v-if="store.selectedId" />
     <TransformSnapshotModal />
+    <ColorPickerModal />
     <MessageHost />
   </div>
 </template>

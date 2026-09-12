@@ -11,6 +11,7 @@ import { useFilterPresetModal } from '../../../composables/useFilterPresetModal'
 import { useMessage } from '../../../composables/useMessage'
 import { FILTER_GROUPS, type FilterItemSpec, type FilterGroupSpec } from '../../../utils/consts'
 import ColorPicker, { type RGBColor } from '../../common/ColorPicker.vue'
+import Live2dPreview from '../../common/Live2dPreview.vue'
 
 /**
  * 滤镜预设管理模态。
@@ -27,6 +28,17 @@ import ColorPicker, { type RGBColor } from '../../common/ColorPicker.vue'
 const { state, currentDraft, originalSnapshot, close } = useFilterPresetModal()
 const store = useModelStore()
 const msg = useMessage()
+const live2dPreviewRef = ref<InstanceType<typeof Live2dPreview> | null>(null)
+
+// 取当前选中模型 json 路径作为预览模型。优先选中 live2d 模型，其次取第一个 live2d 模型，
+// 再次退化到当前选中图片立绘 / 空（此时预览组件显示空画布）。
+const previewModelPath = computed(() => {
+  const sel = store.selectedModel
+  if (sel?.kind === 'live2d' && sel.jsonPath) return sel.jsonPath
+  const firstLive2d = store.models.find((m) => m.kind === 'live2d' && m.jsonPath)
+  if (firstLive2d?.jsonPath) return firstLive2d.jsonPath
+  return ''
+})
 
 // ───────── 预设列表 ─────────
 
@@ -105,6 +117,16 @@ watch(
       originalSnapshot.value = null
     }
   },
+)
+
+// 实时把 draft 同步到预览组件，方便用户调参时直观看到效果
+watch(
+  currentDraft,
+  (draft) => {
+    if (!draft) return
+    live2dPreviewRef.value?.setFilter(draft as Partial<FilterState>)
+  },
+  { deep: true },
 )
 
 onMounted(() => {
@@ -245,6 +267,15 @@ function onApplyToModel() {
                 </div>
               </template>
             </div>
+
+            <!-- 置顶预览：与编辑区同级，渲染当前选中/第一个 live2d 模型，实时显示滤镜效果 -->
+            <aside class="preset-preview">
+              <div class="preset-preview__header">实时预览</div>
+              <div class="preset-preview__canvas">
+                <Live2dPreview v-if="previewModelPath" ref="live2dPreviewRef" :model-path="previewModelPath" />
+                <div v-else class="preset-preview__empty">暂无可预览的模型</div>
+              </div>
+            </aside>
           </section>
 
           <!-- 底部固定操作区 -->
@@ -292,7 +323,7 @@ function onApplyToModel() {
 .filter-preset-modal {
   background-color: rgba(29, 32, 38, 0.92);
   color: #e6e6e6;
-  width: min(600px, 94vw);
+  width: min(900px, 94vw);
   height: min(640px, 86vh);
   border-radius: 8px;
   border: 1px solid rgba(60, 68, 80, 0.35);
@@ -501,6 +532,48 @@ function onApplyToModel() {
   flex-shrink: 0;
   padding: 4px 6px;
   cursor: default;
+}
+
+/* 右侧实时预览区（与编辑区同级） */
+.preset-preview {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(60, 68, 80, 0.35);
+  background-color: rgba(20, 23, 28, 0.42);
+}
+
+.preset-preview__header {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b0b8c4;
+  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  flex-shrink: 0;
+}
+
+.preset-preview__canvas {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  display: flex;
+}
+
+.preset-preview__canvas > * {
+  flex: 1;
+  height: 100%;
+}
+
+.preset-preview__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 13px;
+  padding: 24px;
+  text-align: center;
 }
 
 /* 底部固定按钮区 */

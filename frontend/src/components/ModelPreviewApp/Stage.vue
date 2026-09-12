@@ -104,6 +104,9 @@ function isCurrentFigureGroup(): boolean {
  * 取立绘组所有目标 wrapper（含嵌套立绘组展平）。
  * - includeBackground=true 时把背景容器也纳入
  * - 跳过未找到的 wrapper（已删除/加载失败）
+ *
+ * 收集到的容器在 startTransform 期间会被 reparent 到 groupContainer，
+ * 并由 startTransform 保证 backgroundContainer 在组内 zIndex 最低。
  */
 function getFigureGroupTargetContainers(): PIXI.Container[] {
   const id = store.selectedId
@@ -254,6 +257,23 @@ function startTransform(mode: TransformMode) {
     })
 
     groupTargetSnapshots.sort((a, b) => a.parentIndex - b.parentIndex)
+
+    // 组内排序：backgroundContainer 排最底，立绘 wrapper 按当前顺序递增，
+    // crosshair（PIXI.Graphics）排最顶层。
+    // 即便 groupContainer 整体被 bringGroupContainerToTop 提到最高，
+    // 组内仍保持"背景在下、立绘在中、准心在上"的关系。
+    let z = 0
+    for (const c of groupContainer.children) {
+      if (c === backgroundContainer) {
+        c.zIndex = 0
+      } else if (c instanceof PIXI.Graphics) {
+        // crosshair：排最顶层，避免被立绘盖住
+        c.zIndex = Number.MAX_SAFE_INTEGER
+      } else {
+        c.zIndex = ++z
+      }
+    }
+    groupContainer.sortChildren()
 
     // 组容器 reset：scale=1/rotation=0，x/y 同步为 group.x/y - 中心
     resetGroupContainer(id)

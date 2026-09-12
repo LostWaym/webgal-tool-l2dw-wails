@@ -513,6 +513,26 @@ export const useModelStore = defineStore('models', {
       }
     },
 
+    /** 从 PixiJS 容器同步变换到 store（读取容器当前 rts，写入 TransformState） */
+    syncTransformFromModel(id: string): void {
+      if (isFigureGroupId(id)) return
+      const container = isSpecialId(id)
+        ? previewRuntime.specialContainers.get(id)
+        : previewRuntime.modelWrappers.get(id)
+      if (!container) return
+
+      const state: TransformState = {
+        x: Math.round(container.x * 100) / 100,
+        y: Math.round(container.y * 100) / 100,
+        scale: {
+          x: Math.round(container.scale.x * 100) / 100,
+          y: Math.round(container.scale.y * 100) / 100,
+        },
+        rotation: Math.round(container.rotation * 180 / Math.PI),
+      }
+      this.setTransformState(id, state)
+    },
+
     /** 记录当前选中模型的变换快照，默认名为时间戳 */
     recordTransformSnapshot(): TransformSnapshot | null {
       if (!this.selectedId) return null

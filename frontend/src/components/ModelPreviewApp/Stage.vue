@@ -64,6 +64,8 @@ let baseInitialized = false
 // 立绘组变换用的"逐目标初始状态"快照
 interface GroupTargetSnap {
   container: PIXI.Container
+  /** 立绘或特殊容器 id，对应 store 的 transform state key */
+  id: string
   /** reparent 前的父容器（结束时要扔回去） */
   parent: PIXI.Container
   /** reparent 前在父容器 children 中的索引（addChildAt 还原 zIndex） */
@@ -108,11 +110,11 @@ function isCurrentFigureGroup(): boolean {
  * 收集到的容器在 startTransform 期间会被 reparent 到 groupContainer，
  * 并由 startTransform 保证 backgroundContainer 在组内 zIndex 最低。
  */
-function getFigureGroupTargetContainers(): PIXI.Container[] {
+function getFigureGroupTargetContainers(): { containers: PIXI.Container[]; ids: string[] } {
   const id = store.selectedId
-  if (!id || !isFigureGroupId(id)) return []
+  if (!id || !isFigureGroupId(id)) return { containers: [], ids: [] }
   const group = store.figureGroups.find((g) => g.id === id)
-  if (!group) return []
+  if (!group) return { containers: [], ids: [] }
 
   const figureIds = store.flattenFigureGroupTargets(id)
   const containers: PIXI.Container[] = []
@@ -121,12 +123,15 @@ function getFigureGroupTargetContainers(): PIXI.Container[] {
     if (c) containers.push(c)
   }
 
+  const ids: string[] = [...figureIds]
+
   // includeBackground 时把背景容器也加进去（Bug 2 修复）
   if (group.includeBackground && backgroundContainer) {
     containers.push(backgroundContainer)
+    ids.push(SpecialId.BgContainer)
   }
 
-  return containers
+  return { containers, ids }
 }
 
 function pixiToClientCoords(displayObject: PIXI.DisplayObject, localPoint: { x: number; y: number }, app: PIXI.Application): PIXI.Point {
@@ -217,7 +222,8 @@ function startTransform(mode: TransformMode) {
     // editAnchorOnly 时只改锚点本身：跳过 reparent + snapshot，让 endTransform 走 "仅 reset groupContainer" 分支
     const lockTarget = group.editAnchorOnly === true
 
-    const containers = lockTarget ? [] : getFigureGroupTargetContainers()
+    const { containers: containerList, ids } = lockTarget ? { containers: [], ids: [] } : getFigureGroupTargetContainers()
+    const containers = containerList
     const groupContainer = ensureGroupContainer(group)
 
     // 先让所有 worldTransform 是新的（保证原父变换是最新的）
@@ -230,7 +236,7 @@ function startTransform(mode: TransformMode) {
       // groupContainer 此刻带 rts（identity，但 world position != 0），c.worldPos 不等于 c.position。
       // 因此 reparent 前必须把 c.position 转成"在 groupContainer 局部下、抵消 groupContainer 当前 rts"的坐标，
       // 这样 addChild 后视觉位置才保持不变。
-      groupTargetSnapshots = containers.map((c) => {
+      groupTargetSnapshots = containers.map((c, i) => {
         const parent = c.parent
         const parentIndex = parent ? parent.getChildIndex(c) : 0
 
@@ -245,6 +251,7 @@ function startTransform(mode: TransformMode) {
 
         const snap: GroupTargetSnap = {
           container: c,
+          id: ids[i],
           parent: parent!,
           parentIndex,
           localX: oldX,
@@ -390,6 +397,8 @@ function endTransform() {
           snap.container.position.copyFrom(snap.parent.toLocal(worldPos))
         }
         snap.parent.addChildAt(snap.container, snap.parentIndex)
+        // 把 commit 后的 child rts 同步到 store
+        store.syncTransformFromModel(snap.id)
       }
 
       void sortFigures()
@@ -405,6 +414,10 @@ function endTransform() {
   groupTargetSnapshots = []
   emitter.emit(StageEvents.TransformStart, false)
   emitter.emit(StageEvents.TransformChange, store.selectedId)
+  // 同步变换到 store
+  if (store.selectedId) {
+    store.syncTransformFromModel(store.selectedId)
+  }
   refreshTransformHint()
   updateFigureGroupCrosshair()
 }
@@ -915,7 +928,7 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
 
   // 创建主 wrapper（wmdl 整体容器）
   const mainWrapper = new L2dwContainer()
-  mainWrapper.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 1.8)
+  mainWrapper.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
   mainWrapper.pivot.set(0, STAGE_HEIGHT / 2);
   figureContainer?.addChild(mainWrapper)
   containersById.set(entry.id, mainWrapper)
@@ -945,7 +958,7 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
     model.scale.y = targetScale
     model.anchor.set(0.5)
     model.position.x = 0 + wmdlModel.offsetX;
-    model.position.y = STAGE_HEIGHT / 2 + wmdlModel.offsetY;
+    model.position.y = STAGE_HEIGHT / 1.8 + wmdlModel.offsetY;
 
     mainWrapper.addChild(model)
     live2dById.set(wmdlModel.id, model)

@@ -218,8 +218,6 @@ function startTransform(mode: TransformMode) {
     const lockTarget = group.editAnchorOnly === true
 
     const containers = lockTarget ? [] : getFigureGroupTargetContainers()
-    if (!lockTarget && containers.length === 0) return
-
     const groupContainer = ensureGroupContainer(group)
 
     // 先让所有 worldTransform 是新的（保证原父变换是最新的）
@@ -369,31 +367,36 @@ function cancelTransform() {
 
 function endTransform() {
   const id = store.selectedId
-  if (id && isFigureGroupId(id) && groupTargetSnapshots.length > 0) {
-    const groupContainer = groupContainers.get(id)
+  if (id && isFigureGroupId(id)) {
 
-    // 立绘组结束变换（commit）：把 groupContainer 当前 rts"正向叠加"到每个 child 上，
-    // 然后把 child 扔回原父。因为原父是 stageMain（identity），child 在 groupContainer 局部下的
-    // 新 rts 直接就是它在 stageMain 局部下的最终 rts，视觉与变换结束时一致。
-    //
-    // 注意：要用 position 而非 x/y 操作位置，绕开 L2dwContainer 的 base 偏移重写。
-    stageMain?.updateTransform()
-    for (const snap of groupTargetSnapshots) {
-      if (groupContainer) {
-        snap.container.scale.x *= groupContainer.scale.x
-        snap.container.scale.y *= groupContainer.scale.y
-        snap.container.rotation += groupContainer.rotation
-        // 位置：用 toGlobal 读真世界位置（自动应用 groupContainer 的 s/r/p），
-        // 再 toLocal 转回 snap.parent（原父）局部，保证 addChildAt 后视觉位置不变。
-        const worldPos = groupContainer.toGlobal(snap.container.position)
-        snap.container.position.copyFrom(snap.parent.toLocal(worldPos))
+    if (groupTargetSnapshots.length > 0)
+    {
+      // 立绘组结束变换（commit）：把 groupContainer 当前 rts"正向叠加"到每个 child 上，
+      // 然后把 child 扔回原父。因为原父是 stageMain（identity），child 在 groupContainer 局部下的
+      // 新 rts 直接就是它在 stageMain 局部下的最终 rts，视觉与变换结束时一致。
+      //
+      // 注意：要用 position 而非 x/y 操作位置，绕开 L2dwContainer 的 base 偏移重写。
+      const groupContainer = groupContainers.get(id)
+
+      stageMain?.updateTransform()
+      for (const snap of groupTargetSnapshots) {
+        if (groupContainer) {
+          snap.container.scale.x *= groupContainer.scale.x
+          snap.container.scale.y *= groupContainer.scale.y
+          snap.container.rotation += groupContainer.rotation
+          // 位置：用 toGlobal 读真世界位置（自动应用 groupContainer 的 s/r/p），
+          // 再 toLocal 转回 snap.parent（原父）局部，保证 addChildAt 后视觉位置不变。
+          const worldPos = groupContainer.toGlobal(snap.container.position)
+          snap.container.position.copyFrom(snap.parent.toLocal(worldPos))
+        }
+        snap.parent.addChildAt(snap.container, snap.parentIndex)
       }
-      snap.parent.addChildAt(snap.container, snap.parentIndex)
+
+      void sortFigures()
     }
 
     // 重置 groupContainer（identity + 当前 store.group.x/y 作为 base）
     resetGroupContainer(id)
-    void sortFigures()
   }
 
   transformMode.value = 'none'

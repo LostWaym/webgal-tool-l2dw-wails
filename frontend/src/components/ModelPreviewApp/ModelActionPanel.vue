@@ -633,6 +633,28 @@ function onFigureGroupCleanup() {
   msg.success('已清理无效目标')
 }
 
+function onFigureGroupCenterToAverage() {
+  const cur = store.selectedFigureGroup
+  if (!cur) return
+  const ids = cur.includeAllFigures
+    ? store.models.map((m) => m.id)
+    : store.flattenFigureGroupTargets(cur.id)
+  if (ids.length === 0) {
+    msg.error('无可计算锚点的立绘')
+    return
+  }
+  const set = new Set(ids)
+  const targets = store.models.filter((m) => set.has(m.id))
+  if (targets.length === 0) {
+    msg.error('无可计算锚点的立绘')
+    return
+  }
+  const avgX = targets.reduce((s, m) => s + (m.state?.x ?? 0), 0) / targets.length
+  const avgY = targets.reduce((s, m) => s + (m.state?.y ?? 0), 0) / targets.length
+  store.updateFigureGroup(cur.id, { x: avgX, y: avgY })
+  msg.success(`已设置锚点为 ${targets.length} 个立绘的中心 (${avgX.toFixed(1)}, ${avgY.toFixed(1)})`)
+}
+
 function generateBgTemplate() {
   store.setBgTemplate(DEFAULT_BG_TEMPLATE)
 }
@@ -1509,6 +1531,7 @@ function onLabelDragEnd() {
         <!-- 操作按钮 -->
         <div class="info-row">
           <button class="reset-btn reset-btn--small" @click="onFigureGroupCleanup">清理无效目标</button>
+          <button class="reset-btn reset-btn--small" @click="onFigureGroupCenterToAverage">锚点中心点</button>
         </div>
       </div>
     </div>

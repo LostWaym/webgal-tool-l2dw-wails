@@ -14,8 +14,10 @@ const props = withDefaults(
   defineProps<{
     color: RGBColor
     disabled?: boolean
+    /** 透传到根容器的额外样式，可用于外部指定宽度等 */
+    pickerStyle?: Record<string, string>
   }>(),
-  { disabled: false },
+  { disabled: false, pickerStyle: () => ({}) },
 )
 
 const emit = defineEmits<{
@@ -226,7 +228,12 @@ function onOpenModal() {
 </script>
 
 <template>
-  <div class="color-picker" :class="{ 'is-disabled': disabled }" @mousedown.stop>
+  <div
+    class="color-picker"
+    :class="{ 'is-disabled': disabled }"
+    :style="pickerStyle"
+    @mousedown.stop
+  >
     <!-- SV 选择区 + 色相条 -->
     <div class="cp-sv-row">
       <div
@@ -389,6 +396,11 @@ function onOpenModal() {
   flex: 1;
   min-width: 0;
   user-select: none;
+}
+
+/* 当外部传入显式宽度时，覆盖默认 flex: 1 */
+.color-picker[style*='width'] {
+  flex: 0 0 auto;
 }
 
 .color-picker.is-disabled {

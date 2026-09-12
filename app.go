@@ -541,6 +541,87 @@ func (a *App) ReadPresetFile(filename string) (string, error) {
 	return string(data), nil
 }
 
+// filterPresetDir 返回滤镜预设目录的绝对路径。优先使用环境变量
+// L2DW_FILTER_PRESETS_DIR 覆盖；否则相对于可执行文件所在目录下的
+// assets/filter_presets 解析；解析失败时回退到当前工作目录下的
+// assets/filter_presets。
+func filterPresetDir() string {
+	if v := os.Getenv("L2DW_FILTER_PRESETS_DIR"); v != "" {
+		return v
+	}
+	if exe, err := os.Executable(); err == nil {
+		return filepath.Join(filepath.Dir(exe), "assets", "filter_presets")
+	}
+	return filepath.Join("assets", "filter_presets")
+}
+
+// ensureFilterPresetDir 确保滤镜预设目录存在，不存在则创建。
+func ensureFilterPresetDir() error {
+	return os.MkdirAll(filterPresetDir(), 0755)
+}
+
+// ListFilterPresetFiles 列出滤镜预设目录下所有 .json 文件的 basename。
+// 不存在的目录返回空切片（不报错），以便前端可以无感降级。
+func (a *App) ListFilterPresetFiles() ([]string, error) {
+	dir := filterPresetDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+	out := []string{}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasSuffix(strings.ToLower(name), ".json") {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out, nil
+}
+
+// ReadFilterPresetFile 读取指定滤镜预设文件的内容。filename 必须是
+// ListFilterPresetFiles 返回的 basename 之一，防止越界读取预设目录之外的文件。
+func (a *App) ReadFilterPresetFile(filename string) (string, error) {
+	if filename == "" {
+		return "", fmt.Errorf("ReadFilterPresetFile: filename is empty")
+	}
+	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
+		return "", fmt.Errorf("ReadFilterPresetFile: invalid filename %q", filename)
+	}
+	path := filepath.Join(filterPresetDir(), filename)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// SaveFilterPresetFile 将 content 写入滤镜预设目录的 filename 文件。
+// filename 必须以 .json 结尾，不允许路径分隔符或 ..，防止越界写入。
+// 若目录不存在会自动创建。
+func (a *App) SaveFilterPresetFile(filename string, content string) error {
+	if filename == "" {
+		return fmt.Errorf("SaveFilterPresetFile: filename is empty")
+	}
+	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
+		return fmt.Errorf("SaveFilterPresetFile: invalid filename %q", filename)
+	}
+	if !strings.HasSuffix(strings.ToLower(filename), ".json") {
+		return fmt.Errorf("SaveFilterPresetFile: filename must end with .json: %q", filename)
+	}
+	if err := ensureFilterPresetDir(); err != nil {
+		return err
+	}
+	path := filepath.Join(filterPresetDir(), filename)
+	return os.WriteFile(path, []byte(content), 0644)
+}
+
 // SetClipboardText 将 text 写入系统剪贴板。
 // 仅供主窗口的快捷键逻辑调用，统一对外屏蔽 Wails runtime 差异。
 func (a *App) SetClipboardText(text string) error {

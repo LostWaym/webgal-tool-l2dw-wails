@@ -11,6 +11,9 @@ import {
   DEFAULT_STAGE_TRANSFORM_TEMPLATE,
   DEFAULT_FIGURE_TEMPLATE,
   DEFAULT_TRANSFORM_TEMPLATE,
+  FILTER_GROUPS,
+  type FilterItemSpec,
+  type FilterGroupSpec,
 } from '../../utils/consts'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { isSpecialId, getSpecialName, SpecialId, isFigureGroupId } from '../../live2d/specialIds'
@@ -28,9 +31,12 @@ import { useColorPickerModal, type ColorPickerTarget } from '../../composables/u
 import settingsIcon from '../../assets/icons/settings.png'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
+import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
+import { ListFilterPresetFiles, SaveFilterPresetFile } from '../../../wailsjs/go/main/App'
 
 const store = useModelStore()
 const snapshotModal = useTransformSnapshotModal()
+const filterPresetModal = useFilterPresetModal()
 const motionScroll = useDraggableScroll()
 const expressionScroll = useDraggableScroll()
 const filterScroll = useDraggableScroll()
@@ -126,75 +132,7 @@ const filterState = computed<FilterState>(
 const filterCollapsed = ref(false)
 
 /** 每个 group: { title, items: { key, label, min?, max?, step?, boolean?, colorPicker? }[] } */
-interface FilterItemSpec {
-  key?: keyof FilterState
-  label: string
-  min?: number
-  max?: number
-  step?: number
-  boolean?: boolean
-  /** 当设置时，该项用 ColorPicker 渲染（绑定的 rKey/gKey/bKey 必须存在于 FilterState） */
-  colorPicker?: ColorPickerTarget
-}
-interface FilterGroupSpec {
-  title: string
-  items: FilterItemSpec[]
-}
-const FILTER_GROUPS: FilterGroupSpec[] = [
-  {
-    title: '基础',
-    items: [
-      { key: 'blur', label: '模糊', min: 0, max: 32, step: 0.1 },
-      { key: 'l2dwAlphaFilter', label: '整体透明度', min: 0, max: 1, step: 0.01 },
-    ],
-  },
-  {
-    title: '色彩调整',
-    items: [
-      { key: 'brightness', label: '亮度', min: 0, max: 2, step: 0.01 },
-      { key: 'contrast', label: '对比度', min: 0, max: 2, step: 0.01 },
-      { key: 'saturation', label: '饱和度', min: 0, max: 2, step: 0.01 },
-      { key: 'gamma', label: '伽马', min: 0, max: 2, step: 0.01 },
-      {
-        label: '色彩',
-        colorPicker: { rKey: 'colorRed', gKey: 'colorGreen', bKey: 'colorBlue' },
-      },
-    ],
-  },
-  {
-    title: '风格化',
-    items: [
-      { key: 'oldFilm', label: '老电影', boolean: true },
-      { key: 'dotFilm', label: '点阵', boolean: true },
-      { key: 'reflectionFilm', label: '反射', boolean: true },
-      { key: 'glitchFilm', label: '故障', boolean: true },
-      { key: 'rgbFilm', label: 'RGB 分离', boolean: true },
-      { key: 'godrayFilm', label: '体积光', boolean: true },
-    ],
-  },
-  {
-    title: '光照',
-    items: [
-      { key: 'bevel', label: '强度', min: 0, max: 1, step: 0.01 },
-      { key: 'bevelThickness', label: '厚度', min: 0, max: 32, step: 0.1 },
-      { key: 'bevelRotation', label: '角度', min: 0, max: 360, step: 1 },
-      { key: 'bevelSoftness', label: '柔度', min: 0, max: 1, step: 0.01 },
-      {
-        label: '光色',
-        colorPicker: { rKey: 'bevelRed', gKey: 'bevelGreen', bKey: 'bevelBlue' },
-      },
-    ],
-  },
-  {
-    title: '辉光',
-    items: [
-      { key: 'bloom', label: '强度', min: 0, max: 2, step: 0.01 },
-      { key: 'bloomBrightness', label: '亮度', min: 0, max: 5, step: 0.01 },
-      { key: 'bloomBlur', label: '模糊', min: 0, max: 32, step: 0.1 },
-      { key: 'bloomThreshold', label: '阈值', min: 0, max: 1, step: 0.01 },
-    ],
-  },
-]
+// FILTER_GROUPS / FilterItemSpec / FilterGroupSpec 现已从 utils/consts 导入
 
 /** 选中项变化时把容器当前值同步到 store（避免 UI 与画面不一致） */
 function syncFilterFromContainer() {
@@ -213,6 +151,51 @@ function onFilterToggle(key: keyof FilterState, checked: boolean) {
 
 function resetFilters() {
   store.resetFilterState(store.selectedId)
+}
+
+// ───────── 滤镜预设 ─────────
+/** 弹出提示让用户输入预设名，默认值由当前选中项生成。 */
+async function onSaveFilterPreset() {
+  const id = store.selectedId
+  if (!id) {
+    msg.warning('请先选中模型')
+    return
+  }
+  // 1) 先扫描已存在的预设，避免重名覆盖
+  let exists: string[] = []
+  try {
+    exists = await ListFilterPresetFiles()
+  } catch {
+    exists = []
+  }
+  const baseDefault = id === SpecialId.BgContainer
+    ? 'bg_preset'
+    : id === SpecialId.StageMain
+      ? 'stage_preset'
+      : 'filter_preset'
+  const rawName = window.prompt('保存滤镜预设（请输入名称，无需带 .json 后缀）', baseDefault)
+  if (!rawName) return
+  const name = rawName.trim()
+  if (!name) return
+  // 简单清洗：去掉非法字符
+  const safe = name.replace(/[\\/:*?"<>|]/g, '_')
+  const filename = safe.endsWith('.json') ? safe : `${safe}.json`
+  if (exists.includes(filename)) {
+    const overwrite = window.confirm(`已存在 ${filename}，是否覆盖？`)
+    if (!overwrite) return
+  }
+  try {
+    const content = JSON.stringify({ name: safe, filters: filterState.value }, null, 2)
+    await SaveFilterPresetFile(filename, content)
+    msg.success(`已保存：${filename}`)
+  } catch (e) {
+    console.error('failed to save filter preset', e)
+    msg.error(`保存失败：${e}`)
+  }
+}
+
+function onSelectFilterPreset() {
+  filterPresetModal.open()
 }
 
 // ───────── 颜色拾取器 ─────────
@@ -1135,6 +1118,12 @@ function onLabelDragEnd() {
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
                 <button class="reset-btn" @click="resetFilters">重置滤镜</button>
+              </div>
+            </li>
+            <li class="list-item list-item--row">
+              <div class="form-row form-row--btn form-row--snapshot">
+                <button class="snapshot-btn" @click="onSaveFilterPreset">保存滤镜</button>
+                <button class="snapshot-btn" @click="onSelectFilterPreset">选择滤镜</button>
               </div>
             </li>
           </ul>

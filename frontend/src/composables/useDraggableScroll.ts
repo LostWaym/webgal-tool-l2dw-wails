@@ -1,4 +1,4 @@
-import { onUnmounted, reactive, readonly, ref } from 'vue'
+import { onUnmounted, reactive, readonly, ref, shallowRef } from 'vue'
 
 /**
  * 拖拽滚动，支持惯性滚动。
@@ -42,6 +42,7 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
   let lastMoveX = 0
   let lastMoveY = 0
   let scrollEl: HTMLElement | null = null
+  const containerRef = shallowRef<HTMLElement | null>(null)
 
   function inertiaLoop() {
     if (!scrollEl) return
@@ -69,6 +70,22 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
     }
     velocity.x = 0
     velocity.y = 0
+  }
+
+  // 滚动容器内通过 [data-key] 定位项并滚到视口（默认居中、平滑滚动）。
+  function scrollToItem(
+    key: string | number,
+    opts?: { block?: ScrollLogicalPosition; behavior?: ScrollBehavior },
+  ) {
+    stopInertia()
+    const el = containerRef.value
+    if (!el) return
+    const target = el.querySelector<HTMLElement>(`[data-key="${String(key).replace(/"/g, '\\"')}"]`)
+    if (!target || target.classList.contains('list-item--empty')) return
+    target.scrollIntoView({
+      block: opts?.block ?? 'center',
+      behavior: opts?.behavior ?? 'smooth',
+    })
   }
 
   function onMouseMove(e: MouseEvent) {
@@ -133,6 +150,8 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
 
   return {
     isDragging: readonly(isDragging),
+    containerRef,
+    scrollToItem,
     scrollHandlers: {
       onMousedown(e: MouseEvent) {
         if (e.button !== 0) return

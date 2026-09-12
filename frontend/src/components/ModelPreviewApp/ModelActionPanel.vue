@@ -734,6 +734,9 @@ async function playRandomMotion() {
   if (list.length === 0) return
   const item = list[Math.floor(Math.random() * list.length)]
   await playMotion(item)
+  if (motionCollapsed.value) return
+  if (motionScroll.isDragging.value) return
+  motionScroll.scrollToItem(`${item.group}_${item.index}`)
 }
 
 // 随机播放一个表情
@@ -742,6 +745,9 @@ async function playRandomExpression() {
   if (list.length === 0) return
   const item = list[Math.floor(Math.random() * list.length)]
   await playExpression(item)
+  if (expressionCollapsed.value) return
+  if (expressionScroll.isDragging.value) return
+  expressionScroll.scrollToItem(item.index)
 }
 
 // 拖拽宽度
@@ -904,10 +910,11 @@ function onLabelDragEnd() {
           <div class="panel__search">
             <SearchInput v-model="motionSearch" variant="action" placeholder="搜索动作..." />
           </div>
-          <ul class="panel__list is-dragging-scroll" v-bind="motionScroll.scrollHandlers">
+          <ul class="panel__list is-dragging-scroll" v-bind="motionScroll.scrollHandlers" :ref="el => { motionScroll.containerRef.value = el as HTMLElement | null }">
             <li
               v-for="item in filteredMotions"
               :key="`${item.group}_${item.index}`"
+              :data-key="`${item.group}_${item.index}`"
               class="list-item"
               :class="{ 'is-playing': isMotionPlaying(item) }"
               @click="playMotion(item)"
@@ -947,10 +954,11 @@ function onLabelDragEnd() {
           <div class="panel__search">
             <SearchInput v-model="expressionSearch" variant="action" placeholder="搜索表情..." />
           </div>
-          <ul class="panel__list is-dragging-scroll" v-bind="expressionScroll.scrollHandlers">
+          <ul class="panel__list is-dragging-scroll" v-bind="expressionScroll.scrollHandlers" :ref="el => { expressionScroll.containerRef.value = el as HTMLElement | null }">
             <li
               v-for="item in filteredExpressions"
               :key="item.index"
+              :data-key="item.index"
               class="list-item"
               :class="{ 'is-playing': isExpressionPlaying(item) }"
               @click="playExpression(item)"

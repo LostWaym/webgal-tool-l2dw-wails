@@ -514,12 +514,17 @@ function runShortcutForFigureGroup(key: string): void {
   useMessage().success(`复制立绘组指令成功（${lines.length} 行）`)
 }
 
-/** 检测当前焦点是否在输入控件内（input / textarea / contentEditable） */
+/** 检测当前焦点是否在文本输入控件内（input[非 checkbox/radio] / textarea / contentEditable） */
 export function isInputFocused(): boolean {
   const active = document.activeElement
   if (!active) return false
   const tag = active.tagName.toLowerCase()
-  return tag === 'input' || tag === 'textarea' || (active as HTMLElement).isContentEditable
+  if (tag === 'input') {
+    const type = (active as HTMLInputElement).type.toLowerCase()
+    if (type === 'checkbox' || type === 'radio') return false
+    return true
+  }
+  return tag === 'textarea' || (active as HTMLElement).isContentEditable
 }
 
 /**

@@ -1470,24 +1470,30 @@ function onLabelDragEnd() {
         <div class="info-row">
           <label class="info-label">包括背景</label>
           <input
+            tabindex="-1"
             type="checkbox"
             :checked="store.selectedFigureGroup.includeBackground"
+            @mousedown.prevent
             @change="onFigureGroupFlagChange('includeBackground', ($event.target as HTMLInputElement).checked)"
           />
         </div>
         <div class="info-row">
           <label class="info-label">包含所有立绘</label>
           <input
+            tabindex="-1"
             type="checkbox"
             :checked="store.selectedFigureGroup.includeAllFigures"
+            @mousedown.prevent
             @change="onFigureGroupFlagChange('includeAllFigures', ($event.target as HTMLInputElement).checked)"
           />
         </div>
         <div class="info-row">
           <label class="info-label">仅编辑锚点</label>
           <input
+            tabindex="-1"
             type="checkbox"
             :checked="store.selectedFigureGroup.editAnchorOnly"
+            @mousedown.prevent
             @change="onFigureGroupFlagChange('editAnchorOnly', ($event.target as HTMLInputElement).checked)"
           />
         </div>
@@ -1504,8 +1510,10 @@ function onLabelDragEnd() {
             >
               <label>
                 <input
+                  tabindex="-1"
                   type="checkbox"
                   :checked="store.selectedFigureGroup.targetIds.includes(m.id)"
+                  @mousedown.prevent
                   @change="store.toggleFigureGroupTarget(store.selectedFigureGroup.id, m.id)"
                 />
                 {{ m.name }}
@@ -1526,8 +1534,10 @@ function onLabelDragEnd() {
             >
               <label>
                 <input
+                  tabindex="-1"
                   type="checkbox"
                   :checked="store.selectedFigureGroup.targetGroupIds.includes(g.id)"
+                  @mousedown.prevent
                   @change="store.toggleFigureGroupNestedTarget(store.selectedFigureGroup.id, g.id)"
                 />
                 {{ g.name }}
@@ -1538,8 +1548,8 @@ function onLabelDragEnd() {
 
         <!-- 操作按钮 -->
         <div class="info-row">
-          <button class="reset-btn reset-btn--small" @click="onFigureGroupCleanup">清理无效目标</button>
-          <button class="reset-btn reset-btn--small" @click="onFigureGroupCenterToAverage">锚点中心点</button>
+          <button tabindex="-1" class="reset-btn reset-btn--small" @click="onFigureGroupCleanup">清理无效目标</button>
+          <button tabindex="-1" class="reset-btn reset-btn--small" @click="onFigureGroupCenterToAverage">锚点中心点</button>
         </div>
       </div>
     </div>

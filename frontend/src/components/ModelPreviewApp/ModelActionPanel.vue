@@ -24,6 +24,7 @@ import { reloadAllModelTextures } from '../../live2d/textureUtils'
 import { useMessage } from '../../composables/useMessage'
 import { useDraggableScroll } from '../../composables/useDraggableScroll'
 import SearchInput from '../common/SearchInput.vue'
+import NumberInput from '../common/NumberInput.vue'
 import FocusPicker from '../common/FocusPicker.vue'
 import ColorPicker, { type RGBColor } from '../common/ColorPicker.vue'
 import ColorPickerModal from '../common/ColorPickerModal.vue'
@@ -988,64 +989,59 @@ function onLabelDragEnd() {
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label @mousedown="(e) => onLabelDragStart('x', e)">X</label>
-                <input
-                  v-model.number="transformState.x"
-                  type="number"
-                  class="form-input"
-                  step="1"
-                  @input="onTransformInput"
+                <NumberInput
+                  :model-value="transformState.x"
+                  :step="1"
+                  :precision="2"
+                  @update:model-value="(v: number) => { transformState.x = v; onTransformInput() }"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label @mousedown="(e) => onLabelDragStart('y', e)">Y</label>
-                <input
-                  v-model.number="transformState.y"
-                  type="number"
-                  class="form-input"
-                  step="1"
-                  @input="onTransformInput"
+                <NumberInput
+                  :model-value="transformState.y"
+                  :step="1"
+                  :precision="2"
+                  @update:model-value="(v: number) => { transformState.y = v; onTransformInput() }"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label @mousedown="(e) => onLabelDragStart('scaleX', e)">X 缩放</label>
-                <input
-                  v-model.number="transformState.scale.x"
-                  type="number"
-                  class="form-input"
-                  step="0.01"
-                  min="0.01"
-                  max="10"
-                  @input="onTransformInput"
+                <NumberInput
+                  :model-value="transformState.scale.x"
+                  :step="0.01"
+                  :min="0.01"
+                  :max="10"
+                  :precision="3"
+                  @update:model-value="(v: number) => { transformState.scale.x = v; onTransformInput() }"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label @mousedown="(e) => onLabelDragStart('scaleY', e)">Y 缩放</label>
-                <input
-                  v-model.number="transformState.scale.y"
-                  type="number"
-                  class="form-input"
-                  step="0.01"
-                  min="0.01"
-                  max="10"
-                  @input="onTransformInput"
+                <NumberInput
+                  :model-value="transformState.scale.y"
+                  :step="0.01"
+                  :min="0.01"
+                  :max="10"
+                  :precision="3"
+                  @update:model-value="(v: number) => { transformState.scale.y = v; onTransformInput() }"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label @mousedown="(e) => onLabelDragStart('rotation', e)">旋转</label>
-                <input
-                  v-model.number="transformState.rotation"
-                  type="number"
-                  class="form-input"
-                  step="1"
-                  @input="onTransformInput"
+                <NumberInput
+                  :model-value="transformState.rotation"
+                  :step="1"
+                  :precision="2"
+                  @update:model-value="(v: number) => { transformState.rotation = v; onTransformInput() }"
                 />
               </div>
             </li>
@@ -1114,14 +1110,13 @@ function onLabelDragEnd() {
                   </template>
                   <template v-else>
                     <label>{{ item.label }}</label>
-                    <input
-                      :value="filterState[item.key as keyof FilterState]"
-                      type="number"
-                      class="form-input"
-                      :step="item.step ?? 'any'"
+                    <NumberInput
+                      :model-value="filterState[item.key as keyof FilterState] as number"
+                      :step="item.step ?? 1"
                       :min="item.min"
                       :max="item.max"
-                      @input="(e: any) => onFilterInput(item.key as keyof FilterState, Number(e.target.value))"
+                      :precision="(item.step ?? 1) < 1 ? 3 : 2"
+                      @update:model-value="(v: number) => onFilterInput(item.key as keyof FilterState, v)"
                     />
                   </template>
                 </div>
@@ -1183,28 +1178,26 @@ function onLabelDragEnd() {
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>X</label>
-                <input
-                  :value="focusState.x"
-                  type="number"
-                  class="form-input"
-                  step="0.01"
-                  min="-1"
-                  max="1"
-                  @input="(e: any) => onFocusInput('x', Number(e.target.value))"
+                <NumberInput
+                  :model-value="focusState.x"
+                  :step="0.01"
+                  :min="-1"
+                  :max="1"
+                  :precision="2"
+                  @update:model-value="(v: number) => onFocusInput('x', v)"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>Y</label>
-                <input
-                  :value="focusState.y"
-                  type="number"
-                  class="form-input"
-                  step="0.01"
-                  min="-1"
-                  max="1"
-                  @input="(e: any) => onFocusInput('y', Number(e.target.value))"
+                <NumberInput
+                  :model-value="focusState.y"
+                  :step="0.01"
+                  :min="-1"
+                  :max="1"
+                  :precision="2"
+                  @update:model-value="(v: number) => onFocusInput('y', v)"
                 />
               </div>
             </li>
@@ -1262,65 +1255,60 @@ function onLabelDragEnd() {
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>间隔</label>
-                <input
-                  :value="blinkState.blinkInterval"
-                  type="number"
-                  class="form-input"
-                  step="100"
-                  min="0"
-                  @input="(e: any) => onBlinkInput('blinkInterval', Number(e.target.value))"
+                <NumberInput
+                  :model-value="blinkState.blinkInterval"
+                  :step="100"
+                  :min="0"
+                  :precision="0"
+                  @update:model-value="(v: number) => onBlinkInput('blinkInterval', v)"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>随机偏移</label>
-                <input
-                  :value="blinkState.blinkIntervalRandom"
-                  type="number"
-                  class="form-input"
-                  step="10"
-                  min="0"
-                  @input="(e: any) => onBlinkInput('blinkIntervalRandom', Number(e.target.value))"
+                <NumberInput
+                  :model-value="blinkState.blinkIntervalRandom"
+                  :step="10"
+                  :min="0"
+                  :precision="0"
+                  @update:model-value="(v: number) => onBlinkInput('blinkIntervalRandom', v)"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>闭眼时长</label>
-                <input
-                  :value="blinkState.closingDuration"
-                  type="number"
-                  class="form-input"
-                  step="10"
-                  min="0"
-                  @input="(e: any) => onBlinkInput('closingDuration', Number(e.target.value))"
+                <NumberInput
+                  :model-value="blinkState.closingDuration"
+                  :step="10"
+                  :min="0"
+                  :precision="0"
+                  @update:model-value="(v: number) => onBlinkInput('closingDuration', v)"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>闭合停留</label>
-                <input
-                  :value="blinkState.closedDuration"
-                  type="number"
-                  class="form-input"
-                  step="10"
-                  min="0"
-                  @input="(e: any) => onBlinkInput('closedDuration', Number(e.target.value))"
+                <NumberInput
+                  :model-value="blinkState.closedDuration"
+                  :step="10"
+                  :min="0"
+                  :precision="0"
+                  @update:model-value="(v: number) => onBlinkInput('closedDuration', v)"
                 />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
                 <label>睁眼时长</label>
-                <input
-                  :value="blinkState.openingDuration"
-                  type="number"
-                  class="form-input"
-                  step="10"
-                  min="0"
-                  @input="(e: any) => onBlinkInput('openingDuration', Number(e.target.value))"
+                <NumberInput
+                  :model-value="blinkState.openingDuration"
+                  :step="10"
+                  :min="0"
+                  :precision="0"
+                  @update:model-value="(v: number) => onBlinkInput('openingDuration', v)"
                 />
               </div>
             </li>
@@ -1437,22 +1425,20 @@ function onLabelDragEnd() {
         <!-- 锚点坐标 -->
         <div class="info-row">
           <label class="info-label">锚点 X</label>
-          <input
-            type="number"
-            class="form-input"
-            :value="store.selectedFigureGroup.x"
-            step="1"
-            @input="onFigureGroupCenterChange('x', ($event.target as HTMLInputElement).value)"
+          <NumberInput
+            :model-value="store.selectedFigureGroup.x"
+            :step="1"
+            :precision="2"
+            @update:model-value="(v: number) => store.updateFigureGroup(store.selectedFigureGroup!.id, { x: v })"
           />
         </div>
         <div class="info-row">
           <label class="info-label">锚点 Y</label>
-          <input
-            type="number"
-            class="form-input"
-            :value="store.selectedFigureGroup.y"
-            step="1"
-            @input="onFigureGroupCenterChange('y', ($event.target as HTMLInputElement).value)"
+          <NumberInput
+            :model-value="store.selectedFigureGroup.y"
+            :step="1"
+            :precision="2"
+            @update:model-value="(v: number) => store.updateFigureGroup(store.selectedFigureGroup!.id, { y: v })"
           />
         </div>
 

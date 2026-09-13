@@ -152,6 +152,8 @@ l2dw-wails/
 ### 通用组件
 
 - 搜索栏 = SearchInput.vue
+- 轻量数值输入 = `frontend/src/components/common/NumberInput.vue`（展示态为文本，点击进入编辑；支持 min/max/precision/clamp，常用于变换/滤镜等参数）
+- 拖拽调参输入 = `frontend/src/components/ModelEditApp/EditRangeCard.vue`（带重置按钮 + label 拖拽改值，常用于编辑器初始参数/部件参数）
 
 ### 折叠块设计参考
 

@@ -603,12 +603,10 @@ function onFigureGroupNameChange(name: string) {
   store.updateFigureGroup(cur.id, { name })
 }
 
-function onFigureGroupCenterChange(axis: 'x' | 'y', value: string) {
+function onFigureGroupCenterChange(axis: 'x' | 'y', value: number) {
   const cur = store.selectedFigureGroup
   if (!cur) return
-  const num = Number(value)
-  if (Number.isNaN(num)) return
-  store.applyFigureGroupAnchor(cur.id, axis, num)
+  store.applyFigureGroupAnchor(cur.id, axis, value)
 }
 
 function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures' | 'editAnchorOnly', checked: boolean) {
@@ -1429,7 +1427,7 @@ function onLabelDragEnd() {
             :model-value="store.selectedFigureGroup.x"
             :step="1"
             :precision="2"
-            @update:model-value="(v: number) => store.updateFigureGroup(store.selectedFigureGroup!.id, { x: v })"
+            @update:model-value="(v: number) => onFigureGroupCenterChange('x', v)"
           />
         </div>
         <div class="info-row">
@@ -1438,7 +1436,7 @@ function onLabelDragEnd() {
             :model-value="store.selectedFigureGroup.y"
             :step="1"
             :precision="2"
-            @update:model-value="(v: number) => store.updateFigureGroup(store.selectedFigureGroup!.id, { y: v })"
+            @update:model-value="(v: number) => onFigureGroupCenterChange('y', v)"
           />
         </div>
 

@@ -124,8 +124,8 @@ const transformState = computed<TransformState>(
 let _updatingTransform = false
 
 // ───────── 滤镜状态 ─────────
-// 选中 id 变化或用户调整后，通过 syncFilterFromContainer 把容器当前值读回 store；
-// store 自身已经是 reactive，filterState 直接从 store.getFilterState 取。
+// FilterState 由 store 完全托管：UI 通过 store.getFilterState 读取用户逻辑值；
+// 容器中存的是按 rootContainer.scale 补偿后的物理值。
 const filterState = computed<FilterState>(
   () => store.getFilterState(store.selectedId),
 )
@@ -133,11 +133,6 @@ const filterCollapsed = ref(false)
 
 /** 每个 group: { title, items: { key, label, min?, max?, step?, boolean?, colorPicker? }[] } */
 // FILTER_GROUPS / FilterItemSpec / FilterGroupSpec 现已从 utils/consts 导入
-
-/** 选中项变化时把容器当前值同步到 store（避免 UI 与画面不一致） */
-function syncFilterFromContainer() {
-  store.readFilterStateFromContainer(store.selectedId)
-}
 
 /** 写某个滤镜字段到 store（store 内部会自动同步到 L2dwContainer） */
 function onFilterInput(key: keyof FilterState, value: number) {
@@ -420,7 +415,6 @@ watch(() => store.selectedId, async (newId, oldId) => {
     motions.value = []
     expressions.value = []
     await nextTick()
-    syncFilterFromContainer()
     return
   }
 
@@ -438,7 +432,6 @@ watch(() => store.selectedId, async (newId, oldId) => {
     expressions.value = []
     await nextTick()
     syncTransformFromModel()
-    syncFilterFromContainer()
     return
   }
 
@@ -446,7 +439,6 @@ watch(() => store.selectedId, async (newId, oldId) => {
     motions.value = []
     expressions.value = []
     syncTransformFromModel()
-    syncFilterFromContainer()
     return
   }
 
@@ -469,7 +461,6 @@ watch(() => store.selectedId, async (newId, oldId) => {
       activeTab.value = 'figureInfo'
     }
     syncTransformFromModel()
-    syncFilterFromContainer()
     return
   }
 
@@ -482,7 +473,6 @@ watch(() => store.selectedId, async (newId, oldId) => {
   motions.value = extractMotions(model)
   expressions.value = extractExpressions(model)
   syncTransformFromModel()
-  syncFilterFromContainer()
 }, { immediate: true })
 
 // 表单输入更新模型

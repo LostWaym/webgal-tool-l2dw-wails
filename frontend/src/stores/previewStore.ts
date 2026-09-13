@@ -16,8 +16,8 @@ import {
 import { SpecialId, isSpecialId, isFigureGroupId, makeFigureGroupId } from '../live2d/specialIds'
 import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
 import { previewRuntime } from '../utils/runtimeRegistry'
+import { DEFAULT_FILTER_PROPERTY_VALUES, FILTER_PROPERTY_KEYS, writeFilterStateToContainer } from '../live2d/L2dwContainer'
 import type { L2dwContainer } from '../live2d/L2dwContainer'
-import { DEFAULT_FILTER_PROPERTY_VALUES, FILTER_PROPERTY_KEYS } from '../live2d/L2dwContainer'
 
 interface MotionState {
   group: string
@@ -213,6 +213,8 @@ export const useModelStore = defineStore('models', {
     figureFilterStates: {} as Record<string, FilterState>,
     bgFilterState: { ...DEFAULT_FILTER_STATE } as FilterState,
     stageFilterState: { ...DEFAULT_FILTER_STATE } as FilterState,
+    /** Stage.vue 的 rootContainer.scale.x（仅供外部读取；由 Stage.vue 写入） */
+    rootContainerScale: 1,
     /** 注视状态：按 modelId 索引（仅 live2d 模型，仅运行时） */
     figureFocusStates: {} as Record<string, FocusState>,
     /** 眨眼状态：按 modelId 索引（仅 live2d 模型，仅运行时） */
@@ -638,28 +640,7 @@ export const useModelStore = defineStore('models', {
           : { ...DEFAULT_FILTER_STATE, ...patch }
         this.figureFilterStates[id] = target
       }
-      syncFilterToContainer(id, target)
-    },
-
-    /** 把指定 id 的滤镜属性读回 store（用于选中切换时把容器当前值同步到 UI） */
-    readFilterStateFromContainer(id: string | null): void {
-      if (id == null) return
-      const container = resolveFilterContainer(id)
-      if (!container) return
-      const next: FilterState = {
-        ...DEFAULT_FILTER_STATE,
-        l2dwAlphaFilter: container.l2dwAlphaFilter,
-      }
-      for (const key of FILTER_PROPERTY_KEYS) {
-        ;(next as any)[key] = (container as any)[key]
-      }
-      if (id === SpecialId.StageMain) {
-        this.stageFilterState = next
-      } else if (id === SpecialId.BgContainer) {
-        this.bgFilterState = next
-      } else {
-        this.figureFilterStates[id] = next
-      }
+      syncFilterToContainer(id, target, this.rootContainerScale)
     },
 
     /** 把指定 id 的 FilterState 重置回 DEFAULT_FILTER_STATE，并写回容器 */
@@ -673,7 +654,32 @@ export const useModelStore = defineStore('models', {
       } else {
         this.figureFilterStates[id] = fresh
       }
-      syncFilterToContainer(id, fresh)
+      syncFilterToContainer(id, fresh, this.rootContainerScale)
+    },
+
+    /**
+     * Stage.vue 在 rootContainer.scale 改变时调用。
+     * 更新内部 rootContainerScale 字段，并按新 scale 重算所有容器的物理值。
+     */
+    applyRootScaleToAllContainers(scale: number): void {
+      this.rootContainerScale = scale
+      for (const [id, c] of previewRuntime.specialContainers) {
+        const state = this.getFilterState(id)
+        writeFilterStateToContainer(c as L2dwContainer, state, scale)
+      }
+      for (const [id, wrapper] of previewRuntime.modelWrappers) {
+        const state = this.getFilterState(id)
+        writeFilterStateToContainer(wrapper, state, scale)
+      }
+    },
+
+    /**
+     * wrapper 新建（如 loadOne / reloadOne / 新建 groupContainer）后显式调用，
+     * 把 store 里 id 对应的 FilterState 按当前 scale 写入指定容器。
+     */
+    applyFilterToContainer(id: string, container: L2dwContainer): void {
+      const state = this.getFilterState(id)
+      writeFilterStateToContainer(container, state, this.rootContainerScale)
     },
 
     /**
@@ -879,13 +885,10 @@ function resolveFilterContainer(id: string): L2dwContainer | undefined {
 }
 
 /** 把 FilterState 字段写回对应 L2dwContainer；不存在的容器直接跳过。 */
-function syncFilterToContainer(id: string, state: FilterState): void {
+function syncFilterToContainer(id: string, state: FilterState, multiplier: number): void {
   const container = resolveFilterContainer(id)
   if (!container) return
-  for (const key of FILTER_PROPERTY_KEYS) {
-    ;(container as any)[key] = (state as any)[key]
-  }
-  container.l2dwAlphaFilter = state.l2dwAlphaFilter
+  writeFilterStateToContainer(container, state, multiplier)
 }
 
 /** 取指定模型的全部子 Live2DModel（wmdl 子模型），不存在则返回空数组。 */

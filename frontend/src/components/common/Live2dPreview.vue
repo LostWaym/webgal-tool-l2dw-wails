@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as PIXI from 'pixi.js'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
-import { L2dwContainer, FILTER_PROPERTY_KEYS } from '../../live2d/L2dwContainer'
+import { L2dwContainer, writeFilterStateToContainer } from '../../live2d/L2dwContainer'
 import { toFileUrl } from '../../path_utils'
 import type { FilterState } from '../../stores/previewStore'
 import { DEFAULT_FILTER_STATE } from '../../stores/previewStore'
@@ -22,6 +22,7 @@ let wrapper: L2dwContainer | null = null
 let model: Live2DModel | null = null
 let resizeObserver: ResizeObserver | null = null
 let currentFilterState: FilterState = { ...DEFAULT_FILTER_STATE }
+let currentScale = 1
 
 // 视口交互常量
 const MIN_SCALE = 0.05
@@ -133,6 +134,9 @@ function attachDomHandlers() {
     const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
     const next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x * factor))
     rootContainer.scale.set(next)
+    currentScale = next
+    // 重算 wrapper 中受缩放影响的滤镜属性
+    if (wrapper) writeFilterStateToContainer(wrapper, currentFilterState, currentScale)
   }
 
   canvas.addEventListener('pointerdown', onPointerDown)
@@ -177,7 +181,7 @@ async function loadModel(jsonPath: string) {
     })
     model = loaded
     wrapper.addChild(model)
-    applyFilter(currentFilterState)
+    writeFilterStateToContainer(wrapper, currentFilterState, currentScale)
     fitModel()
   } catch (err) {
     console.error('Live2dPreview failed to load model:', err)
@@ -209,13 +213,10 @@ function fitModel() {
   initialViewport.scale = 1
 }
 
-/** 把 FilterState 字段写回当前 wrapper。 */
+/** 把 FilterState 按当前 rootContainer 缩放写入 wrapper。 */
 function applyFilter(state: FilterState) {
   if (!wrapper) return
-  for (const key of FILTER_PROPERTY_KEYS) {
-    ;(wrapper as any)[key] = (state as any)[key]
-  }
-  wrapper.l2dwAlphaFilter = state.l2dwAlphaFilter
+  writeFilterStateToContainer(wrapper, state, currentScale)
 }
 
 function setFilter(patch: Partial<FilterState>) {

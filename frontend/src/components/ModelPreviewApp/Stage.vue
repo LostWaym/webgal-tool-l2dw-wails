@@ -550,9 +550,10 @@ async function init() {
   rootContainer.x = app.renderer.width / 2
   rootContainer.y = app.renderer.height / 2
   rootContainer.scale.set(0.33)
+  store.rootContainerScale = 0.33
 
   // 创建主容器结构
-  stageMain = new PIXI.Container()
+  stageMain = new L2dwContainer()
   stageMain.width = STAGE_WIDTH
   stageMain.height = STAGE_HEIGHT
   stageMain.pivot.set(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
@@ -928,6 +929,7 @@ async function loadImageFigure(entry: NonNullable<ReturnType<typeof store.models
   sprite.height = imgH * scale
 
   wrapper.addChild(sprite)
+  store.applyFilterToContainer(entry.id, wrapper)
 }
 
 async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.find>>) {
@@ -979,6 +981,9 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
   // 暴露给外部组件访问
   previewRuntime.live2dModels = live2dById
   previewRuntime.modelWrappers = containersById
+
+  // 新建 wrapper 立即同步滤镜（按当前 rootContainer.scale 补偿）
+  store.applyFilterToContainer(entry.id, mainWrapper)
 }
 
 async function reloadOne(id: string) {
@@ -1267,6 +1272,7 @@ function attachDomHandlers() {
     const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
     const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x * factor))
     rootContainer.scale.set(newScale)
+    store.applyRootScaleToAllContainers(newScale)
   }
 
   canvas.addEventListener('wheel', onWheel, { passive: false })

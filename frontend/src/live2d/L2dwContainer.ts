@@ -511,3 +511,38 @@ export const FILTER_PROPERTY_KEYS = Object.keys(PROPERTY_CONFIGS)
 export const DEFAULT_FILTER_PROPERTY_VALUES: Record<string, number> = Object.fromEntries(
   Object.entries(PROPERTY_CONFIGS).map(([key, cfg]) => [key, cfg.defaultValue]),
 )
+
+/**
+ * 受 rootContainer 缩放影响的滤镜字段：写入容器时需乘以 multiplier。
+ * 其余字段直接写入容器。
+ */
+export const SCALE_SENSITIVE_FILTER_KEYS: ReadonlySet<string> = new Set([
+  'blur',
+  'bevelThickness',
+  'bloomBlur',
+])
+
+/** writeFilterStateToContainer 接受的滤镜状态类型（兼容 store 的 FilterState） */
+export interface L2dwFilterStateLike {
+  l2dwAlphaFilter: number
+}
+
+/**
+ * 把 FilterState 写入 L2dwContainer。
+ * scaleSensitiveKey 命中集合的字段会乘以 multiplier，其余直接写入。
+ * multiplier 由调用方根据各自 rootContainer 缩放提供。
+ */
+export function writeFilterStateToContainer(
+  container: L2dwContainer,
+  // state 实际是 FilterState（含 l2dwAlphaFilter + 一组 number 字段），但 FilterState 没有
+  // string 索引签名会导致结构化赋值失败；这里放宽为 any 以避免把 FilterState 强转为 Record。
+  state: any,
+  multiplier: number,
+): void {
+  for (const key of FILTER_PROPERTY_KEYS) {
+    const raw = state[key] as number
+    const v = SCALE_SENSITIVE_FILTER_KEYS.has(key) ? raw * multiplier : raw
+    ;(container as any)[key] = v
+  }
+  container.l2dwAlphaFilter = state.l2dwAlphaFilter
+}

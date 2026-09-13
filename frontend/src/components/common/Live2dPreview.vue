@@ -177,7 +177,7 @@ function attachDomHandlers() {
 }
 
 async function loadModel(jsonPath: string) {
-  if (!app || !rootContainer) return
+  if (!app || !rootContainer || !stageMain) return
 
   // 销毁旧的模型与 wrapper
   if (model) {

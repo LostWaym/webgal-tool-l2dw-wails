@@ -10,6 +10,7 @@ import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
 import { OpenEditor } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
+import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
 import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
 import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
@@ -492,9 +493,6 @@ const live2dById = new Map<string, Live2DModel>()
 const containersById = new Map<string, L2dwContainer>()
 let resizeObserver: ResizeObserver | null = null
 let backgroundSprite: PIXI.Sprite | null = null
-
-const STAGE_WIDTH = 2560
-const STAGE_HEIGHT = 1440
 
 // Root 容器交互常量
 const DRAG_SENSITIVITY = 1      // 中键拖拽灵敏度

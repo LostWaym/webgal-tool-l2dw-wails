@@ -8,6 +8,10 @@ export const DEFAULT_IMAGE_TRANSFORM_TEMPLATE = 'setTransform:%me% -target=%img_
 
 import type { ColorPickerTarget } from '../composables/useColorPickerModal'
 
+// 舞台尺寸（用于预览与编辑器的统一画布尺寸）
+export const STAGE_WIDTH = 2560
+export const STAGE_HEIGHT = 1440
+
 export interface FilterItemSpec<K extends string = string> {
   key?: K
   label: string

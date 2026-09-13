@@ -8,6 +8,7 @@ import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { createTextureWatcher, type TextureWatcher } from '../../live2d/textureUtils'
 import EditStageToolbar from './EditStageToolbar.vue'
 import { editRuntime } from '../../utils/runtimeRegistry'
+import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
 
 /**
  * 编辑器窗口的 Pixi 预览画布。
@@ -35,9 +36,6 @@ const jsonPathByModelId = new Map<string, string>()
 const containersById = new Map<string, L2dwContainer>()
 let resizeObserver: ResizeObserver | null = null
 let textureWatcher: TextureWatcher | null = null
-
-const STAGE_WIDTH = 2560
-const STAGE_HEIGHT = 1440
 
 // Root 容器交互常量（与主 Stage 完全一致）
 const DRAG_SENSITIVITY = 1      // 中键拖拽灵敏度

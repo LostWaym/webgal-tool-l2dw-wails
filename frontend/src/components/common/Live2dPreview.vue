@@ -6,6 +6,7 @@ import { L2dwContainer, writeFilterStateToContainer } from '../../live2d/L2dwCon
 import { toFileUrl } from '../../path_utils'
 import type { FilterState } from '../../stores/previewStore'
 import { DEFAULT_FILTER_STATE } from '../../stores/previewStore'
+import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
 
 // pixi-live2d-display reads window.PIXI.Ticker
 ;(window as any).PIXI = PIXI
@@ -18,6 +19,7 @@ const props = defineProps<{
 const containerRef = ref<HTMLDivElement | null>(null)
 let app: PIXI.Application | null = null
 let rootContainer: PIXI.Container | null = null
+let stageMain: PIXI.Container | null = null
 let wrapper: L2dwContainer | null = null
 let model: Live2DModel | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -77,11 +79,23 @@ async function init() {
 
   host.appendChild(app.view as HTMLCanvasElement)
 
-  // Root 容器：用户通过左键拖拽和滚轮缩放操作它
+  // Root 容器：以舞台坐标系 (STAGE_WIDTH/STAGE_HEIGHT) 为基准，
+  // 用 scale 把舞台适配进 host.clientHeight（保留 80% 留白）。
   rootContainer = new PIXI.Container()
-  rootContainer.x = app.renderer.width / 2
-  rootContainer.y = app.renderer.height / 2
-  rootContainer.scale.set(1)
+  const initialScale = computeFitScale(host.clientHeight)
+  rootContainer.x = host.clientWidth / 2
+  rootContainer.y = host.clientHeight / 2
+  rootContainer.scale.set(initialScale)
+  currentScale = initialScale
+
+  stageMain = new PIXI.Container()
+  stageMain.width = STAGE_WIDTH
+  stageMain.height = STAGE_HEIGHT
+  stageMain.pivot.set(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  stageMain.x = 0
+  stageMain.y = 0
+
+  rootContainer.addChild(stageMain)
   app.stage.addChild(rootContainer)
 
   resizeObserver = new ResizeObserver(() => {
@@ -97,6 +111,12 @@ async function init() {
 
   attachDomHandlers()
   await loadModel(props.modelPath)
+}
+
+/** 计算让 STAGE_HEIGHT 适配进 hostHeight、保留 20% 留白的初始 scale。 */
+function computeFitScale(hostHeight: number): number {
+  const h = hostHeight || STAGE_HEIGHT
+  return Math.max(MIN_SCALE, Math.min(MAX_SCALE, (h / STAGE_HEIGHT) * 0.8))
 }
 
 function attachDomHandlers() {
@@ -171,8 +191,10 @@ async function loadModel(jsonPath: string) {
   }
 
   wrapper = new L2dwContainer()
-  wrapper.setBasePosition(0, 0)
-  rootContainer.addChild(wrapper)
+  // base 锚定舞台中心，使模型天然位于 STAGE 坐标系中央；
+  // rootContainer 自身的 scale/居中负责把 STAGE 适配进 host。
+  wrapper.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  stageMain.addChild(wrapper)
 
   try {
     const loaded = await Live2DModel.from(toFileUrl(jsonPath), {
@@ -189,28 +211,32 @@ async function loadModel(jsonPath: string) {
 }
 
 /**
- * FitInside: 模型长边贴齐容器边界，整体不被裁剪。
- * 居中/缩放由 rootContainer 负责，wrapper 内部模型保持 anchor (0.5, 0.5)。
+ * FitInside: 在 STAGE 坐标系下，模型长边贴齐 STAGE 边界，整体不被裁剪。
+ * rootContainer 自身负责把整个 STAGE 缩放到适配 host。
  */
 function fitModel() {
   if (!model || !wrapper || !rootContainer || !app) return
   const host = containerRef.value
   if (!host) return
 
-  const w = host.clientWidth
   const h = host.clientHeight
-  if (w <= 0 || h <= 0) return
+  if (h <= 0) return
 
-  // 让模型在 rootContainer 内部按自身原始大小显示；rootContainer 自身负责缩放与居中。
+  // 模型在 STAGE 坐标系下按长边贴齐 STAGE 边界
   model.anchor.set(0.5)
   model.position.set(0, 0)
-  const scale = Math.min(w / model.width, h / model.height)
+  const scale = Math.min(STAGE_WIDTH / model.width, STAGE_HEIGHT / model.height)
   model.scale.set(scale, scale)
 
-  // 记录初始视口（重置按钮使用）
+  // 记录初始视口（重置按钮使用）：重置到 fitModel 时计算的自适应 scale
   initialViewport.x = rootContainer.x
   initialViewport.y = rootContainer.y
-  initialViewport.scale = 1
+  initialViewport.scale = computeFitScale(h)
+  // 把当前 rootContainer 也同步到 fitScale，避免多次 resize 时累积误差
+  rootContainer.scale.set(initialViewport.scale)
+  currentScale = initialViewport.scale
+  // 重置后再写一次滤镜，使 scale 敏感字段（blur/bevelThickness/bloomBlur）按新 scale 重新换算
+  if (wrapper) writeFilterStateToContainer(wrapper, currentFilterState, currentScale)
 }
 
 /** 把 FilterState 按当前 rootContainer 缩放写入 wrapper。 */

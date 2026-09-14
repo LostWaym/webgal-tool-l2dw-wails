@@ -475,13 +475,11 @@ function resultToLines(result: unknown): string[] {
 }
 
 /**
- * 立绘组快捷键分发（按 key 聚合，按 targets 区分）：
+ * 立绘组快捷键分发（按 key 聚合，只对立绘类分发）：
  *  - 立绘类：SHORTCUTS.filter(s => s.key === key && s.targets.includes('model'))
  *    （即 modelFigure / modelTransform / modelSplit / modelMerge / modelHide）
- *  - 背景类：SHORTCUTS.filter(s => s.key === key && s.targets.includes('background'))
- *    （即 bgSetImage / bgTransform），仅在 includeBackground=true 时执行
  *  - 立绘类循环每个立绘组目标，临时切 selectedId 复用 handler
- *  - 背景类直接调 handler，不依赖 selectedId = BgContainer
+ *  - includeBackground=true 时，在所有立绘指令之后无条件附加一条背景变换指令（bgTransform）
  *  - 其他 entry（如 stageTransform，targets 只有 stage）自然不会命中，跳过
  *  - 所有结果按 SHORTCUTS 声明顺序 + 目标顺序，行拼接后写入剪贴板
  */
@@ -494,24 +492,16 @@ function runShortcutForFigureGroup(key: string): void {
   if (!group) return
   store.cleanupInvalidFigureGroupTargets(id)
 
-  // 按 key + targets 筛选：
-  //   立绘类：targets 含 'model'（即 model/figureGroup）
-  //   背景类：targets 含 'background'（即 background/figureGroup）
+  // 按 key + targets 筛选立绘类（targets 含 'model'，即 model/figureGroup）
   const figureEntries = SHORTCUTS.filter(
     (s) => s.key === key && s.targets.includes('model'),
   )
-  const backgroundEntries = SHORTCUTS.filter(
-    (s) => s.key === key && s.targets.includes('background'),
-  )
-  if (figureEntries.length === 0 && backgroundEntries.length === 0) return
+  if (figureEntries.length === 0) return
 
   const figureTargets = store.flattenFigureGroupTargets(id)
   const lines: string[] = []
-  // const seen = new Set<ShortcutHandlerKey>()
 
   const tryRun = (entry: ShortcutEntry): void => {
-    // if (seen.has(entry.handlerKey)) return
-    // seen.add(entry.handlerKey)
     const fn = (handler as Record<string, unknown>)[entry.handlerKey]
     if (typeof fn !== 'function') return
     lines.push(...resultToLines((fn as (shouldShowToast?: boolean) => unknown)(false)))
@@ -531,11 +521,10 @@ function runShortcutForFigureGroup(key: string): void {
     }
   }
 
-  // 2) 背景类：仅 includeBackground 时执行
+  // 2) 包含背景时：固定附加一次背景变换指令（与按键无关），放在所有立绘指令之后
   if (group.includeBackground) {
-    for (const entry of backgroundEntries) {
-      tryRun(entry)
-    }
+    const bgInst = handler.bgTransform(false)
+    if (bgInst) lines.push(bgInst.toInstString())
   }
 
   if (lines.length === 0) {

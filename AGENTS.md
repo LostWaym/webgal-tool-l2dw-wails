@@ -133,6 +133,7 @@ l2dw-wails/
   - 立绘列表（一般指"frontend\src\components\ModelPreviewApp\ModelList.vue"）
   - 操作区（一般指"frontend\src\components\ModelPreviewApp\ModelActionPanel.vue"）
   - 页签（一般指操作区上方的页签），页签内容（一般指选择页签后，操作区里展示的panel内容。
+- 立绘组快捷键复制 = useShortcuts.ts 的 runShortcutForFigureGroup（handler.bgTransform / bgSetImage / modelFigure...）
 
 ### 改模编辑器相关
 

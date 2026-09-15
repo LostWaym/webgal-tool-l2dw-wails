@@ -560,6 +560,7 @@ function onReloadModel() {
   const id = store.selectedId
   if (!id) return
   emitter.emit(StageEvents.ReloadModel, id)
+  msg.success('已从磁盘重新加载配置')
 }
 
 async function onReloadTextures() {
@@ -576,6 +577,7 @@ async function onReloadTextures() {
       await reloadAllModelTextures(model, subEntry.jsonAbsPath)
     }
   }
+  msg.success('已从磁盘重新加载纹理')
 }
 
 function generateFigureTemplate() {

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { reloadAllModelTextures } from '../../live2d/textureUtils'
+import { useMessage } from '../../composables/useMessage'
 import type { Live2DModel } from 'pixi-live2d-display-webgal'
 
 const props = defineProps<{
@@ -10,6 +11,7 @@ const props = defineProps<{
 }>()
 
 const store = useWmdlModelEditorStore()
+const msg = useMessage()
 
 const modelsEmpty = computed(() => store.currentWmdl.models.length === 0)
 
@@ -19,6 +21,7 @@ async function onReloadAllClick() {
     if (!jsonAbs) continue
     await reloadAllModelTextures(model, jsonAbs)
   }
+  msg.success('已从磁盘重新加载纹理')
 }
 
 function onWatchChange(checked: boolean) {

@@ -30,14 +30,13 @@ const store = useModelStore()
 const msg = useMessage()
 const live2dPreviewRef = ref<InstanceType<typeof Live2dPreview> | null>(null)
 
-// 取当前选中模型 json 路径作为预览模型。优先选中 live2d 模型，其次取第一个 live2d 模型，
-// 再次退化到当前选中图片立绘 / 空（此时预览组件显示空画布）。
-const previewModelPath = computed(() => {
+// 取当前选中模型的 wmdlConfig 作为预览。优先选中 live2d 模型，其次取第一个 live2d 模型。
+const previewWmdlConfig = computed(() => {
   const sel = store.selectedModel
-  if (sel?.kind === 'live2d' && sel.jsonPath) return sel.jsonPath
-  const firstLive2d = store.models.find((m) => m.kind === 'live2d' && m.jsonPath)
-  if (firstLive2d?.jsonPath) return firstLive2d.jsonPath
-  return ''
+  if (sel?.kind === 'live2d' && sel.wmdlConfig) return sel.wmdlConfig
+  const firstLive2d = store.models.find((m) => m.kind === 'live2d' && m.wmdlConfig)
+  if (firstLive2d?.wmdlConfig) return firstLive2d.wmdlConfig
+  return null
 })
 
 // ───────── 预设列表 ─────────
@@ -272,7 +271,7 @@ function onApplyToModel() {
             <aside class="preset-preview">
               <div class="preset-preview__header">实时预览</div>
               <div class="preset-preview__canvas">
-                <Live2dPreview v-if="previewModelPath" ref="live2dPreviewRef" :model-path="previewModelPath" />
+                <Live2dPreview v-if="previewWmdlConfig" ref="live2dPreviewRef" :wmdl-config="previewWmdlConfig" />
                 <div v-else class="preset-preview__empty">暂无可预览的模型</div>
               </div>
             </aside>

@@ -7,13 +7,14 @@ import { toFileUrl } from '../../path_utils'
 import type { FilterState } from '../../stores/previewStore'
 import { DEFAULT_FILTER_STATE } from '../../stores/previewStore'
 import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
+import type { WmdlConfig } from '../../stores/wmdlTypes'
 
 // pixi-live2d-display reads window.PIXI.Ticker
 ;(window as any).PIXI = PIXI
 
 const props = defineProps<{
-  /** Live2D 模型描述 json 的绝对路径 */
-  modelPath: string
+  /** wmdl 模型组配置（含子模型列表）。为空时不渲染任何模型。 */
+  wmdlConfig?: WmdlConfig | null
 }>()
 
 const containerRef = ref<HTMLDivElement | null>(null)
@@ -21,7 +22,8 @@ let app: PIXI.Application | null = null
 let rootContainer: PIXI.Container | null = null
 let stageMain: PIXI.Container | null = null
 let wrapper: L2dwContainer | null = null
-let model: Live2DModel | null = null
+/** 子模型 Live2DModel 列表（按 wmdlConfig.models 顺序），用于销毁 */
+const subModels: Live2DModel[] = []
 let resizeObserver: ResizeObserver | null = null
 let currentFilterState: FilterState = { ...DEFAULT_FILTER_STATE }
 let currentScale = 1
@@ -43,20 +45,20 @@ let detachDomHandlers: (() => void) | null = null
 const initialViewport = { x: 0, y: 0, scale: 1 }
 
 onMounted(async () => {
-  if (!props.modelPath) return
   await init()
 })
 
 watch(
-  () => props.modelPath,
-  async (newPath) => {
-    if (!newPath) return
+  () => props.wmdlConfig,
+  async (newConfig) => {
+    if (!newConfig) return
     if (!app) {
       await init()
     } else {
-      await loadModel(newPath)
+      await loadWmdlModels(newConfig)
     }
   },
+  { deep: true },
 )
 
 onBeforeUnmount(() => {
@@ -110,7 +112,7 @@ async function init() {
   resizeObserver.observe(host)
 
   attachDomHandlers()
-  await loadModel(props.modelPath)
+  await loadWmdlModels(props.wmdlConfig)
 }
 
 /** 计算让 STAGE_HEIGHT 适配进 hostHeight、保留 20% 留白的初始 scale。 */
@@ -176,57 +178,81 @@ function attachDomHandlers() {
   }
 }
 
-async function loadModel(jsonPath: string) {
+async function loadWmdlModels(config: WmdlConfig | null | undefined) {
   if (!app || !rootContainer || !stageMain) return
 
-  // 销毁旧的模型与 wrapper
-  if (model) {
-    wrapper?.removeChild(model)
-    model.destroy()
-    model = null
+  // 销毁旧的子模型与 wrapper
+  for (const m of subModels) {
+    wrapper?.removeChild(m)
+    m.destroy()
   }
+  subModels.length = 0
+
   if (wrapper) {
     wrapper.destroy({ children: true })
     wrapper = null
   }
 
+  // 创建主 wrapper（wmdl 整体容器），与 Stage.vue loadWmdlModels 一致
   wrapper = new L2dwContainer()
-  // base 锚定舞台中心，使模型天然位于 STAGE 坐标系中央；
-  // rootContainer 自身的 scale/居中负责把 STAGE 适配进 host。
   wrapper.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  wrapper.pivot.set(0, STAGE_HEIGHT / 2)
   stageMain.addChild(wrapper)
 
+  const models = config?.models ?? []
+  if (models.length === 0) {
+    fitModel()
+    return
+  }
+
   try {
-    const loaded = await Live2DModel.from(toFileUrl(jsonPath), {
-      idleMotionGroup: '',
-      autoInteract: false,
-    })
-    model = loaded
-    wrapper.addChild(model)
+    for (const wmdlModel of models) {
+      const url = toFileUrl(wmdlModel.jsonAbsPath)
+      const model = await Live2DModel.from(url, {
+        idleMotionGroup: '',
+        autoInteract: false,
+      })
+
+      const scaleX = STAGE_WIDTH / model.width
+      const scaleY = STAGE_HEIGHT / model.height
+      const targetScale = Math.min(scaleX, scaleY) * 1.25
+      model.scale.set(targetScale, targetScale)
+      model.anchor.set(0.5)
+      model.position.x = 0 + wmdlModel.offsetX
+      model.position.y = STAGE_HEIGHT / 1.8 + wmdlModel.offsetY
+
+      wrapper.addChild(model)
+      subModels.push(model)
+    }
+
     writeFilterStateToContainer(wrapper, currentFilterState, currentScale)
     fitModel()
   } catch (err) {
-    console.error('Live2dPreview failed to load model:', err)
+    console.error('Live2dPreview failed to load model group:', err)
   }
 }
 
 /**
- * FitInside: 在 STAGE 坐标系下，模型长边贴齐 STAGE 边界，整体不被裁剪。
+ * FitInside: 在 STAGE 坐标系下，模型组长边贴齐 STAGE 边界，整体不被裁剪。
  * rootContainer 自身负责把整个 STAGE 缩放到适配 host。
  */
 function fitModel() {
-  if (!model || !wrapper || !rootContainer || !app) return
+  if (!wrapper || !rootContainer || !app) return
   const host = containerRef.value
   if (!host) return
 
   const h = host.clientHeight
   if (h <= 0) return
 
-  // 模型在 STAGE 坐标系下按长边贴齐 STAGE 边界
-  model.anchor.set(0.5)
-  model.position.set(0, 0)
-  const scale = Math.min(STAGE_WIDTH / model.width, STAGE_HEIGHT / model.height)
-  model.scale.set(scale, scale)
+  // 模型组为空时不做 fit 处理（仅保留 rootContainer 居中）
+  if (subModels.length === 0) {
+    initialViewport.x = rootContainer.x
+    initialViewport.y = rootContainer.y
+    initialViewport.scale = computeFitScale(h)
+    rootContainer.scale.set(initialViewport.scale)
+    currentScale = initialViewport.scale
+    return
+  }
 
   // 记录初始视口（重置按钮使用）：重置到 fitModel 时计算的自适应 scale
   initialViewport.x = rootContainer.x
@@ -270,10 +296,10 @@ function dispose() {
   resizeObserver?.disconnect()
   resizeObserver = null
 
-  if (model) {
-    model.destroy()
-    model = null
+  for (const m of subModels) {
+    m.destroy()
   }
+  subModels.length = 0
   if (wrapper) {
     wrapper.destroy({ children: true })
     wrapper = null

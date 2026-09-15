@@ -977,6 +977,13 @@ async function reloadOne(id: string) {
   store.selectedId = null
   removeOne(id)
   await loadWmdlModels(entry)
+  // 加载完成后恢复 playing 状态
+  if (entry.playing.motion) {
+    await store.playMotion(id, entry.playing.motion.group, entry.playing.motion.index, entry.playing.motion.name)
+  }
+  if (entry.playing.expression) {
+    await store.playExpression(id, entry.playing.expression.index, entry.playing.expression.name)
+  }
   store.selectedId = id
 }
 

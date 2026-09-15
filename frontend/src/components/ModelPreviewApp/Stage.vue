@@ -1187,7 +1187,6 @@ function attachDomHandlers() {
       const d = entry.dummy
       const worldPos = gc.toGlobal(d.position)
       t.position.copyFrom(t.parent.toLocal(worldPos))
-      console.log(d.targetId,'worldPos', worldPos, 't.position', t.position, 't.parent.toLocal', t.parent.toLocal(worldPos))
       t.scale.x = d.scale.x * gc.scale.x
       t.scale.y = d.scale.y * gc.scale.y
       t.rotation = d.rotation + gc.rotation

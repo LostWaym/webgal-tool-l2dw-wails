@@ -70,23 +70,21 @@ let startScreenMP = new PIXI.Point(0, 0)
 // 鼠标起点/起点距离/方向是否已记录（首次 onPointerMove 时记录）
 let baseInitialized = false
 
-// 立绘组变换用的"逐目标初始状态"快照
-interface GroupTargetSnap {
-  container: PIXI.Container
-  /** 立绘或特殊容器 id，对应 store 的 transform state key */
+// 立绘组变换用的 dummy 映射（不再 reparent 目标，而是创建 dummy 跟随 groupContainer）
+interface GroupDummyEntry {
+  dummy: PIXI.Container
+  target: PIXI.Container
   id: string
-  /** reparent 前的父容器（结束时要扔回去） */
   parent: PIXI.Container
-  /** reparent 前在父容器 children 中的索引（addChildAt 还原 zIndex） */
   parentIndex: number
-  /** child 在原父坐标系下的真值 local x/y/scaleX/scaleY/rotation（cancel/commit 时写回） */
-  localX: number
-  localY: number
-  scaleX: number
-  scaleY: number
-  rotation: number
+  // target 在 startTransform 前的 rts 快照（cancelTransform 时还原用）
+  originalLocalX: number
+  originalLocalY: number
+  originalScaleX: number
+  originalScaleY: number
+  originalRotation: number
 }
-let groupTargetSnapshots: GroupTargetSnap[] = []
+let groupDummyEntries: GroupDummyEntry[] = []
 // 立绘组变换开始的组中心（用于以中心为基准的旋转/缩放）
 let groupStartCenterX = 0
 let groupStartCenterY = 0
@@ -239,44 +237,45 @@ function startTransform(mode: TransformMode) {
     stageMain?.updateTransform()
 
     if (!lockTarget) {
-      // 缓存每个目标"reparent 前的父 / index / 本地 rts"
-      // 关键：PIXI.addChild 不会处理 child 的本地坐标，reparent 后 c.position
-      // 仍按原父坐标系解释，所以视觉位置 = groupContainer.localToWorld(c.position)。
-      // groupContainer 此刻带 rts（identity，但 world position != 0），c.worldPos 不等于 c.position。
-      // 因此 reparent 前必须把 c.position 转成"在 groupContainer 局部下、抵消 groupContainer 当前 rts"的坐标，
-      // 这样 addChild 后视觉位置才保持不变。
-      groupTargetSnapshots = containers.map((c, i) => {
+      // 创建 dummy（rts 与 target 视觉一致）并 addChild 到 groupContainer。
+      // 不再 reparent target，target 的 rts 在 pointMove 中由 syncDummyToTarget 实时同步。
+      // 位置转换走 toGlobal/toLocal，自动处理 parent chain 的 rts，避免与 L2dwContainer base 偏移耦合。
+      groupDummyEntries = containers.map((c, i) => {
         const parent = c.parent
         const parentIndex = parent ? parent.getChildIndex(c) : 0
 
         // 用 c.position 读真实 local（绕开 L2dwContainer.x getter 的 base 偏移）
         const oldX = c.position.x
         const oldY = c.position.y
+        const oldScaleX = c.scale.x
+        const oldScaleY = c.scale.y
+        const oldRotation = c.rotation
 
-        // 把 c.position 转成"抵消 groupContainer 当前世界变换"的新局部坐标
-        // 用 position 而非 x/y，绕开 L2dwContainer 的 base 偏移重写
-        c.position.x = oldX - groupContainer.position.x
-        c.position.y = oldY - groupContainer.position.y
+        const dummy = new PIXI.Container()
+        dummy.position.copyFrom(c.position)
+        dummy.position.x -= groupContainer.position.x
+        dummy.position.y -= groupContainer.position.y
+        dummy.scale.x = oldScaleX
+        dummy.scale.y = oldScaleY
+        dummy.rotation = oldRotation
 
-        const snap: GroupTargetSnap = {
-          container: c,
+        groupContainer.addChild(dummy)
+
+        return {
+          dummy,
+          target: c,
           id: ids[i],
           parent: parent!,
           parentIndex,
-          localX: oldX,
-          localY: oldY,
-          scaleX: c.scale.x,
-          scaleY: c.scale.y,
-          rotation: c.rotation,
+          originalLocalX: oldX,
+          originalLocalY: oldY,
+          originalScaleX: oldScaleX,
+          originalScaleY: oldScaleY,
+          originalRotation: oldRotation,
         }
-
-        groupContainer.addChild(c)
-        return snap
       })
 
-      groupTargetSnapshots.sort((a, b) => a.parentIndex - b.parentIndex)
-
-      // 组内排序：backgroundContainer 排最底，立绘 wrapper 按当前顺序递增，
+      // 组内排序：backgroundContainer 排最底，立绘 dummy 按当前顺序递增，
       // crosshair（PIXI.Graphics）排最顶层。
       // 即便 groupContainer 整体被 bringGroupContainerToTop 提到最高，
       // 组内仍保持"背景在下、立绘在中、准心在上"的关系。
@@ -348,12 +347,15 @@ function startTransform(mode: TransformMode) {
 function cancelTransform() {
   const id = store.selectedId
   if (id && isFigureGroupId(id)) {
-    // 立绘组：还原每个目标到原父原 local rts
-    for (const snap of groupTargetSnapshots) {
-      snap.parent.addChildAt(snap.container, snap.parentIndex)
-      snap.container.position.set(snap.localX, snap.localY)
-      snap.container.scale.set(snap.scaleX, snap.scaleY)
-      snap.container.rotation = snap.rotation
+    // 立绘组：还原每个 target 到 startTransform 前的 rts（其 parent 未变）
+    for (const entry of groupDummyEntries) {
+      entry.target.position.set(entry.originalLocalX, entry.originalLocalY)
+      entry.target.scale.set(entry.originalScaleX, entry.originalScaleY)
+      entry.target.rotation = entry.originalRotation
+    }
+    // 销毁所有 dummy
+    for (const entry of groupDummyEntries) {
+      entry.dummy.destroy()
     }
     // g 模式：把 store.group.x/y 还原到 start 前的值
     if (transformMode.value === 'g') {
@@ -361,7 +363,7 @@ function cancelTransform() {
     }
     // 重置 groupContainer（identity + 当前 store.group.x/y 作为 base）
     resetGroupContainer(id)
-    groupTargetSnapshots = []
+    groupDummyEntries = []
     endTransform()
     return
   }
@@ -385,32 +387,20 @@ function endTransform() {
   const id = store.selectedId
   if (id && isFigureGroupId(id)) {
 
-    if (groupTargetSnapshots.length > 0)
+    if (groupDummyEntries.length > 0)
     {
-      // 立绘组结束变换（commit）：把 groupContainer 当前 rts"正向叠加"到每个 child 上，
-      // 然后把 child 扔回原父。因为原父是 stageMain（identity），child 在 groupContainer 局部下的
-      // 新 rts 直接就是它在 stageMain 局部下的最终 rts，视觉与变换结束时一致。
-      //
-      // 注意：要用 position 而非 x/y 操作位置，绕开 L2dwContainer 的 base 偏移重写。
-      const groupContainer = groupContainers.get(id)
-
-      stageMain?.updateTransform()
-      for (const snap of groupTargetSnapshots) {
-        if (groupContainer) {
-          snap.container.scale.x *= groupContainer.scale.x
-          snap.container.scale.y *= groupContainer.scale.y
-          snap.container.rotation += groupContainer.rotation
-          // 位置：用 toGlobal 读真世界位置（自动应用 groupContainer 的 s/r/p），
-          // 再 toLocal 转回 snap.parent（原父）局部，保证 addChildAt 后视觉位置不变。
-          const worldPos = groupContainer.toGlobal(snap.container.position)
-          snap.container.position.copyFrom(snap.parent.toLocal(worldPos))
-        }
-        snap.parent.addChildAt(snap.container, snap.parentIndex)
-        // 把 commit 后的 child rts 同步到 store
-        store.syncTransformFromModel(snap.id)
+      // 立绘组结束变换：target 的 rts 在 pointMove 中已被实时同步（包含 groupContainer 的整体贡献），
+      // 此处只需销毁 dummy 并把每个 target 的最终 rts 同步到 store。
+      // target 物理上一直在原父下，无需 reparent。
+      // 先同步所有 target 的 rts 到 store
+      for (const entry of groupDummyEntries) {
+        store.syncTransformFromModel(entry.id)
       }
-
-      void sortFigures()
+      // 再销毁所有 dummy
+      for (const entry of groupDummyEntries) {
+        entry.dummy.destroy()
+      }
+      groupDummyEntries = []
     }
 
     // 重置 groupContainer（identity + 当前 store.group.x/y 作为 base）
@@ -420,7 +410,7 @@ function endTransform() {
   transformMode.value = 'none'
   axisLock.value = 'none'
   baseInitialized = false
-  groupTargetSnapshots = []
+  groupDummyEntries = []
   emitter.emit(StageEvents.TransformStart, false)
   emitter.emit(StageEvents.TransformChange, store.selectedId)
   // 同步变换到 store
@@ -777,16 +767,6 @@ watch(
     figureContainer.sortChildren()
   },
 )
-
-function sortFigures() {
-  if (!figureContainer) return;
-  let index = 0
-  containersById.forEach((wrapper, id) => {
-    wrapper.zIndex = index
-    index++
-  })
-  figureContainer.sortChildren()
-}
 
 // 监听模型可见性变化
 watch(
@@ -1165,11 +1145,32 @@ function attachDomHandlers() {
   }
 
   /**
-   * 立绘组模式下的鼠标移动处理：只改 groupContainer 的 rts，所有目标自动跟随。
+   * 同步所有 dummy 的当前 rts 给对应的 target。
+   * 通过 toGlobal/toLocal 转换位置，自动处理 parent chain rts；
+   * scale/rotation 直接复制。
+   */
+  function syncDummyToTarget(gc: PIXI.Container) {
+    if (groupDummyEntries.length === 0) return
+    stageMain?.updateTransform()
+    for (const entry of groupDummyEntries) {
+      const t = entry.target
+      const d = entry.dummy
+      const worldPos = gc.toGlobal(d.position)
+      t.position.copyFrom(t.parent.toLocal(worldPos))
+      console.log(d.targetId,'worldPos', worldPos, 't.position', t.position, 't.parent.toLocal', t.parent.toLocal(worldPos))
+      t.scale.x = d.scale.x * gc.scale.x
+      t.scale.y = d.scale.y * gc.scale.y
+      t.rotation = d.rotation + gc.rotation
+    }
+    stageMain?.updateTransform()
+  }
+
+  /**
+   * 立绘组模式下的鼠标移动处理：只改 groupContainer 的 rts，然后同步给所有 target。
    *
-   * - g：groupContainer.x/y += dx；同步更新 store.group.x/y 和 base
-   * - s：groupContainer.scale *= factor（围绕 base 锚点放大）
-   * - r：groupContainer.rotation += deltaAngle（围绕 base 锚点旋转）
+   * - g：groupContainer.x/y += dx；同步更新 store.group.x/y
+   * - s：groupContainer.scale *= factor
+   * - r：groupContainer.rotation += deltaAngle
    */
   function handleFigureGroupPointerMove(e: PointerEvent) {
     if (!rootContainer) return
@@ -1219,6 +1220,7 @@ function attachDomHandlers() {
         groupContainer.y = groupStartCenterY + dy
         store.updateFigureGroup(id, { x: groupContainer.x, y: groupContainer.y })
       }
+      syncDummyToTarget(groupContainer)
       return
     }
 
@@ -1236,6 +1238,7 @@ function attachDomHandlers() {
         groupContainer.scale.x = groupStartScaleX * factor
         groupContainer.scale.y = groupStartScaleY * factor
       }
+      syncDummyToTarget(groupContainer)
       return
     }
 
@@ -1250,6 +1253,7 @@ function attachDomHandlers() {
       const sinA = startDirX * curDirY - startDirY * curDirX
       const deltaAngle = Math.atan2(sinA, cosA)
       groupContainer.rotation = groupStartRotation + deltaAngle
+      syncDummyToTarget(groupContainer)
     }
   }
 
@@ -1507,6 +1511,12 @@ function dispose() {
   for (const id of [...containersById.keys()]) {
     removeOne(id)
   }
+
+  // 兜底销毁任何遗留的 dummy（正常流程 endTransform/cancelTransform 时已清空）
+  for (const entry of groupDummyEntries) {
+    entry.dummy.destroy()
+  }
+  groupDummyEntries = []
 
   if (app) {
     if (typeof previewRuntime.cleanup === 'function') previewRuntime.cleanup()

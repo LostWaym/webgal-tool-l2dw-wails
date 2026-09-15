@@ -175,6 +175,7 @@ function onApplyToModel() {
   }
   store.setFilterState(id, currentDraft.value as Partial<FilterState>)
   msg.success('已将滤镜应用到当前模型')
+  close()
 }
 </script>
 

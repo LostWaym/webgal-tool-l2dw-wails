@@ -16,8 +16,10 @@ import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
+import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 
 const store = useModelStore()
+const filterPresetModal = useFilterPresetModal()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 
@@ -477,6 +479,27 @@ const hints = computed<HintsView>(() => {
     shortcuts: [...getShortcutHints(type), ...COMMON_SHORTCUT_HINTS],
   }
 })
+
+// 便签模块：选择滤镜按钮（背景 / 舞台 / 立绘 可用；立绘组无独立滤镜状态，不显示）
+const showSelectFilterBtn = computed(() => {
+  const type = resolveShortcutTargetType(store.selectedId)
+  return type === 'background' || type === 'stage' || type === 'model'
+})
+
+// 便签模块：重载模型配置按钮（仅 Live2D 立绘且有 wmdl 路径时显示）
+const showReloadConfigBtn = computed(() => {
+  const model = store.selectedModel
+  return !!model && model.kind === 'live2d' && !!model.wmdlConfig?.wmdlFilePath
+})
+
+function onOpenFilterPreset() {
+  filterPresetModal.open()
+}
+
+function onReloadModelConfig() {
+  if (!store.selectedId) return
+  emitter.emit(StageEvents.ReloadModel, store.selectedId)
+}
 
 let app: PIXI.Application | null = null
 const live2dById = new Map<string, Live2DModel>()
@@ -1628,6 +1651,27 @@ function dispose() {
             </li>
           </ul>
         </section>
+        <section v-if="showSelectFilterBtn || showReloadConfigBtn" class="stage__hints-group">
+          <h4 class="stage__hints-heading">便签</h4>
+          <div class="stage__hints-buttons">
+            <button
+              v-if="showSelectFilterBtn"
+              type="button"
+              class="stage__hints-sticky-btn"
+              @click="onOpenFilterPreset"
+            >
+              选择滤镜
+            </button>
+            <button
+              v-if="showReloadConfigBtn"
+              type="button"
+              class="stage__hints-sticky-btn"
+              @click="onReloadModelConfig"
+            >
+              重载模型配置
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   </section>
@@ -1861,6 +1905,31 @@ function dispose() {
 
 .stage__hints-desc {
   flex: 1 1 auto;
+}
+
+.stage__hints-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stage__hints-sticky-btn {
+  pointer-events: auto;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-shadow: inherit;
+}
+
+.stage__hints-sticky-btn:hover,
+.stage__hints-sticky-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.22);
+  outline: none;
 }
 
 .stage__hints.is-collapsed .stage__hints-toggle {

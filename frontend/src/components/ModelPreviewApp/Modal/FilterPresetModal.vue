@@ -66,6 +66,53 @@ async function onPresetSelect(filename: string) {
   }
 }
 
+// 保存悬停预览前的滤镜状态（用于恢复）
+const savedFilterBeforeHover = ref<Partial<FilterState> | null>(null)
+
+// 鼠标移入列表项：保存当前状态并预览该滤镜
+async function onPresetHoverStart(filename: string) {
+  if (!live2dPreviewRef.value) return
+  // 保存当前预览滤镜
+  savedFilterBeforeHover.value = currentDraft.value ? { ...currentDraft.value } : null
+
+  try {
+    const content = await ReadFilterPresetFile(filename)
+    const parsed = JSON.parse(content)
+    const filters = parsed?.filters ?? parsed ?? {}
+    // 预览该滤镜
+    live2dPreviewRef.value.setFilter(filters as Partial<FilterState>)
+  } catch (e) {
+    console.error('failed to preview preset', filename, e)
+  }
+}
+
+// 鼠标移出列表项：恢复之前的滤镜状态
+function onPresetHoverEnd() {
+  if (!live2dPreviewRef.value || !savedFilterBeforeHover.value) return
+  live2dPreviewRef.value.setFilter(savedFilterBeforeHover.value)
+  savedFilterBeforeHover.value = null
+}
+
+// 点击 √ 按钮：应用该滤镜到当前模型并关闭
+async function onApplyAndClose(filename: string) {
+  const id = store.selectedId
+  if (!id) {
+    msg.warning('请先选中模型')
+    return
+  }
+  try {
+    const content = await ReadFilterPresetFile(filename)
+    const parsed = JSON.parse(content)
+    const filters = parsed?.filters ?? parsed ?? {}
+    store.setFilterState(id, filters as Partial<FilterState>)
+    msg.success('已应用滤镜：' + filename)
+    close()
+  } catch (e) {
+    console.error('failed to apply preset', filename, e)
+    msg.error('应用滤镜失败：' + filename)
+  }
+}
+
 // FILTER_GROUPS / FilterItemSpec / FilterGroupSpec 现已从 utils/consts 导入
 
 // ───────── 编辑辅助 ─────────
@@ -200,8 +247,15 @@ function onApplyToModel() {
                   class="preset-list__item"
                   :class="{ 'is-active': state.selectedFilename === name }"
                   @click="onPresetSelect(name)"
+                  @mouseenter="onPresetHoverStart(name)"
+                  @mouseleave="onPresetHoverEnd"
                 >
-                  {{ name }}
+                  <span class="preset-list__item-name">{{ name }}</span>
+                  <button
+                    class="preset-list__apply-btn"
+                    title="应用此滤镜并关闭"
+                    @click.stop="onApplyAndClose(name)"
+                  >√</button>
                 </li>
                 <li v-if="presetFiles.length === 0" class="preset-list__empty">
                   暂无预设
@@ -401,15 +455,53 @@ function onApplyToModel() {
 }
 
 .preset-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 6px 12px;
   font-size: 13px;
   color: #e6e6e6;
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   border-left: 3px solid transparent;
   transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.preset-list__item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-list__apply-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(47, 128, 237, 0.7);
+  border: 1px solid rgba(47, 128, 237, 0.85);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.12s ease;
+}
+
+.preset-list__item:hover .preset-list__apply-btn {
+  opacity: 1;
+}
+
+.preset-list__apply-btn:hover {
+  background-color: rgba(63, 144, 255, 0.95);
+}
+
+.preset-list__apply-btn:active {
+  transform: scale(0.95);
 }
 
 .preset-list__item:hover {

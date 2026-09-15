@@ -18,10 +18,10 @@ import Live2dPreview from '../../common/Live2dPreview.vue'
  *
  * - 左侧：动态从 filter_presets 读取已有的 .json 预设列表
  * - 右侧：当前选中预设的参数编辑区
- * - 编辑不直接写回磁盘；点击【应用滤镜】才落盘
+ * - 编辑不直接写回磁盘；点击【保存滤镜修改】才落盘
  * - 底部固定区域包含三个按钮：
- *   - 应用滤镜：把当前 draft 写回磁盘
- *   - 重置：从磁盘重新读取，丢弃未保存的修改
+ *   - 保存滤镜修改：把当前 draft 写回磁盘
+ *   - 撤销修改内容：从磁盘重新读取，丢弃未保存的修改
  *   - 应用到模型：把 draft 写入当前选中模型的 FilterState
  */
 
@@ -137,7 +137,7 @@ function onMaskClick() {
   close()
 }
 
-// ───────── 按钮：应用滤镜 / 重置 / 应用到模型 ─────────
+// ───────── 按钮：保存滤镜修改 / 撤销修改内容 / 应用到模型 ─────────
 
 async function onApplyPreset() {
   if (!currentDraft.value || !state.selectedFilename) return
@@ -285,14 +285,14 @@ function onApplyToModel() {
               :disabled="!currentDraft || !state.selectedFilename"
               @click="onApplyPreset"
             >
-              应用滤镜
+              保存滤镜修改
             </button>
             <button
               class="footer-btn"
               :disabled="!currentDraft"
               @click="onResetDraft"
             >
-              重置
+              撤销修改内容
             </button>
             <button
               class="footer-btn"

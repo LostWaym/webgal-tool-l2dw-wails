@@ -1064,6 +1064,27 @@ function onLabelDragEnd() {
           <span class="list-region-title">滤镜</span>
           <button
             type="button"
+            class="list-region-shuffle"
+            @click="resetFilters"
+          >
+            重置
+          </button>
+          <button
+            type="button"
+            class="list-region-shuffle"
+            @click="onSaveFilterPreset"
+          >
+            保存
+          </button>
+          <button
+            type="button"
+            class="list-region-shuffle"
+            @click="onSelectFilterPreset"
+          >
+            选择
+          </button>
+          <button
+            type="button"
             class="list-region-toggle"
             :aria-expanded="!filterCollapsed"
             :aria-label="filterCollapsed ? '展开滤镜' : '折叠滤镜'"
@@ -1118,17 +1139,6 @@ function onLabelDragEnd() {
                     />
                   </template>
                 </div>
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row form-row--btn">
-                <button class="reset-btn" @click="resetFilters">重置滤镜</button>
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row form-row--btn form-row--snapshot">
-                <button class="snapshot-btn" @click="onSaveFilterPreset">保存滤镜</button>
-                <button class="snapshot-btn" @click="onSelectFilterPreset">选择滤镜</button>
               </div>
             </li>
           </ul>

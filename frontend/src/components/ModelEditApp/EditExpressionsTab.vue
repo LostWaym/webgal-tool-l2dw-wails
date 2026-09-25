@@ -4,6 +4,7 @@ import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import ExpressionsToolbar from './ExpressionsToolbar.vue'
 import { useBatchAddModal } from '../../composables/useBatchAddModal'
 import { useBatchModifyModal } from '../../composables/useBatchModifyModal'
+import { useExpressionEditorModal } from '../../composables/useExpressionEditorModal'
 import { filterBySearch } from '../../utils/searchUtils'
 import SearchInput from '../common/SearchInput.vue'
 
@@ -20,6 +21,7 @@ import SearchInput from '../common/SearchInput.vue'
 const store = useWmdlModelEditorStore()
 const modal = useBatchAddModal()
 const modifyModal = useBatchModifyModal()
+const editorModal = useExpressionEditorModal()
 
 const expressions = computed(() => store.selectedModel?.expressions ?? [])
 const hasSelection = computed(() => !!store.selectedModelId)
@@ -47,6 +49,10 @@ function onBatchModify() {
   modifyModal.open('expression')
 }
 
+function onOpenEditor() {
+  editorModal.open()
+}
+
 function onRemove(item: { name: string; path: string }) {
   store.removeExpression(item.name, item.path)
 }
@@ -54,7 +60,12 @@ function onRemove(item: { name: string; path: string }) {
 
 <template>
   <div class="expressions-tab">
-    <ExpressionsToolbar v-if="hasSelection" @batch-add="onBatchAdd" @batch-modify="onBatchModify" />
+    <ExpressionsToolbar
+      v-if="hasSelection"
+      @batch-add="onBatchAdd"
+      @batch-modify="onBatchModify"
+      @open-editor="onOpenEditor"
+    />
     <div v-if="!hasSelection" class="empty-hint">
       请先在左侧选择要查看的模型
     </div>

@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import * as PIXI from 'pixi.js'
-import { Live2DModel } from 'pixi-live2d-display-webgal'
+import { computed, ref, watch } from 'vue'
 import { useWmdlModelEditorStore } from '../../../stores/wmdlModelEditor'
-import { toFileUrl, pathCombine, pathDirname } from '../../../path_utils'
-import { L2dwContainer } from '../../../live2d/L2dwContainer'
+import { pathCombine, pathDirname } from '../../../path_utils'
 import { writeParameter } from '../../../live2d/coreAdapter'
 import { useExpressionEditorModal, type ExportFormat } from '../../../composables/useExpressionEditorModal'
 import { useMessage } from '../../../composables/useMessage'
@@ -15,16 +12,22 @@ import {
   defaultExportDirForModel,
   type ParamSnapshot,
 } from '../../../live2d/expressionUtils'
+import type { WmdlConfig } from '../../../stores/wmdlTypes'
+import Live2dPreview from '../../common/Live2dPreview.vue'
+import EditRangeCard from '../EditRangeCard.vue'
+import SearchInput from '../../common/SearchInput.vue'
+import { filterBySearch } from '../../../utils/searchUtils'
 
 /**
  * 表情编辑模态。
  *
- * 布局：左侧 Live2D 预览，右侧 [参数 / 表情] 两个页签。
- * 表情 Tab 点击条目 → 把表情文件的参数写入当前模型 + 缓存到内存快照。
- * 顶栏"导出"按钮 → 进入导出覆盖层（不开新窗口），让用户选 .exp.json / .exp3.json。
+ * 布局：左侧 Live2dPreview 预览（独立 PIXI 实例），右侧 [表情 / 参数] 页签。
+ * 表情 Tab 点击条目 → 读取表情 JSON，把参数写到 store.initParams.override + 主舞台 coreModel + Live2dPreview。
+ * 参数 Tab 使用 EditRangeCard 网格 + 顶部搜索栏（与 EditParamsTab 一致），可拖动实时调参。
+ * 顶栏"导出"按钮 → 进入导出覆盖层，让用户选 .exp.json / .exp3.json。
  *
- * 预览 canvas 与 EditStage 是完全独立的 Pixi 实例，避免与主舞台互相干扰。
- * 模态关闭 / 切换选中模型时，会先 destroy 旧实例再重建。
+ * 预览复用 Live2dPreview：表情点击 / 参数拖动 / 重置 三个动作都会通过 previewRef.applyParameters
+ * 同步到独立的 PIXI 子模型，确保模态内预览实时刷新（与主舞台互不干扰）。
  */
 
 const store = useWmdlModelEditorStore()
@@ -34,20 +37,16 @@ const modal = useExpressionEditorModal()
 type RightTab = 'params' | 'expressions'
 const activeTab = ref<RightTab>('expressions')
 
-const leftCanvasRef = ref<HTMLDivElement | null>(null)
+/** Live2dPreview 组件引用，用于在表情点击 / 参数拖动时同步写入子模型 */
+const previewRef = ref<InstanceType<typeof Live2dPreview> | null>(null)
 
-let previewApp: PIXI.Application | null = null
-let previewRoot: PIXI.Container | null = null
-let previewStage: PIXI.Container | null = null
-let previewFigure: PIXI.Container | null = null
-let previewWrapper: L2dwContainer | null = null
-let previewModel: Live2DModel | null = null
-let previewModelId: string | null = null
-
-/** 当前快照（用户在表情 Tab 每次点击覆盖后会被替换为最新一组） */
+/** 当前快照（用户在表情 Tab 每次点击覆盖后会被替换为最新一组）。 */
 const currentSnapshot = ref<ParamSnapshot[]>([])
 /** 上次点击的表情条目 key（高亮） */
 const activeExpressionKey = ref<string | null>(null)
+
+/** 参数 Tab 搜索词 */
+const paramSearch = ref('')
 
 // 导出覆盖层状态
 const exportName = ref('my_expression')
@@ -67,135 +66,48 @@ const defaultExportDir = computed(() => {
   return defaultExportDirForModel(m.jsonAbsPath)
 })
 
-// ── 生命周期 / 预览 canvas 初始化 ──────────────────────────────────────────
-
-onMounted(() => {
-  // 第一次进入直接重建预览
-  rebuildPreview()
+/**
+ * Live2dPreview 接受 wmdlConfig 作为模型数据源。
+ * 我们只展示"当前选中模型"，因此构造一个仅含一个 models 的伪 wmdlConfig。
+ * 用 computed 保证选中模型切换时预览自动换模型。
+ */
+const previewConfig = computed<WmdlConfig | null>(() => {
+  const m = selectedModel.value
+  if (!m) return null
+  return {
+    name: m.name,
+    figureTemplate: '',
+    transformTemplate: '',
+    live2dBounds: [0, 0, 0, 0],
+    models: [m],
+    wmdlFilePath: '',
+  }
 })
 
-onBeforeUnmount(() => {
-  destroyPreview()
+// ── 参数 Tab 视图（与 EditParamsTab 几乎一致）────────────────────────────
+
+/** 把 store.initParams 投影为卡片可用的视图模型。 */
+const paramsView = computed(() => {
+  const item = selectedModel.value
+  if (!item) return []
+  return item.initParams.map((p) => ({
+    id: p.id,
+    min: p.min ?? -1,
+    max: p.max ?? 1,
+    effective: p.override !== undefined ? p.override : p.value,
+    hasOverride: p.override !== undefined,
+  }))
 })
 
-watch(
-  () => stateForWatch(),
-  () => rebuildPreview(),
+/**
+ * 搜索过滤：复用项目内 filterBySearch。
+ * 规则：trim 空串不过滤；多关键字空格分隔，全部命中才显示；不区分大小写。
+ */
+const filteredParams = computed(() =>
+  filterBySearch(paramsView.value, paramSearch.value, (p) => p.id),
 )
 
-function stateForWatch() {
-  const m = selectedModel.value
-  if (!m) return { id: '', json: '' }
-  return { id: m.id, json: m.jsonAbsPath }
-}
-
-watch(
-  () => modal.state.visible,
-  (visible) => {
-    if (!visible) {
-      // 关闭时清理预览与快照
-      currentSnapshot.value = []
-      activeExpressionKey.value = null
-      destroyPreview()
-    } else {
-      // 打开时预选导出格式
-      modal.setExportFormat(defaultFormat.value)
-      // 用 nextTick 让 canvas 容器先挂载
-      setTimeout(() => rebuildPreview(), 0)
-    }
-  },
-)
-
-function destroyPreview() {
-  if (previewWrapper) {
-    previewWrapper.destroy({ children: true })
-    previewWrapper = null
-  }
-  previewModel = null
-  previewModelId = null
-  if (previewFigure && previewStage) {
-    previewStage.removeChild(previewFigure)
-  }
-  previewFigure = null
-  previewStage = null
-  previewRoot = null
-  if (previewApp) {
-    try {
-      previewApp.destroy(true, { children: true, texture: true, baseTexture: true })
-    } catch (e) {
-      console.warn('preview pixi destroy error', e)
-    }
-    previewApp = null
-  }
-}
-
-async function rebuildPreview() {
-  destroyPreview()
-
-  if (!modal.state.visible) return
-  const m = selectedModel.value
-  if (!m) return
-
-  const container = leftCanvasRef.value
-  if (!container) return
-
-  previewApp = new PIXI.Application({
-    width: container.clientWidth || 480,
-    height: container.clientHeight || 360,
-    backgroundAlpha: 0,
-    antialias: true,
-    autoDensity: true,
-    resolution: window.devicePixelRatio || 1,
-  })
-  previewApp.ticker.maxFPS = 60
-  ;(window as any).PIXI = PIXI
-
-  container.appendChild(previewApp.view as HTMLCanvasElement)
-
-  previewRoot = new PIXI.Container()
-  previewRoot.x = previewApp.renderer.width / 2
-  previewRoot.y = previewApp.renderer.height / 2
-  previewRoot.scale.set(0.5)
-
-  previewStage = new PIXI.Container()
-  previewStage.width = 1024
-  previewStage.height = 1024
-  previewStage.pivot.set(512, 512)
-  previewFigure = new PIXI.Container()
-  previewFigure.width = 1024
-  previewFigure.height = 1024
-  previewStage.addChild(previewFigure)
-  previewRoot.addChild(previewStage)
-  previewApp.stage.addChild(previewRoot)
-
-  try {
-    const url = toFileUrl(m.jsonAbsPath)
-    const model = await Live2DModel.from(url, { idleMotionGroup: '', autoInteract: false })
-    const scale = Math.min(1024 / model.width, 1024 / model.height)
-    model.scale.x = scale
-    model.scale.y = scale
-    model.anchor.set(0.5)
-    model.position.x = 0
-    model.position.y = 512
-
-    const wrapper = new L2dwContainer()
-    wrapper.setBasePosition(512, 512)
-    wrapper.addChild(model)
-    wrapper.pivot.set(0, 512)
-    wrapper.x = m.offsetX
-    wrapper.y = m.offsetY
-
-    previewFigure.addChild(wrapper)
-    previewWrapper = wrapper
-    previewModel = model
-    previewModelId = m.id
-  } catch (e) {
-    console.error('ExpressionEditorModal: failed to load model', e)
-    msg.error('预览模型加载失败')
-  }
-}
-
-// ── 表情点击 → 写回参数 + 缓存快照 ────────────────────────────────────────
+// ── 表情点击 → 写回参数 + 缓存快照 ──────────────────────────────────────
 
 async function onExpressionClick(item: { name: string; path: string }) {
   const m = selectedModel.value
@@ -215,15 +127,60 @@ async function onExpressionClick(item: { name: string; path: string }) {
     return
   }
 
-  // 写回模型当前参数
+  // 三处同步：主舞台 coreModel + Live2dPreview + store.initParams.override
   for (const p of result.snapshot) {
     writeParameter(m.id, p.id, p.val)
+    const entry = m.initParams.find((it) => it.id === p.id)
+    if (entry) entry.override = p.val
   }
+  previewRef.value?.applyParameters(
+    result.snapshot.map((s) => ({ id: s.id, val: s.val })),
+  )
 
+  // 保留 currentSnapshot：导出 .exp.json / .exp3.json 需要 calc 字段信息
+  // （store.initParams.override 只存值，不带 calc），所以这里仍是必要的缓存。
   currentSnapshot.value = result.snapshot
   activeExpressionKey.value = `${item.name}\u0000${item.path}`
   msg.success(`已应用表情「${item.name}」（${result.snapshot.length} 个参数）`)
 }
+
+// ── 参数拖动 / 重置 ─────────────────────────────────────────────────────
+
+function onParamChange(id: string, value: number) {
+  const m = selectedModel.value
+  if (!m) return
+  // 1) 写回主舞台 coreModel（走 editRuntime.live2dModels）
+  writeParameter(m.id, id, value)
+  // 2) 同步写回模态内的 Live2dPreview 子模型
+  previewRef.value?.applyParameters([{ id, val: value }])
+  // 3) 同步到 store.override（与 EditParamsTab 一致）
+  const entry = m.initParams.find((p) => p.id === id)
+  if (entry) entry.override = value
+}
+
+function onParamReset(id: string) {
+  const m = selectedModel.value
+  if (!m) return
+  const entry = m.initParams.find((p) => p.id === id)
+  if (!entry) return
+  writeParameter(m.id, id, entry.value)
+  previewRef.value?.applyParameters([{ id, val: entry.value }])
+  delete entry.override
+}
+
+// ── 模态关闭时清空快照与高亮 ─────────────────────────────────────────
+
+watch(
+  () => modal.state.visible,
+  (visible) => {
+    if (visible) {
+      modal.setExportFormat(defaultFormat.value)
+    } else {
+      currentSnapshot.value = []
+      activeExpressionKey.value = null
+    }
+  },
+)
 
 // ── 导出覆盖层 ────────────────────────────────────────────────────────────
 
@@ -287,6 +244,13 @@ const rightTabs: { id: RightTab; label: string }[] = [
   { id: 'expressions', label: '表情' },
   { id: 'params', label: '参数' },
 ]
+
+// 卡片流式布局常量（与 EditParamsTab 一致）
+const LAYOUT = {
+  CARD_MIN_WIDTH: 150,
+  CARD_MAX_WIDTH: 300,
+  GAP: 8,
+} as const
 </script>
 
 <template>
@@ -310,9 +274,14 @@ const rightTabs: { id: RightTab; label: string }[] = [
           </header>
 
           <section class="expr-modal__body">
-            <!-- 左侧预览 -->
+            <!-- 左侧预览：复用 Live2dPreview -->
             <div class="expr-modal__preview">
-              <div ref="leftCanvasRef" class="expr-modal__canvas" />
+              <Live2dPreview
+                v-if="previewConfig"
+                ref="previewRef"
+                :wmdl-config="previewConfig"
+                class="expr-modal__preview-canvas"
+              />
               <p v-if="!hasSelection" class="expr-modal__hint">请先选择模型</p>
             </div>
 
@@ -346,28 +315,37 @@ const rightTabs: { id: RightTab; label: string }[] = [
                     </li>
                   </ul>
                 </template>
-                <!-- 参数 Tab：显示当前快照（最近一次应用的表情参数），未应用时显示模型所有参数当前值 -->
+                <!-- 参数 Tab：搜索栏 + EditRangeCard 网格 -->
                 <template v-else>
                   <div v-if="!hasSelection" class="empty-hint">请先选择模型</div>
-                  <div v-else class="params-summary">
-                    <p class="params-summary__hint">
-                      <template v-if="currentSnapshot.length">
-                        当前快照：{{ currentSnapshot.length }} 个参数（最近一次应用的表情）
-                      </template>
-                      <template v-else>
-                        当前模型共有 {{ (store.selectedModel?.initParams ?? []).length }} 个参数。点击左侧预览或上方表情 Tab 应用表情后，参数值会同步更新。
-                      </template>
-                    </p>
-                    <ul class="params-summary__list">
-                      <li
-                        v-for="p in (currentSnapshot.length ? currentSnapshot : (store.selectedModel?.initParams ?? []))"
-                        :key="p.id"
-                        class="params-summary__item"
-                      >
-                        <span class="params-summary__id">{{ p.id }}</span>
-                        <span class="params-summary__val">{{ Number((p as any).val ?? (p as any).value ?? 0).toFixed(3) }}</span>
-                      </li>
-                    </ul>
+                  <div v-else-if="!paramsView.length" class="empty-hint">该模型暂无参数</div>
+                  <div v-else class="params-tab">
+                    <div class="params-tab__toolbar">
+                      <SearchInput
+                        v-model="paramSearch"
+                        variant="edit"
+                        placeholder="搜索参数(空格分隔多个关键词)"
+                      />
+                    </div>
+                    <div class="params-tab__scroll">
+                      <div v-if="!filteredParams.length" class="empty-hint">
+                        无匹配参数
+                      </div>
+                      <ul v-else class="params-tab__grid">
+                        <li v-for="p in filteredParams" :key="p.id" class="params-tab__item">
+                          <EditRangeCard
+                            :name="p.id"
+                            :min="p.min"
+                            :max="p.max"
+                            :model-value="p.effective"
+                            :highlight="p.hasOverride"
+                            :show-reset="p.hasOverride"
+                            @update:model-value="onParamChange(p.id, $event)"
+                            @reset="onParamReset(p.id)"
+                          />
+                        </li>
+                      </ul>
+                    </div>
                   </div>
                 </template>
               </div>
@@ -520,15 +498,21 @@ const rightTabs: { id: RightTab; label: string }[] = [
   display: flex;
 }
 
-.expr-modal__canvas {
-  position: absolute;
-  inset: 0;
+.expr-modal__preview-canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .expr-modal__hint {
-  margin: auto;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
   color: #6b7280;
   font-size: 13px;
+  pointer-events: none;
 }
 
 .expr-modal__panel {
@@ -572,6 +556,7 @@ const rightTabs: { id: RightTab; label: string }[] = [
   flex: 1;
   overflow-y: auto;
   padding: 8px 0;
+  min-height: 0;
 }
 
 .expr-list {
@@ -615,41 +600,44 @@ const rightTabs: { id: RightTab; label: string }[] = [
   text-overflow: ellipsis;
 }
 
-.params-summary {
-  padding: 12px 16px;
+/* ── 参数 Tab 布局 ───────────────────────────────────────────── */
+
+.params-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
 }
 
-.params-summary__hint {
-  font-size: 12px;
-  color: #b0b8c4;
-  margin: 0 0 12px 0;
+.params-tab__toolbar {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
 }
 
-.params-summary__list {
+.params-tab__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px 12px 12px;
+}
+
+.params-tab__grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
 }
 
-.params-summary__item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  background: rgba(35, 40, 48, 0.5);
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.params-summary__id {
-  color: #c8ceda;
-}
-
-.params-summary__val {
-  color: #ffffff;
+.params-tab__item {
+  flex: 1 1 150px;
+  max-width: 300px;
+  min-width: 0;
+  display: block;
 }
 
 .empty-hint {

@@ -322,6 +322,24 @@ defineExpose({
   setFilter,
   resetFilter,
   resetViewport,
+  /**
+   * 直接写入选中子模型的参数值（不重载模型），用于表情编辑等需要实时预览的场景。
+   * 不依赖外部 runtimeRegistry，走本组件自己的 subModels 引用。
+   */
+  applyParameters(params: Array<{ id: string; val: number }>) {
+    if (!subModels.length) return
+    for (const m of subModels) {
+      const core: any = (m as any).internalModel?.coreModel
+      if (!core) continue
+      for (const { id, val } of params) {
+        if (typeof core.setParameterValueById === 'function') {
+          core.setParameterValueById(id, val)
+        } else if (typeof core.setParamFloat === 'function') {
+          core.setParamFloat(id, val)
+        }
+      }
+    }
+  },
 })
 </script>
 

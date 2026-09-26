@@ -8,22 +8,28 @@
  *
  * 数据：复用 useWmdlModelEditorStore，仅在演出编辑模式下持有当前 wmdl 的副本。
  * 加载逻辑由 main.ts 在启动时（通过 --actor-wmdl 参数）自动触发。
+ *
+ * 右侧面板支持拖拽调整宽度（min 280, max 600）。
  */
 import { computed, ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import ActorStage from './ActorStage.vue'
 import EditPanel from './EditPanel.vue'
+import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
 
 const store = useWmdlModelEditorStore()
 const stageRef = ref<InstanceType<typeof ActorStage> | null>(null)
 
-const models = computed(() => store.currentWmdl.models)
-const selectedId = computed(() => store.selectedModelId)
 const wmdlName = computed(() => store.currentWmdl.name || '未加载')
 
-function onSelectModel(e: Event) {
-  const value = (e.target as HTMLSelectElement).value
-  store.selectModel(value || null)
+const PANEL_MIN = 280
+const PANEL_MAX = 600
+const DEFAULT_PANEL = 360
+const panelWidth = ref(DEFAULT_PANEL)
+
+function onRightDrag(dx: number) {
+  const next = panelWidth.value - dx
+  panelWidth.value = Math.max(PANEL_MIN, Math.min(PANEL_MAX, next))
 }
 
 function onApplyParams(params: Array<{ id: string; val: number }>) {
@@ -39,15 +45,6 @@ function onApplyParams(params: Array<{ id: string; val: number }>) {
         <span class="actor-app__wmdl-name" :title="store.currentWmdl.wmdlFilePath ?? ''">
           {{ wmdlName }}
         </span>
-        <select
-          v-if="models.length > 0"
-          class="actor-app__model-select"
-          :value="selectedId ?? ''"
-          @change="onSelectModel"
-        >
-          <option v-for="m in models" :key="m.id" :value="m.id">{{ m.name }}</option>
-        </select>
-        <span v-else class="actor-app__no-model">无模型</span>
       </div>
     </header>
 
@@ -55,7 +52,8 @@ function onApplyParams(params: Array<{ id: string; val: number }>) {
       <div class="actor-app__stage">
         <ActorStage ref="stageRef" />
       </div>
-      <aside class="actor-app__panel">
+      <ResizeHandle side="right" @drag="onRightDrag" />
+      <aside class="actor-app__panel" :style="{ width: panelWidth + 'px' }">
         <EditPanel @apply-params="onApplyParams" />
       </aside>
     </section>
@@ -108,32 +106,12 @@ function onApplyParams(params: Array<{ id: string; val: number }>) {
   min-width: 0;
 }
 
-.actor-app__model-select {
-  background-color: rgba(20, 23, 28, 0.6);
-  border: 1px solid rgba(60, 68, 80, 0.7);
-  border-radius: 4px;
-  color: #ffffff;
-  font-size: 12px;
-  padding: 4px 8px;
-  outline: none;
-  cursor: pointer;
-  min-width: 160px;
-}
-
-.actor-app__model-select:focus {
-  border-color: rgba(47, 128, 237, 0.85);
-}
-
-.actor-app__no-model {
-  font-size: 12px;
-  color: #6b7280;
-}
-
 .actor-app__body {
   flex: 1;
   display: flex;
   flex-direction: row;
   min-height: 0;
+  align-items: stretch;
 }
 
 .actor-app__stage {
@@ -144,7 +122,7 @@ function onApplyParams(params: Array<{ id: string; val: number }>) {
 }
 
 .actor-app__panel {
-  flex: 0 0 360px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-left: 1px solid #2c313a;

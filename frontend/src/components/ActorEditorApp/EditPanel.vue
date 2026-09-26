@@ -16,6 +16,8 @@ import {
   exportAsExpJson,
   exportAsExp3Json,
   defaultExportDirForModel,
+  buildExpJson,
+  buildExp3Json,
   type ParamSnapshot,
 } from '../../live2d/expressionUtils'
 import { useActorEditorState, type ExportFormat } from '../../composables/useActorEditorState'
@@ -42,6 +44,7 @@ const paramSearch = ref('')
 const exportName = ref('my_expression')
 const fadeIn = ref(500)
 const fadeOut = ref(500)
+const compress = ref(false)
 
 const selectedModel = computed(() => store.selectedModel)
 const expressions = computed(() => store.selectedModel?.expressions ?? [])
@@ -156,14 +159,35 @@ async function onConfirmExport() {
 
   try {
     if (fmt === 'exp3') {
-      await exportAsExp3Json(targetPath, exportName.value.trim(), currentSnapshot.value, fadeIn.value, fadeOut.value)
+      await exportAsExp3Json(targetPath, exportName.value.trim(), currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
     } else {
-      await exportAsExpJson(targetPath, exportName.value.trim(), currentSnapshot.value, fadeIn.value, fadeOut.value)
+      await exportAsExpJson(targetPath, exportName.value.trim(), currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
     }
     msg.success(`已导出到 ${targetPath}`)
     editorState.cancelExport()
   } catch (e: any) {
     msg.error(`导出失败：${e?.message ?? e}`)
+  }
+}
+
+async function onCopyToClipboard() {
+  const fmt = editorState.state.selectedExportFormat
+  if (!fmt) {
+    msg.warning('请先选择导出格式')
+    return
+  }
+  if (!currentSnapshot.value.length) {
+    msg.warning('请先在表情 Tab 选中一个表情作为导出快照')
+    return
+  }
+  const text = fmt === 'exp3'
+    ? buildExp3Json(currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
+    : buildExpJson(currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
+  try {
+    await navigator.clipboard.writeText(text)
+    msg.success('已复制到剪贴板')
+  } catch {
+    msg.error('复制到剪贴板失败')
   }
 }
 </script>
@@ -299,6 +323,11 @@ async function onConfirmExport() {
               </label>
             </div>
 
+            <label class="export-checkbox">
+              <input v-model="compress" type="checkbox" />
+              <span>压缩输出（单行）</span>
+            </label>
+
             <p class="export-preview">
               将写入：<code>{{ defaultExportDir }}/{{ exportName }}{{ editorState.state.selectedExportFormat === 'exp3' ? '.exp3.json' : '.exp.json' }}</code>
             </p>
@@ -308,6 +337,7 @@ async function onConfirmExport() {
           </section>
           <footer class="actor-export-modal__footer">
             <button class="card-btn" @click="editorState.cancelExport()">取消</button>
+            <button class="card-btn" @click="onCopyToClipboard">复制到剪贴板</button>
             <button class="card-btn card-btn--primary" @click="onConfirmExport">确认导出</button>
           </footer>
         </div>
@@ -620,6 +650,22 @@ async function onConfirmExport() {
   color: #b0b8c4;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   word-break: break-all;
+}
+
+.export-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #c8ceda;
+  cursor: pointer;
+}
+
+.export-checkbox input {
+  width: 14px;
+  height: 14px;
+  accent-color: #2f80ed;
+  cursor: pointer;
 }
 
 .card-btn {

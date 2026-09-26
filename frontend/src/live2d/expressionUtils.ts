@@ -89,9 +89,9 @@ function parseExpJson(txt: string): ParamSnapshot[] {
 
 /**
  * 生成 .exp.json 的完整 JSON 文本。
- * 单行压缩风格，与样本一致。
+ * compress=true 时单行无缩进；compress=false 时使用 2 空格缩进。
  */
-function buildExpJson(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500): string {
+export function buildExpJson(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500, compress = false): string {
   const params = snapshot.map((p) => ({
     id: p.id,
     val: p.val,
@@ -102,7 +102,7 @@ function buildExpJson(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500): s
     fade_in: fadeIn,
     fade_out: fadeOut,
     params,
-  })
+  }, null, compress ? undefined : 2)
 }
 
 // ── Cubism 3+ / .exp3.json ──────────────────────────────────────────────────
@@ -130,9 +130,9 @@ function parseExp3Json(txt: string): ParamSnapshot[] {
 
 /**
  * 生成 .exp3.json 的完整 JSON 文本。
- * 使用 2 空格缩进的可读风格（与样本一致）。
+ * compress=true 时单行无缩进，false 时 2 空格缩进。
  */
-function buildExp3Json(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500): string {
+export function buildExp3Json(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500, compress = false): string {
   const Parameters = snapshot.map((p) => ({
     Id: p.id,
     Value: p.val,
@@ -144,7 +144,7 @@ function buildExp3Json(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500): 
   }
   if (fadeIn !== undefined) obj.fade_in = fadeIn
   if (fadeOut !== undefined) obj.fade_out = fadeOut
-  return JSON.stringify(obj, null, 2)
+  return JSON.stringify(obj, null, compress ? undefined : 2)
 }
 
 // ── Calc / Blend 互转（与 mtnExpMdf.ts CalcKind 对齐） ─────────────────────
@@ -191,8 +191,9 @@ export async function exportAsExpJson(
   snapshot: ParamSnapshot[],
   fadeIn = 500,
   fadeOut = 500,
+  compress = false,
 ): Promise<void> {
-  const content = buildExpJson(snapshot, fadeIn, fadeOut)
+  const content = buildExpJson(snapshot, fadeIn, fadeOut, compress)
   await WriteTextFile(targetPath, content)
 }
 
@@ -205,8 +206,9 @@ export async function exportAsExp3Json(
   snapshot: ParamSnapshot[],
   fadeIn = 500,
   fadeOut = 500,
+  compress = false,
 ): Promise<void> {
-  const content = buildExp3Json(snapshot, fadeIn, fadeOut)
+  const content = buildExp3Json(snapshot, fadeIn, fadeOut, compress)
   await WriteTextFile(targetPath, content)
 }
 

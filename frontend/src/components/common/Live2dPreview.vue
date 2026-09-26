@@ -8,6 +8,10 @@ import type { FilterState } from '../../stores/previewStore'
 import { DEFAULT_FILTER_STATE } from '../../stores/previewStore'
 import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
 import type { WmdlConfig } from '../../stores/wmdlTypes'
+import { useMessage } from '../../composables/useMessage'
+import { SaveScreenshot } from '../../../wailsjs/go/main/App'
+
+const msg = useMessage()
 
 // pixi-live2d-display reads window.PIXI.Ticker
 ;(window as any).PIXI = PIXI
@@ -287,6 +291,127 @@ function resetViewport() {
   rootContainer.scale.set(initialViewport.scale)
 }
 
+/** 把 Blob 写入系统剪贴板。失败时通过气泡提示原因。 */
+async function copyBlobToClipboard(blob: Blob) {
+  try {
+    if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+      msg.warning('当前环境不支持将图片写入剪贴板')
+      return
+    }
+    console.error(`${blob.type}`)
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+  } catch (err) {
+    msg.error('复制到剪贴板失败：' + (err instanceof Error ? err.message : String(err)))
+  }
+}
+
+/**
+ * 把截图 PNG 同时落盘到 exe 同级 screenshots/。
+ * 文件名：prefix_yyyymmdd_HHMMSS_fff.png。
+ * 失败时降级为 warning（剪贴板复制仍继续），不阻塞主流程。
+ */
+async function saveBlobToDisk(blob: Blob, prefix: 'screen' | 'original'): Promise<string> {
+  try {
+    const d = new Date()
+    const pad = (n: number, w = 2) => String(n).padStart(w, '0')
+    const stamp =
+      d.getFullYear().toString() +
+      pad(d.getMonth() + 1) +
+      pad(d.getDate()) + '_' +
+      pad(d.getHours()) +
+      pad(d.getMinutes()) +
+      pad(d.getSeconds()) + '_' +
+      pad(d.getMilliseconds(), 3)
+    const filename = `${prefix}_${stamp}.png`
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result as string)
+      fr.onerror = () => reject(fr.error)
+      fr.readAsDataURL(blob)
+    })
+    const base64 = dataUrl.split(',')[1] ?? ''
+
+    const path = await SaveScreenshot(filename, base64)
+    msg.success(`已保存截图：${path}`)
+    return path
+  } catch (err) {
+    msg.warning('保存截图失败：' + (err instanceof Error ? err.message : String(err)))
+    return ''
+  }
+}
+
+/**
+ * canvas -> Blob 的 Promise 封装；toBlob 在主线程中是异步的，回包用 Promise 包起来。
+ * 出错时返回 null 并提示。
+ */
+function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/png'): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    try {
+      canvas.toBlob((blob) => resolve(blob), type)
+    } catch (err) {
+      msg.error('生成图片失败：' + (err instanceof Error ? err.message : String(err)))
+      resolve(null)
+    }
+  })
+}
+
+/**
+ * PIXI extract 输出的 canvas 在 toBlob 时会被浏览器合成为黑色不透明 PNG。
+ * 这里把内容重绘到一张全新的 2D 画布：先 clearRect 拿到 alpha=0 透明底，
+ * 再 drawImage 原样贴回去，PNG 输出即可保留真正的透明通道。
+ */
+function toTransparentCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement('canvas')
+  out.width = src.width
+  out.height = src.height
+  const ctx = out.getContext('2d')
+  if (!ctx) return src
+  ctx.clearRect(0, 0, out.width, out.height)
+  ctx.drawImage(src, 0, 0)
+  return out
+}
+
+/** 功能1：抽取 rootContainer 作为"屏幕所见"画面（包含用户的缩放/平移），输出透明 PNG。 */
+async function copyScreenToClipboard() {
+  if (!app || !rootContainer) {
+    msg.warning('模型尚未加载')
+    return
+  }
+  let raw: HTMLCanvasElement
+  try {
+    raw = (app.renderer as any).extract.canvas(rootContainer) as HTMLCanvasElement
+  } catch (err) {
+    msg.error('PIXI 抽帧失败：' + (err instanceof Error ? err.message : String(err)))
+    return
+  }
+  const canvas = toTransparentCanvas(raw)
+  const blob = await canvasToBlob(canvas)
+  if (!blob) return
+  await saveBlobToDisk(blob, 'screen')
+  await copyBlobToClipboard(blob)
+}
+
+/** 功能2：使用 PIXI renderer.extract 抽取 stageMain（原始 stage 坐标系），不受视口变换影响。 */
+async function copyOriginalToClipboard() {
+  if (!app || !stageMain) {
+    msg.warning('模型尚未加载')
+    return
+  }
+  let raw: HTMLCanvasElement
+  try {
+    raw = (app.renderer as any).extract.canvas(stageMain) as HTMLCanvasElement
+  } catch (err) {
+    msg.error('PIXI 抽帧失败：' + (err instanceof Error ? err.message : String(err)))
+    return
+  }
+  const canvas = toTransparentCanvas(raw)
+  const blob = await canvasToBlob(canvas)
+  if (!blob) return
+  await saveBlobToDisk(blob, 'original')
+  await copyBlobToClipboard(blob)
+}
+
 function dispose() {
   detachDomHandlers?.()
   detachDomHandlers = null
@@ -359,6 +484,22 @@ defineExpose({
     >
       &#8634;
     </button>
+    <button
+      class="reset-view-btn"
+      title="复制屏幕画面到剪贴板"
+      aria-label="复制屏幕画面到剪贴板"
+      @click="copyScreenToClipboard"
+    >
+      &#x1F4F7;
+    </button>
+    <button
+      class="reset-view-btn"
+      title="复制原图到剪贴板"
+      aria-label="复制原图到剪贴板"
+      @click="copyOriginalToClipboard"
+    >
+      &#x1F3A8;
+    </button>
   </div>
 </template>
 
@@ -403,5 +544,14 @@ defineExpose({
 
 .reset-view-btn:active {
   transform: scale(0.95);
+}
+
+/* 后续按钮相对前一个按钮偏移 32px，避免逐个硬编码 left */
+.reset-view-btn + .reset-view-btn {
+  left: 40px;
+}
+
+.reset-view-btn + .reset-view-btn + .reset-view-btn {
+  left: 72px;
 }
 </style>

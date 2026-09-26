@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -699,4 +700,45 @@ func (a *App) WriteTextFile(path string, content string) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// screenshotDir 返回截图保存目录的绝对路径。优先使用环境变量
+// L2DW_SCREENSHOTS_DIR 覆盖；否则相对于可执行文件所在目录下的 screenshots
+// 解析；解析失败时回退到当前工作目录下的 screenshots。
+func screenshotDir() string {
+	if v := os.Getenv("L2DW_SCREENSHOTS_DIR"); v != "" {
+		return v
+	}
+	if exe, err := os.Executable(); err == nil {
+		return filepath.Join(filepath.Dir(exe), "screenshots")
+	}
+	return filepath.Join("screenshots")
+}
+
+// SaveScreenshot 将 base64Data 解码后写入 screenshots 目录的 filename 文件。
+// filename 必须是纯文件名（不含路径分隔符 / .. 等），后缀必须为 .png。
+// 目录不存在会自动创建。返回写入文件的绝对路径。
+func (a *App) SaveScreenshot(filename string, base64Data string) (string, error) {
+	if filename == "" {
+		return "", fmt.Errorf("SaveScreenshot: filename is empty")
+	}
+	if strings.ContainsAny(filename, `/\`) || strings.Contains(filename, "..") {
+		return "", fmt.Errorf("SaveScreenshot: invalid filename %q", filename)
+	}
+	if !strings.HasSuffix(strings.ToLower(filename), ".png") {
+		return "", fmt.Errorf("SaveScreenshot: filename must end with .png: %q", filename)
+	}
+	dir := screenshotDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	payload, err := base64.StdEncoding.DecodeString(base64Data)
+	if err != nil {
+		return "", fmt.Errorf("SaveScreenshot: decode base64 failed: %w", err)
+	}
+	path := filepath.Join(dir, filename)
+	if err := os.WriteFile(path, payload, 0644); err != nil {
+		return "", err
+	}
+	return path, nil
 }

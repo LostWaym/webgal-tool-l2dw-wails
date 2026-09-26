@@ -7,7 +7,7 @@ import { toFileUrl } from '../../path_utils'
 import type { FilterState } from '../../stores/previewStore'
 import { DEFAULT_FILTER_STATE } from '../../stores/previewStore'
 import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
-import type { WmdlConfig } from '../../stores/wmdlTypes'
+import type { WmdlConfig, ParamCalc } from '../../stores/wmdlTypes'
 import { useMessage } from '../../composables/useMessage'
 import { SaveScreenshot } from '../../../wailsjs/go/main/App'
 
@@ -122,6 +122,46 @@ async function init() {
 function computeFitScale(hostHeight: number): number {
   const h = hostHeight || STAGE_HEIGHT
   return Math.max(MIN_SCALE, Math.min(MAX_SCALE, (h / STAGE_HEIGHT) * 0.8))
+}
+
+/**
+ * 根据 calc 把 id/val 写入 Live2D coreModel。
+ *  - cubism 3/4：原生支持 set/add/mult，优先调用专属方法
+ *  - cubism 2：仅原生 set；add/mult 走 getParamFloat → 算术 → setParamFloat
+ */
+function writeParamByCalc(core: any, id: string, val: number, calc: ParamCalc): void {
+  if (calc === 'set') {
+    if (typeof core.setParameterValueById === 'function') {
+      core.setParameterValueById(id, val)
+    } else if (typeof core.setParamFloat === 'function') {
+      core.setParamFloat(id, val)
+    }
+    return
+  }
+
+  if (calc === 'add' && typeof core.addParameterValueById === 'function') {
+    core.addParameterValueById(id, val)
+    return
+  }
+  if (calc === 'mult' && typeof core.multiplyParameterValueById === 'function') {
+    core.multiplyParameterValueById(id, val)
+    return
+  }
+
+  // cubism 2 兼容路径：手动 read-modify-write
+  const cur =
+    typeof core.getParameterValueById === 'function'
+      ? core.getParameterValueById(id)
+      : typeof core.getParamFloat === 'function'
+        ? core.getParamFloat(id)
+        : undefined
+  if (typeof cur !== 'number') return
+  const next = calc === 'add' ? cur + val : cur * val
+  if (typeof core.setParameterValueById === 'function') {
+    core.setParameterValueById(id, next)
+  } else if (typeof core.setParamFloat === 'function') {
+    core.setParamFloat(id, next)
+  }
 }
 
 function attachDomHandlers() {
@@ -432,18 +472,19 @@ defineExpose({
   /**
    * 直接写入选中子模型的参数值（不重载模型），用于表情编辑等需要实时预览的场景。
    * 不依赖外部 runtimeRegistry，走本组件自己的 subModels 引用。
+   *
+   * 每个参数携带 calc 合成方式：
+   *   - set:  直接覆盖当前值（裸写 coreModel.setParameterValueById / setParamFloat）
+   *   - add:  在当前值基础上叠加增量（cubism 2 用 read-modify-write）
+   *   - mult: 在当前值基础上乘以倍数（cubism 2 用 read-modify-write）
    */
-  applyParameters(params: Array<{ id: string; val: number }>) {
+  applyParameters(params: Array<{ id: string; val: number; calc: ParamCalc }>) {
     if (!subModels.length) return
     for (const m of subModels) {
       const core: any = (m as any).internalModel?.coreModel
       if (!core) continue
-      for (const { id, val } of params) {
-        if (typeof core.setParameterValueById === 'function') {
-          core.setParameterValueById(id, val)
-        } else if (typeof core.setParamFloat === 'function') {
-          core.setParamFloat(id, val)
-        }
+      for (const { id, val, calc } of params) {
+        writeParamByCalc(core, id, val, calc)
       }
     }
   },

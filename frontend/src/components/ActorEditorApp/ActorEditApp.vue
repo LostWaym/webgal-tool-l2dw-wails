@@ -13,6 +13,7 @@
  */
 import { computed, ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
+import type { ParamCalc } from '../../stores/wmdlTypes'
 import ActorStage from './ActorStage.vue'
 import EditPanel from './EditPanel.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
@@ -33,7 +34,7 @@ function onRightDrag(dx: number) {
   panelWidth.value = Math.max(PANEL_MIN, Math.min(PANEL_MAX, next))
 }
 
-function onApplyParams(params: Array<{ id: string; val: number }>) {
+function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc }>) {
   stageRef.value?.applyParameters(params)
 }
 </script>

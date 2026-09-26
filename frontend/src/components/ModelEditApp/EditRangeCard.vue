@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
+import type { ParamCalc } from '../../stores/wmdlTypes'
 
 /**
  * 可复用的"参数/部件卡片"。
  *
  * 卡片内部采用垂直布局：
- *   - 顶部：参数名（name）
+ *   - 顶部：参数名（name）；左上角可选的 calc 切换按钮（仅 showCalcSwitch=true 显示）
  *   - 中部：进度条
  *       左：最小值   中：当前值（单击可输入）   右：最大值
  *   - 拖动进度条区域：横向拖动改变当前值（实时 emit）
@@ -16,6 +17,15 @@ import { computed, nextTick, ref } from 'vue'
  *
  * 通过 v-model 暴露当前值；父组件负责把更新写回 Live2D coreModel。
  */
+
+// calc 切换按钮上的单字标签 & 循环顺序：set → add → mult → set ...
+const CALC_LABELS: Record<ParamCalc, string> = {
+  set: '覆',
+  add: '叠',
+  mult: '乘',
+}
+const CALC_ORDER: ParamCalc[] = ['set', 'add', 'mult']
+
 const props = withDefaults(
   defineProps<{
     name: string
@@ -27,13 +37,24 @@ const props = withDefaults(
     highlight?: boolean
     /** 是否在卡片标题右侧显示"重置"按钮。 */
     showReset?: boolean
+    /** 是否显示左上角的 calc 切换按钮（仅演出编辑器需要）。默认 false，避免污染其他场景。 */
+    showCalcSwitch?: boolean
+    /** 当前 calc 类型。默认 'set'。 */
+    calcType?: ParamCalc
   }>(),
-  { precision: 3, highlight: false, showReset: false },
+  {
+    precision: 3,
+    highlight: false,
+    showReset: false,
+    showCalcSwitch: false,
+    calcType: 'set',
+  },
 )
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: number): void
   (e: 'reset'): void
+  (e: 'update:calcType', value: ParamCalc): void
 }>()
 
 const trackEl = ref<HTMLDivElement | null>(null)
@@ -55,6 +76,15 @@ function clamp(v: number, lo: number, hi: number): number {
 
 function format(v: number): string {
   return Number.isFinite(v) ? v.toFixed(props.precision) : '0'
+}
+
+function nextCalc(c: ParamCalc): ParamCalc {
+  const idx = CALC_ORDER.indexOf(c)
+  return CALC_ORDER[(idx + 1) % CALC_ORDER.length]
+}
+
+function onCalcClick() {
+  emit('update:calcType', nextCalc(props.calcType))
 }
 
 // 进度条占比：[min, max] → [0, 1]
@@ -131,6 +161,21 @@ function cancelEdit() {
       @click.stop="emit('reset')"
     >
       ↺
+    </button>
+
+    <!--
+      calc 切换按钮：仅当 showCalcSwitch=true 时渲染；默认不污染其他场景。
+      循环切换 set → add → mult；不同 calc 渲染不同背景色便于一眼区分。
+    -->
+    <button
+      v-if="showCalcSwitch"
+      type="button"
+      class="range-card__calc"
+      :class="`range-card__calc--${calcType}`"
+      :title="`合成方式：${calcType}（点击切换）`"
+      @click.stop="onCalcClick"
+    >
+      {{ CALC_LABELS[calcType] }}
     </button>
 
     <div class="range-card__header">
@@ -226,6 +271,61 @@ function cancelEdit() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/*
+ * calc 切换按钮：左上角绝对定位，尺寸尽量小但字清晰。
+ * 默认不渲染（showCalcSwitch=false），padding-left 用于当按钮出现时避免
+ * 名称被遮挡；其它场景（按钮不出现）通过额外 class 不撑开 padding。
+ */
+.range-card__calc {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1d2026;
+  border: 1px solid #2c313a;
+  border-radius: 3px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.range-card__calc:hover {
+  border-color: #2f80ed;
+}
+
+/* 启用 calc 按钮时给名称预留左侧空间，避免遮挡 */
+.range-card:has(.range-card__calc) .range-card__name {
+  padding-left: 26px;
+}
+
+.range-card__calc--set {
+  background: rgba(47, 128, 237, 0.25);
+  border-color: rgba(47, 128, 237, 0.6);
+  color: #5fa8ff;
+}
+
+.range-card__calc--add {
+  background: rgba(46, 160, 67, 0.25);
+  border-color: rgba(46, 160, 67, 0.6);
+  color: #5fcc7f;
+}
+
+.range-card__calc--mult {
+  background: rgba(224, 144, 41, 0.25);
+  border-color: rgba(224, 144, 41, 0.6);
+  color: #f0a050;
 }
 
 .range-card__reset {

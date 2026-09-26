@@ -20,15 +20,17 @@ import {
   buildExp3Json,
   ensureDirAndOpenInExplorer,
   type ParamSnapshot,
+  type CalcKind,
 } from '../../live2d/expressionUtils'
 import { useActorEditorState, type ExportFormat } from '../../composables/useActorEditorState'
 import { useMessage } from '../../composables/useMessage'
 import EditRangeCard from '../ModelEditApp/EditRangeCard.vue'
 import SearchInput from '../common/SearchInput.vue'
 import { filterBySearch } from '../../utils/searchUtils'
+import type { ParamCalc } from '../../stores/wmdlTypes'
 
 const emit = defineEmits<{
-  (e: 'apply-params', params: Array<{ id: string; val: number }>): void
+  (e: 'apply-params', params: Array<{ id: string; val: number; calc: ParamCalc }>): void
 }>()
 
 const store = useWmdlModelEditorStore()
@@ -41,6 +43,23 @@ const activeTab = ref<RightTab>('expressions')
 const currentSnapshot = ref<ParamSnapshot[]>([])
 const activeExpressionKey = ref<string | null>(null)
 const paramSearch = ref('')
+
+/** 导出用的快照：所有有 override 的参数，按 store.initParams 顺序。
+ *  原表情快照外的修改也会被携带。val 取 override；calc 取 entry.calc（默认 'add'）。 */
+const exportableSnapshot = computed<ParamSnapshot[]>(() => {
+  const m = selectedModel.value
+  if (!m) return []
+  const out: ParamSnapshot[] = []
+  for (const entry of m.initParams) {
+    if (entry.override === undefined) continue
+    out.push({
+      id: entry.id,
+      val: entry.override,
+      calc: entry.calc ?? 'add',
+    })
+  }
+  return out
+})
 
 const exportName = ref('my_expression')
 const fadeIn = ref(500)
@@ -68,6 +87,7 @@ const paramsView = computed(() => {
     max: p.max ?? 1,
     effective: p.override !== undefined ? p.override : p.value,
     hasOverride: p.override !== undefined,
+    calc: p.calc ?? 'set',
   }))
 })
 
@@ -79,6 +99,21 @@ const rightTabs: { id: RightTab; label: string }[] = [
   { id: 'expressions', label: '表情' },
   { id: 'params', label: '参数' },
 ]
+
+/** CalcKind → ParamCalc：缺省 / 'none' → 'add'；其他原样。 */
+function toRangeCalc(c: CalcKind | undefined): ParamCalc {
+  if (c === 'set' || c === 'add' || c === 'mult') return c
+  return 'add'
+}
+
+/** 按 entry 当前 calc + override 状态合成 emit payload。 */
+function buildApplyEntry(entry: { id: string; value: number; override?: number; calc?: ParamCalc }) {
+  return {
+    id: entry.id,
+    val: entry.override !== undefined ? entry.override : entry.value,
+    calc: entry.calc ?? 'add',
+  }
+}
 
 async function onExpressionClick(item: { name: string; path: string }) {
   const m = selectedModel.value
@@ -93,18 +128,26 @@ async function onExpressionClick(item: { name: string; path: string }) {
     return
   }
 
-  // 先把所有参数重置为默认值，避免上一个表情或手动调整的 override 残留
-  emit('apply-params', m.initParams.map((p) => ({ id: p.id, val: p.value })))
+  // Step 1: 重置快照到默认值（calc='set'，清 override）
   for (const entry of m.initParams) {
     delete entry.override
+    entry.calc = 'set'
   }
+  emit(
+    'apply-params',
+    m.initParams.map((p) => buildApplyEntry(p)),
+  )
 
-  // 同步到 store.initParams.override + 舞台子模型
-  for (const p of result.snapshot) {
-    const entry = m.initParams.find((it) => it.id === p.id)
-    if (entry) entry.override = p.val
+  // Step 2: 应用表情，把 calc 同步到 range；缺省/none 不写入舞台但 range 标 add
+  for (const s of result.snapshot) {
+    const entry = m.initParams.find((it) => it.id === s.id)
+    if (!entry) continue
+    entry.calc = toRangeCalc(s.calc)
+    entry.override = s.val
+    if (s.calc !== 'none') {
+      emit('apply-params', [buildApplyEntry(entry)])
+    }
   }
-  emit('apply-params', result.snapshot.map((s) => ({ id: s.id, val: s.val })))
 
   currentSnapshot.value = result.snapshot
   activeExpressionKey.value = `${item.name}\u0000${item.path}`
@@ -114,9 +157,14 @@ async function onExpressionClick(item: { name: string; path: string }) {
 function onParamChange(id: string, value: number) {
   const m = selectedModel.value
   if (!m) return
-  emit('apply-params', [{ id, val: value }])
   const entry = m.initParams.find((p) => p.id === id)
-  if (entry) entry.override = value
+  if (!entry) return
+  entry.override = value
+
+  // Step 1: 先 set 回默认值，消除之前 calc 叠加的残余
+  emit('apply-params', [{ id, val: entry.value, calc: 'set' }])
+  // Step 2: 按当前 calc 叠加目标值
+  emit('apply-params', [buildApplyEntry(entry)])
 }
 
 function onParamReset(id: string) {
@@ -124,8 +172,22 @@ function onParamReset(id: string) {
   if (!m) return
   const entry = m.initParams.find((p) => p.id === id)
   if (!entry) return
-  emit('apply-params', [{ id, val: entry.value }])
   delete entry.override
+  entry.calc = 'set'
+  emit('apply-params', [buildApplyEntry(entry)])
+}
+
+function onCalcTypeChange(id: string, calc: ParamCalc) {
+  const m = selectedModel.value
+  if (!m) return
+  const entry = m.initParams.find((p) => p.id === id)
+  if (!entry) return
+  entry.calc = calc
+  // Step 1: 先 set 回默认值，消除之前 calc 叠加的残余
+  emit('apply-params', [{ id, val: entry.value, calc: 'set' }])
+  // Step 2: 按新 calc 立即用当前值重新合成一次，让用户能在舞台上看区别
+  const val = entry.override !== undefined ? entry.override : entry.value
+  emit('apply-params', [{ id, val, calc }])
 }
 
 function onOpenExport() {
@@ -147,8 +209,9 @@ async function onConfirmExport() {
     msg.warning('请输入表情名称')
     return
   }
-  if (!currentSnapshot.value.length) {
-    msg.warning('请先在表情 Tab 选中一个表情作为导出快照')
+  const snapshot = exportableSnapshot.value
+  if (!snapshot.length) {
+    msg.warning('当前模型没有需要导出的参数（请先在参数 Tab 调整至少一项）')
     return
   }
 
@@ -160,9 +223,9 @@ async function onConfirmExport() {
 
   try {
     if (fmt === 'exp3') {
-      await exportAsExp3Json(targetPath, exportName.value.trim(), currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
+      await exportAsExp3Json(targetPath, exportName.value.trim(), snapshot, fadeIn.value, fadeOut.value, compress.value)
     } else {
-      await exportAsExpJson(targetPath, exportName.value.trim(), currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
+      await exportAsExpJson(targetPath, exportName.value.trim(), snapshot, fadeIn.value, fadeOut.value, compress.value)
     }
     msg.success(`已导出到 ${targetPath}`)
     editorState.cancelExport()
@@ -177,13 +240,14 @@ async function onCopyToClipboard() {
     msg.warning('请先选择导出格式')
     return
   }
-  if (!currentSnapshot.value.length) {
-    msg.warning('请先在表情 Tab 选中一个表情作为导出快照')
+  const snapshot = exportableSnapshot.value
+  if (!snapshot.length) {
+    msg.warning('当前模型没有需要复制的参数（请先在参数 Tab 调整至少一项）')
     return
   }
   const text = fmt === 'exp3'
-    ? buildExp3Json(currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
-    : buildExpJson(currentSnapshot.value, fadeIn.value, fadeOut.value, compress.value)
+    ? buildExp3Json(snapshot, fadeIn.value, fadeOut.value, compress.value)
+    : buildExpJson(snapshot, fadeIn.value, fadeOut.value, compress.value)
   try {
     await navigator.clipboard.writeText(text)
     msg.success('已复制到剪贴板')
@@ -216,7 +280,7 @@ async function onOpenOutputDir() {
       </h2>
       <button
         class="toolbar-btn toolbar-btn--primary"
-        :disabled="!hasSelection || !currentSnapshot.length"
+        :disabled="!hasSelection || !exportableSnapshot.length"
         @click="onOpenExport"
       >导出</button>
     </header>
@@ -272,8 +336,11 @@ async function onOpenOutputDir() {
                   :model-value="p.effective"
                   :highlight="p.hasOverride"
                   :show-reset="p.hasOverride"
+                  :show-calc-switch="true"
+                  :calc-type="p.calc"
                   @update:model-value="onParamChange(p.id, $event)"
                   @reset="onParamReset(p.id)"
+                  @update:calc-type="onCalcTypeChange(p.id, $event)"
                 />
               </li>
             </ul>
@@ -347,7 +414,7 @@ async function onOpenOutputDir() {
               将写入：<code>{{ defaultExportDir }}/{{ exportName }}{{ editorState.state.selectedExportFormat === 'exp3' ? '.exp3.json' : '.exp.json' }}</code>
             </p>
             <p class="export-preview">
-              快照参数：{{ currentSnapshot.length }} 个
+              快照参数：{{ exportableSnapshot.length }} 个
             </p>
           </section>
           <footer class="actor-export-modal__footer">

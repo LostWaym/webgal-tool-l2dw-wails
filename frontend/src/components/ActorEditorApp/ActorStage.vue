@@ -21,6 +21,7 @@ import type { Live2DModel } from 'pixi-live2d-display-webgal'
 import Live2dPreview from '../common/Live2dPreview.vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { editRuntime } from '../../utils/runtimeRegistry'
+import type { ParamCalc } from '../../stores/wmdlTypes'
 
 const store = useWmdlModelEditorStore()
 const previewRef = ref<InstanceType<typeof Live2dPreview> | null>(null)
@@ -69,7 +70,7 @@ onBeforeUnmount(() => {
 })
 
 defineExpose({
-  applyParameters(params: Array<{ id: string; val: number }>) {
+  applyParameters(params: Array<{ id: string; val: number; calc: ParamCalc }>) {
     previewRef.value?.applyParameters(params)
   },
 })

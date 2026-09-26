@@ -92,11 +92,11 @@ function parseExpJson(txt: string): ParamSnapshot[] {
  * compress=true 时单行无缩进；compress=false 时使用 2 空格缩进。
  */
 export function buildExpJson(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500, compress = false): string {
-  const params = snapshot.map((p) => ({
-    id: p.id,
-    val: p.val,
-    calc: 'set' as const,
-  }))
+  const params = snapshot.map((p) => {
+    const item: { id: string; val: number; calc?: CalcKind } = { id: p.id, val: p.val }
+    if (p.calc !== 'none') item.calc = p.calc
+    return item
+  })
   return JSON.stringify({
     type: 'Live2D Expression',
     fade_in: fadeIn,
@@ -136,7 +136,7 @@ export function buildExp3Json(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut =
   const Parameters = snapshot.map((p) => ({
     Id: p.id,
     Value: p.val,
-    Blend: 0,
+    Blend: calcToBlend(p.calc),
   }))
   const obj: Record<string, unknown> = {
     Type: 'Live2D Expression',

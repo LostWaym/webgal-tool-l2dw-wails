@@ -1,4 +1,4 @@
-import { ReadTextFile, WriteTextFile } from '../../wailsjs/go/main/App'
+import { ReadTextFile, WriteTextFile, EnsureDirAndOpenInExplorer } from '../../wailsjs/go/main/App'
 import { toFileUrl, pathCombine, pathDirname } from '../path_utils'
 
 /**
@@ -219,4 +219,12 @@ export async function exportAsExp3Json(
 export function defaultExportDirForModel(jsonAbsPath: string): string {
   const modelDir = pathDirname(jsonAbsPath)
   return pathCombine(modelDir, 'expressions')
+}
+
+/**
+ * 调用 Go 端绑定 EnsureDirAndOpenInExplorer：确保目录存在并用资源管理器打开。
+ * 失败抛错，由调用方负责气泡提示。
+ */
+export async function ensureDirAndOpenInExplorer(dir: string): Promise<void> {
+  await EnsureDirAndOpenInExplorer(dir)
 }

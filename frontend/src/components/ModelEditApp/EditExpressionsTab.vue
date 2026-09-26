@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
-import { OpenActorEditor } from '../../../wailsjs/go/main/App'
 import ExpressionsToolbar from './ExpressionsToolbar.vue'
 import { useBatchAddModal } from '../../composables/useBatchAddModal'
 import { useBatchModifyModal } from '../../composables/useBatchModifyModal'
@@ -48,14 +47,6 @@ function onBatchModify() {
   modifyModal.open('expression')
 }
 
-function onOpenEditor() {
-  const wmdlPath = store.currentWmdl.wmdlFilePath
-  if (!wmdlPath) return
-  OpenActorEditor(wmdlPath).catch((e: unknown) =>
-    console.error('OpenActorEditor failed:', e),
-  )
-}
-
 function onRemove(item: { name: string; path: string }) {
   store.removeExpression(item.name, item.path)
 }
@@ -67,7 +58,6 @@ function onRemove(item: { name: string; path: string }) {
       v-if="hasSelection"
       @batch-add="onBatchAdd"
       @batch-modify="onBatchModify"
-      @open-editor="onOpenEditor"
     />
     <div v-if="!hasSelection" class="empty-hint">
       请先在左侧选择要查看的模型

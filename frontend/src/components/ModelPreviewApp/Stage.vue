@@ -8,10 +8,11 @@ import type { FigureGroupEntry } from '../../stores/previewStore'
 import { toFileUrl } from '../../path_utils'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
-import { OpenEditor } from '../../../wailsjs/go/main/App'
+import { OpenEditor, OpenActorEditor } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
 import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
 import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
+import { useMessage } from '../../composables/useMessage'
 import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
@@ -443,7 +444,7 @@ const COMMON_MOUSE_HINTS: MouseHint[] = [
   { keys: '中键拖动', description: '平移舞台视图' },
   { keys: '鼠标滚轮', description: '缩放舞台视图' },
 ]
-// F1 是真快捷键（舞台上独立监听），点击触发等价行为
+// F1 / F2 都是数据驱动的快捷键提示，仅可点击触发（点击等价于按下 F1/F2）
 const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
   {
     keys: 'F1',
@@ -457,6 +458,37 @@ const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
       run: () => {
         const wmdlPath = store.selectedModel?.wmdlConfig?.wmdlFilePath ?? ''
         OpenEditor(wmdlPath).catch((err) => console.error('OpenEditor failed:', err))
+      },
+    },
+  },
+  {
+    keys: 'F2',
+    description: '打开演出编辑器窗口',
+    entry: {
+      key: 'F2',
+      keys: 'F2',
+      description: '打开演出编辑器窗口',
+      targets: ['model', 'background', 'stage', 'figureGroup', 'none'],
+      handlerKey: 'openActorEditor',
+      run: () => {
+        const msg = useMessage()
+        const entry = store.selectedModel
+        if (!entry) {
+          msg.warning('请先选中一个立绘')
+          return
+        }
+        if (entry.kind !== 'live2d') {
+          msg.warning('仅 Live2D 模型支持此操作')
+          return
+        }
+        const wmdlPath = entry.wmdlConfig?.wmdlFilePath
+        if (!wmdlPath) {
+          msg.error('未找到对应的 wmdl 文件')
+          return
+        }
+        OpenActorEditor(wmdlPath).catch((err: unknown) =>
+          msg.error(`打开失败：${err}`),
+        )
       },
     },
   },
@@ -492,6 +524,8 @@ const showReloadConfigBtn = computed(() => {
   return !!model && model.kind === 'live2d' && !!model.wmdlConfig?.wmdlFilePath
 })
 
+const msg = useMessage()
+
 function onOpenFilterPreset() {
   filterPresetModal.open()
 }
@@ -499,6 +533,7 @@ function onOpenFilterPreset() {
 function onReloadModelConfig() {
   if (!store.selectedId) return
   emitter.emit(StageEvents.ReloadModel, store.selectedId)
+  msg.success('已从磁盘重新加载配置')
 }
 
 let app: PIXI.Application | null = null
@@ -1322,6 +1357,28 @@ function attachDomHandlers() {
       // 若当前选中了模型，把对应 wmdl 文件路径透传给编辑器进程，启动后自动加载
       const wmdlPath = store.selectedModel?.wmdlConfig?.wmdlFilePath ?? ''
       OpenEditor(wmdlPath).catch((err) => console.error('OpenEditor failed:', err))
+      return
+    }
+
+    if (e.key === 'F2') {
+      e.preventDefault()
+      const entry = store.selectedModel
+      if (!entry) {
+        useMessage().warning('请先选中一个立绘')
+        return
+      }
+      if (entry.kind !== 'live2d') {
+        useMessage().warning('仅 Live2D 模型支持此操作')
+        return
+      }
+      const wmdlPath = entry.wmdlConfig?.wmdlFilePath
+      if (!wmdlPath) {
+        useMessage().error('未找到对应的 wmdl 文件')
+        return
+      }
+      OpenActorEditor(wmdlPath).catch((err: unknown) =>
+        useMessage().error(`打开失败：${err}`),
+      )
       return
     }
 

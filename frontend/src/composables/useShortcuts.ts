@@ -67,7 +67,7 @@ export interface ShortcutEntry {
 type ShortcutHandlerKey =
   | 'modelFigure' | 'modelTransform' | 'modelSplit' | 'modelMerge' | 'modelHide'
   | 'bgSetImage' | 'bgTransform' | 'stageTransform'
-  | 'openEditor'
+  | 'openEditor' | 'openActorEditor'
 
 export interface ShortcutHint {
   /** 鼠标/键盘触发键，例如 'Ctrl + F'、'左键拖动' */

@@ -118,6 +118,23 @@ func (a *App) ActorWmdlPath() string {
 	return actorWmdlPath
 }
 
+// EnsureDirAndOpenInExplorer 确保 dir 存在（不存在则创建），然后用资源管理器打开它。
+// 仅支持 Windows（explorer.exe）。dir 为空直接报错。
+// 与 OpenEditor/OpenActorEditor 一样只用 cmd.Start() 不 Wait，避免阻塞 Wails 主线程。
+func (a *App) EnsureDirAndOpenInExplorer(dir string) error {
+	if dir == "" {
+		return fmt.Errorf("EnsureDirAndOpenInExplorer: dir is empty")
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	cmd := exec.Command("explorer.exe", dir)
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	return cmd.Start()
+}
+
 // OpenEditor 异步 spawn 一个新的 L2DW 进程（带 --editor 参数），新进程会打开
 // 独立的"模型编辑器"窗口。子进程在 main.go 启动时识别该 flag 后进入编辑器模式。
 //

@@ -18,6 +18,7 @@ import {
   defaultExportDirForModel,
   buildExpJson,
   buildExp3Json,
+  ensureDirAndOpenInExplorer,
   type ParamSnapshot,
 } from '../../live2d/expressionUtils'
 import { useActorEditorState, type ExportFormat } from '../../composables/useActorEditorState'
@@ -190,6 +191,20 @@ async function onCopyToClipboard() {
     msg.error('复制到剪贴板失败')
   }
 }
+
+async function onOpenOutputDir() {
+  const dir = defaultExportDir.value
+  if (!dir) {
+    msg.warning('暂无可用的输出目录')
+    return
+  }
+  try {
+    await ensureDirAndOpenInExplorer(dir)
+    msg.success(`已打开输出目录：${dir}`)
+  } catch (e: any) {
+    msg.error(`打开输出目录失败：${e?.message ?? e}`)
+  }
+}
 </script>
 
 <template>
@@ -336,6 +351,7 @@ async function onCopyToClipboard() {
             </p>
           </section>
           <footer class="actor-export-modal__footer">
+            <button class="card-btn" @click="onOpenOutputDir">打开输出目录</button>
             <button class="card-btn" @click="editorState.cancelExport()">取消</button>
             <button class="card-btn" @click="onCopyToClipboard">复制到剪贴板</button>
             <button class="card-btn card-btn--primary" @click="onConfirmExport">确认导出</button>

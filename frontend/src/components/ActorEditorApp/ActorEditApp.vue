@@ -16,6 +16,7 @@ import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import ActorStage from './ActorStage.vue'
 import EditPanel from './EditPanel.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
+import MessageHost from '../common/MessageHost.vue'
 
 const store = useWmdlModelEditorStore()
 const stageRef = ref<InstanceType<typeof ActorStage> | null>(null)
@@ -57,6 +58,7 @@ function onApplyParams(params: Array<{ id: string; val: number }>) {
         <EditPanel @apply-params="onApplyParams" />
       </aside>
     </section>
+    <MessageHost />
   </div>
 </template>
 

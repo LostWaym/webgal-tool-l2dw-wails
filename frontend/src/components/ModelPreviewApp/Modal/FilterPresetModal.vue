@@ -39,6 +39,12 @@ const previewWmdlConfig = computed(() => {
   return null
 })
 
+// 检测预览模型中是否包含 moc3。moc3 模型不支持实时滤镜预览，
+// 但仍可正常读取/编辑预设并应用滤镜到模型。
+const hasMoc3Model = computed(() => {
+  return previewWmdlConfig.value?.models.some((m) => m.isMoc3) ?? false
+})
+
 // ───────── 预设列表 ─────────
 
 const presetFiles = ref<string[]>([])
@@ -72,6 +78,8 @@ const savedFilterBeforeHover = ref<Partial<FilterState> | null>(null)
 // 鼠标移入列表项：保存当前状态并预览该滤镜
 async function onPresetHoverStart(filename: string) {
   if (!live2dPreviewRef.value) return
+  // moc3 模型不支持实时滤镜预览
+  if (hasMoc3Model.value) return
   // 保存当前预览滤镜
   savedFilterBeforeHover.value = currentDraft.value ? { ...currentDraft.value } : null
 
@@ -326,7 +334,10 @@ function onApplyToModel() {
             <aside class="preset-preview">
               <div class="preset-preview__header">实时预览</div>
               <div class="preset-preview__canvas">
-                <Live2dPreview v-if="previewWmdlConfig" ref="live2dPreviewRef" :wmdl-config="previewWmdlConfig" />
+                <Live2dPreview v-if="previewWmdlConfig && !hasMoc3Model" ref="live2dPreviewRef" :wmdl-config="previewWmdlConfig" />
+                <div v-else-if="previewWmdlConfig && hasMoc3Model" class="preset-preview__empty">
+                  当前模型为 moc3，暂不支持滤镜预览
+                </div>
                 <div v-else class="preset-preview__empty">暂无可预览的模型</div>
               </div>
             </aside>

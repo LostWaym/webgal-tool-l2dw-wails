@@ -79,6 +79,7 @@ async function init() {
     antialias: true,
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
+    preserveDrawingBuffer: true,
   })
   app.ticker.maxFPS = 60
 
@@ -298,7 +299,6 @@ async function copyBlobToClipboard(blob: Blob) {
       msg.warning('当前环境不支持将图片写入剪贴板')
       return
     }
-    console.error(`${blob.type}`)
     await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
   } catch (err) {
     msg.error('复制到剪贴板失败：' + (err instanceof Error ? err.message : String(err)))
@@ -356,44 +356,21 @@ function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/png'): Promise<Bl
   })
 }
 
-/**
- * PIXI extract 输出的 canvas 在 toBlob 时会被浏览器合成为黑色不透明 PNG。
- * 这里把内容重绘到一张全新的 2D 画布：先 clearRect 拿到 alpha=0 透明底，
- * 再 drawImage 原样贴回去，PNG 输出即可保留真正的透明通道。
- */
-function toTransparentCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
-  const out = document.createElement('canvas')
-  out.width = src.width
-  out.height = src.height
-  const ctx = out.getContext('2d')
-  if (!ctx) return src
-  ctx.clearRect(0, 0, out.width, out.height)
-  ctx.drawImage(src, 0, 0)
-  return out
-}
-
-/** 功能1：抽取 rootContainer 作为"屏幕所见"画面（包含用户的缩放/平移），输出透明 PNG。 */
-async function copyScreenToClipboard() {
-  if (!app || !rootContainer) {
+/** 直接对 app.view 调用 toBlob，屏幕看到什么截什么。 */
+async function copyScreenFromView() {
+  if (!app) {
     msg.warning('模型尚未加载')
     return
   }
-  let raw: HTMLCanvasElement
-  try {
-    raw = (app.renderer as any).extract.canvas(rootContainer) as HTMLCanvasElement
-  } catch (err) {
-    msg.error('PIXI 抽帧失败：' + (err instanceof Error ? err.message : String(err)))
-    return
-  }
-  const canvas = toTransparentCanvas(raw)
+  const canvas = app.view as HTMLCanvasElement
   const blob = await canvasToBlob(canvas)
   if (!blob) return
   await saveBlobToDisk(blob, 'screen')
   await copyBlobToClipboard(blob)
 }
 
-/** 功能2：使用 PIXI renderer.extract 抽取 stageMain（原始 stage 坐标系），不受视口变换影响。 */
-async function copyOriginalToClipboard() {
+/** 从 app.view 抽取 stageMain 内容，保留原始 stage 坐标系（无视口变换）。 */
+async function copyOriginalFromView() {
   if (!app || !stageMain) {
     msg.warning('模型尚未加载')
     return
@@ -405,7 +382,14 @@ async function copyOriginalToClipboard() {
     msg.error('PIXI 抽帧失败：' + (err instanceof Error ? err.message : String(err)))
     return
   }
-  const canvas = toTransparentCanvas(raw)
+  // 手动将内容重绘到新 canvas 以保留透明通道
+  const canvas = document.createElement('canvas')
+  canvas.width = raw.width
+  canvas.height = raw.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(raw, 0, 0)
   const blob = await canvasToBlob(canvas)
   if (!blob) return
   await saveBlobToDisk(blob, 'original')
@@ -488,7 +472,7 @@ defineExpose({
       class="reset-view-btn"
       title="复制屏幕画面到剪贴板"
       aria-label="复制屏幕画面到剪贴板"
-      @click="copyScreenToClipboard"
+      @click="copyScreenFromView"
     >
       &#x1F4F7;
     </button>
@@ -496,7 +480,7 @@ defineExpose({
       class="reset-view-btn"
       title="复制原图到剪贴板"
       aria-label="复制原图到剪贴板"
-      @click="copyOriginalToClipboard"
+      @click="copyOriginalFromView"
     >
       &#x1F3A8;
     </button>

@@ -92,11 +92,11 @@ function parseExpJson(txt: string): ParamSnapshot[] {
  * 单行压缩风格，与样本一致。
  */
 function buildExpJson(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500): string {
-  const params = snapshot.map((p) => {
-    const item: Record<string, unknown> = { id: p.id, val: p.val }
-    if (p.calc !== 'none') item.calc = p.calc
-    return item
-  })
+  const params = snapshot.map((p) => ({
+    id: p.id,
+    val: p.val,
+    calc: 'set' as const,
+  }))
   return JSON.stringify({
     type: 'Live2D Expression',
     fade_in: fadeIn,
@@ -136,7 +136,7 @@ function buildExp3Json(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut = 500): 
   const Parameters = snapshot.map((p) => ({
     Id: p.id,
     Value: p.val,
-    Blend: calcToBlend(p.calc),
+    Blend: 0,
   }))
   const obj: Record<string, unknown> = {
     Type: 'Live2D Expression',

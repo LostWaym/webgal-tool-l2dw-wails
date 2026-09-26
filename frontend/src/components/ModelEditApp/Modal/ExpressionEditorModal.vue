@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import { useWmdlModelEditorStore } from '../../../stores/wmdlModelEditor'
 import { pathCombine, pathDirname } from '../../../path_utils'
-import { writeParameter } from '../../../live2d/coreAdapter'
 import { useExpressionEditorModal, type ExportFormat } from '../../../composables/useExpressionEditorModal'
 import { useMessage } from '../../../composables/useMessage'
 import {
@@ -22,7 +21,7 @@ import { filterBySearch } from '../../../utils/searchUtils'
  * 表情编辑模态。
  *
  * 布局：左侧 Live2dPreview 预览（独立 PIXI 实例），右侧 [表情 / 参数] 页签。
- * 表情 Tab 点击条目 → 读取表情 JSON，把参数写到 store.initParams.override + 主舞台 coreModel + Live2dPreview。
+ * 表情 Tab 点击条目 → 读取表情 JSON，把参数写到 store.initParams.override + Live2dPreview。
  * 参数 Tab 使用 EditRangeCard 网格 + 顶部搜索栏（与 EditParamsTab 一致），可拖动实时调参。
  * 顶栏"导出"按钮 → 进入导出覆盖层，让用户选 .exp.json / .exp3.json。
  *
@@ -69,9 +68,13 @@ const defaultExportDir = computed(() => {
 /**
  * Live2dPreview 接受 wmdlConfig 作为模型数据源。
  * 我们只展示"当前选中模型"，因此构造一个仅含一个 models 的伪 wmdlConfig。
- * 用 computed 保证选中模型切换时预览自动换模型。
+ * 用 ref + watch 而非 computed：保证 previewConfig 引用稳定，避免参数修改触发
+ * Live2dPreview 的 deep watch 重新加载模型。
  */
-const previewConfig = computed<WmdlConfig | null>(() => {
+const previewConfig = ref<WmdlConfig | null>(null)
+let lastModelId: string | null = null
+
+function buildPreviewConfig(): WmdlConfig | null {
   const m = selectedModel.value
   if (!m) return null
   return {
@@ -82,7 +85,19 @@ const previewConfig = computed<WmdlConfig | null>(() => {
     models: [m],
     wmdlFilePath: '',
   }
-})
+}
+
+previewConfig.value = buildPreviewConfig()
+
+watch(
+  () => store.selectedModelId,
+  (newId) => {
+    if (newId !== lastModelId) {
+      lastModelId = newId
+      previewConfig.value = buildPreviewConfig()
+    }
+  },
+)
 
 // ── 参数 Tab 视图（与 EditParamsTab 几乎一致）────────────────────────────
 
@@ -122,14 +137,16 @@ async function onExpressionClick(item: { name: string; path: string }) {
     return
   }
 
-  if (!result.snapshot.length) {
-    msg.warning('该表情文件没有参数')
-    return
+  // 先把所有参数重置为默认值，避免上一个表情或手动调整的 override 残留
+  previewRef.value?.applyParameters(
+    m.initParams.map((p) => ({ id: p.id, val: p.value })),
+  )
+  for (const entry of m.initParams) {
+    delete entry.override
   }
 
-  // 三处同步：主舞台 coreModel + Live2dPreview + store.initParams.override
+  // 同步到 store.initParams.override + Live2dPreview 子模型
   for (const p of result.snapshot) {
-    writeParameter(m.id, p.id, p.val)
     const entry = m.initParams.find((it) => it.id === p.id)
     if (entry) entry.override = p.val
   }
@@ -149,11 +166,8 @@ async function onExpressionClick(item: { name: string; path: string }) {
 function onParamChange(id: string, value: number) {
   const m = selectedModel.value
   if (!m) return
-  // 1) 写回主舞台 coreModel（走 editRuntime.live2dModels）
-  writeParameter(m.id, id, value)
-  // 2) 同步写回模态内的 Live2dPreview 子模型
+  // 同步到 Live2dPreview 子模型 + store.override（与 EditParamsTab 一致）
   previewRef.value?.applyParameters([{ id, val: value }])
-  // 3) 同步到 store.override（与 EditParamsTab 一致）
   const entry = m.initParams.find((p) => p.id === id)
   if (entry) entry.override = value
 }
@@ -163,7 +177,6 @@ function onParamReset(id: string) {
   if (!m) return
   const entry = m.initParams.find((p) => p.id === id)
   if (!entry) return
-  writeParameter(m.id, id, entry.value)
   previewRef.value?.applyParameters([{ id, val: entry.value }])
   delete entry.override
 }
@@ -174,6 +187,17 @@ watch(
   () => modal.state.visible,
   (visible) => {
     if (visible) {
+      // 打开时：重置所有临时状态，避免脏数据残留
+      activeTab.value = 'expressions'
+      paramSearch.value = ''
+      exportName.value = 'my_expression'
+      fadeIn.value = 500
+      fadeOut.value = 500
+      currentSnapshot.value = []
+      activeExpressionKey.value = null
+      // 重建 previewConfig：强制让 Live2dPreview 重新加载并清空残留参数
+      lastModelId = null
+      previewConfig.value = buildPreviewConfig()
       modal.setExportFormat(defaultFormat.value)
     } else {
       currentSnapshot.value = []

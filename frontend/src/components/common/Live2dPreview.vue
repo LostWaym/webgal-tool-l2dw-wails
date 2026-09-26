@@ -58,7 +58,6 @@ watch(
       await loadWmdlModels(newConfig)
     }
   },
-  { deep: true },
 )
 
 onBeforeUnmount(() => {

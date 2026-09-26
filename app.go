@@ -647,5 +647,8 @@ func (a *App) ReadTextFile(path string) (string, error) {
 // on the Go side. Path is not anchored to any sandbox; callers must pass an
 // absolute path returned from a picker / scan.
 func (a *App) WriteTextFile(path string, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	return os.WriteFile(path, []byte(content), 0644)
 }

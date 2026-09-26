@@ -21,6 +21,13 @@ var editorFlag bool
 // editorWmdlPath 由 --wmdl 参数携带；编辑器进程启动时若非空，会自动加载该 wmdl 文件。
 var editorWmdlPath string
 
+// actorFlag 标记当前进程是否以"演出编辑器"模式启动。
+// 主进程启动时不会带此 flag；子进程（由 App.OpenActorEditor 拉起）会带。
+var actorFlag bool
+
+// actorWmdlPath 由 --actor-wmdl 参数携带；演出编辑器进程启动时若非空，会自动加载该 wmdl 文件。
+var actorWmdlPath string
+
 // hasFlag 手动扫描 os.Args，避免引入 flag 包带来的额外输出副作用。
 func hasFlag(args []string, name string) bool {
 	for _, a := range args {
@@ -44,6 +51,8 @@ func hasValue(args []string, name string) string {
 func main() {
 	editorFlag = hasFlag(os.Args[1:], "--editor")
 	editorWmdlPath = hasValue(os.Args[1:], "--wmdl")
+	actorFlag = hasFlag(os.Args[1:], "--actor")
+	actorWmdlPath = hasValue(os.Args[1:], "--actor-wmdl")
 
 	app := NewApp()
 
@@ -70,6 +79,9 @@ func main() {
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 		}
+	} else if actorFlag {
+		title = "L2DW-Wails - 演出编辑器"
+		width, height = 1200, 800
 	}
 
 	err := wails.Run(&options.App{

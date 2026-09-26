@@ -16,7 +16,7 @@ Wails v2 + Vue 3 + PixiJS 桌面应用，用于加载并展示本地 Live2D 模�
 - **构建**：Vite ^3.0.7 + `vue-tsc --noEmit` 类型检查（`npm run build` 前自动执行）
 - **TypeScript** ^4.6.4（严格模式）
 - **Wails dev 端口**：`5173`（Vite）/ `34115`（Wails dev server，浏览器可访问）
-- **Wails 启动模式**：主进程可带 `--editor` 进入"模型编辑器"窗口（标题 `L2DW - 模型编辑器`，1400×900），或附带 `--wmdl <绝对路径>` 让编辑器启动后自动加载该 wmdl 文件。
+- **Wails 启动模式**：主进程可带 `--editor` 进入"模型编辑器"窗口（标题 `L2DW - 模型编辑器`，1400×900），或附带 `--wmdl <绝对路径>` 让编辑器启动后自动加载该 wmdl 文件；亦可带 `--actor` 进入"演出编辑器"窗口（标题 `L2DW - 演出编辑器`，1200×800），并附带 `--actor-wmdl <绝对路径>` 自动加载。
 
 常用命令：
 
@@ -32,7 +32,7 @@ Wails v2 + Vue 3 + PixiJS 桌面应用，用于加载并展示本地 Live2D 模�
 ```
 l2dw-wails/
 ├── app.go                       # Go 绑定：暴露给 JS 的方法（文件对话框、wmdl 读写、剪贴板等）
-├── main.go                      # Wails 入口 + AssetServer 中间件；处理 --editor / --wmdl 启动参数
+├── main.go                      # Wails 入口 + AssetServer 中间件；处理 --editor / --wmdl / --actor / --actor-wmdl 启动参数
 ├── wails.json                   # Wails 项目配置
 ├── go.mod / go.sum              # Go 依赖
 ├── extres/                      # 外部资源（包括live2d模型，背景图片等…）【只读】
@@ -45,7 +45,7 @@ l2dw-wails/
     ├── public/lib/              # Live2D 全局运行时（不进 npm，.gitignore 忽略）
     ├── wailsjs/                 # Wails 自动生成的 JS/TS 绑定（不要手改，.gitignore 忽略）
     └── src/
-        ├── main.ts              # Vue + Pinia 启动入口；根据 AppMode() 选择挂载 App 或 ModelEditApp
+        ├── main.ts              # Vue + Pinia 启动入口；根据 AppMode() 选择挂载 App / ModelEditApp / ActorEditApp
         ├── App.vue              # 顶层布局（左右两栏，主窗口）
         ├── style.css            # 全局样式
         ├── components/          # UI 组件（按 App 分目录：ModelPreviewApp / ModelEditApp / common）
@@ -142,6 +142,16 @@ l2dw-wails/
 - 舞台vue = EditStage.vue
 - 主要组件路径 = "frontend/src/components/ModelEditApp"
 - 相关PiniaStore = "frontend/src/stores/wmdlModelEditor.ts"（注册名 `wmdlModelEditor`，通过 `useWmdlModelEditorStore()` 获取）
+- 数据结构 = "frontend/src/stores/wmdlTypes.ts"
+
+### 演出编辑器相关
+
+- 入口vue = ActorEditApp.vue（启动时通过 `--actor` 参数进入；可附带 `--actor-wmdl <路径>` 自动加载）
+- 左侧 PIXI 舞台 = ActorStage.vue（简化版 EditStage）
+- 右侧面板 = EditPanel.vue（含 [表情 / 参数] 两个 Tab，迁移自 ExpressionEditorModal）
+- 主要组件路径 = "frontend/src/components/ActorEditorApp"
+- 相关PiniaStore = "frontend/src/stores/wmdlModelEditor.ts"（与模型编辑器共用 store id，但 Pinia 按 app 实例隔离）
+- 导出状态 = "frontend/src/composables/useActorEditorState.ts"（reactive 单例，导出覆盖层状态）
 - 数据结构 = "frontend/src/stores/wmdlTypes.ts"
 
 ### 通用气泡信息功能

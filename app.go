@@ -95,8 +95,11 @@ func (a *App) startup(ctx context.Context) {
 }
 
 // AppMode 暴露当前进程的窗口模式给前端，main.ts 据此决定挂载 App 还是 ModelEditApp。
-// 返回 "editor" 表示编辑器模式，"main" 表示主窗口模式。
+// 返回 "editor" 表示编辑器模式，"actor" 表示演出编辑器模式，"main" 表示主窗口模式。
 func (a *App) AppMode() string {
+	if actorFlag {
+		return "actor"
+	}
 	if editorFlag {
 		return "editor"
 	}
@@ -107,6 +110,12 @@ func (a *App) AppMode() string {
 // 若未传则返回空串。主进程调用始终返回空串。
 func (a *App) EditorWmdlPath() string {
 	return editorWmdlPath
+}
+
+// ActorWmdlPath 返回启动时通过 --actor-wmdl 参数传入的 wmdl 文件绝对路径；演出编辑器进程使用，
+// 若未传则返回空串。主进程调用始终返回空串。
+func (a *App) ActorWmdlPath() string {
+	return actorWmdlPath
 }
 
 // OpenEditor 异步 spawn 一个新的 L2DW 进程（带 --editor 参数），新进程会打开
@@ -123,6 +132,28 @@ func (a *App) OpenEditor(wmdlPath string) error {
 	args := []string{"--editor"}
 	if wmdlPath != "" {
 		args = append(args, "--wmdl", wmdlPath)
+	}
+	cmd := exec.Command(self, args...)
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	return cmd.Start()
+}
+
+// OpenActorEditor 异步 spawn 一个新的 L2DW 进程（带 --actor 参数），新进程会打开
+// 独立的"演出编辑器"窗口。子进程在 main.go 启动时识别该 flag 后进入演出编辑器模式。
+//
+// wmdlPath 非空时附带 --actor-wmdl 参数传递到子进程；子进程启动后会自动加载该 wmdl 文件。
+// 这里只 Start() 不 Wait()，避免阻塞主窗口的 UI 线程；新进程退出由 OS 回收。
+// 不传 Stdin/Stdout/Stderr，避免子进程意外继承/阻塞主进程的 console。
+func (a *App) OpenActorEditor(wmdlPath string) error {
+	self, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	args := []string{"--actor"}
+	if wmdlPath != "" {
+		args = append(args, "--actor-wmdl", wmdlPath)
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Stdin = nil

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
+import { OpenActorEditor } from '../../../wailsjs/go/main/App'
 import ExpressionsToolbar from './ExpressionsToolbar.vue'
 import { useBatchAddModal } from '../../composables/useBatchAddModal'
 import { useBatchModifyModal } from '../../composables/useBatchModifyModal'
-import { useExpressionEditorModal } from '../../composables/useExpressionEditorModal'
 import { filterBySearch } from '../../utils/searchUtils'
 import SearchInput from '../common/SearchInput.vue'
 
@@ -21,7 +21,6 @@ import SearchInput from '../common/SearchInput.vue'
 const store = useWmdlModelEditorStore()
 const modal = useBatchAddModal()
 const modifyModal = useBatchModifyModal()
-const editorModal = useExpressionEditorModal()
 
 const expressions = computed(() => store.selectedModel?.expressions ?? [])
 const hasSelection = computed(() => !!store.selectedModelId)
@@ -50,7 +49,11 @@ function onBatchModify() {
 }
 
 function onOpenEditor() {
-  editorModal.open()
+  const wmdlPath = store.currentWmdl.wmdlFilePath
+  if (!wmdlPath) return
+  OpenActorEditor(wmdlPath).catch((e: unknown) =>
+    console.error('OpenActorEditor failed:', e),
+  )
 }
 
 function onRemove(item: { name: string; path: string }) {

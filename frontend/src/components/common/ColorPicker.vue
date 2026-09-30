@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dropletIcon from '../../assets/icons/droplet.png'
 
 export interface RGBColor {
@@ -91,7 +91,22 @@ function hsvToRgb(h: number, s: number, v: number): RGBColor {
   return { r: clamp255((r + m) * 255), g: clamp255((g + m) * 255), b: clamp255((b + m) * 255) }
 }
 
-const hsv = computed(() => rgbToHsv(props.color.r, props.color.g, props.color.b))
+const hue = ref(0)
+
+const hsv = computed(() => {
+  const next = rgbToHsv(props.color.r, props.color.g, props.color.b)
+  if (next.s === 0 || next.v === 0) next.h = hue.value
+  return next
+})
+
+watch(
+  () => [props.color.r, props.color.g, props.color.b] as const,
+  ([r, g, b]) => {
+    const next = rgbToHsv(r, g, b)
+    if (next.s > 0 && next.v > 0) hue.value = next.h
+  },
+  { immediate: true },
+)
 
 const hueHsl = computed(() => `hsl(${hsv.value.h}, 100%, 50%)`)
 
@@ -100,24 +115,26 @@ const rgbText = computed(() => `rgb(${props.color.r}, ${props.color.g}, ${props.
 // ───────── SV 区域 ─────────
 
 const svBox = ref<HTMLElement | null>(null)
+const hueBar = ref<HTMLElement | null>(null)
 const svSize = ref(0)
-let svResizeObserver: ResizeObserver | null = null
+const hueHeight = ref(0)
+let pickerResizeObserver: ResizeObserver | null = null
 
-function setSvSize() {
-  if (!svBox.value) return
-  svSize.value = svBox.value.clientWidth
+function setPickerSizes() {
+  if (svBox.value) svSize.value = svBox.value.clientWidth
+  if (hueBar.value) hueHeight.value = hueBar.value.clientHeight
 }
 
 onMounted(() => {
-  if (!svBox.value) return
-  setSvSize()
-  svResizeObserver = new ResizeObserver(() => setSvSize())
-  svResizeObserver.observe(svBox.value)
+  setPickerSizes()
+  pickerResizeObserver = new ResizeObserver(() => setPickerSizes())
+  if (svBox.value) pickerResizeObserver.observe(svBox.value)
+  if (hueBar.value) pickerResizeObserver.observe(hueBar.value)
 })
 
 onBeforeUnmount(() => {
-  svResizeObserver?.disconnect()
-  svResizeObserver = null
+  pickerResizeObserver?.disconnect()
+  pickerResizeObserver = null
 })
 
 function applySvFromEvent(e: PointerEvent) {
@@ -162,8 +179,6 @@ const svIndicatorStyle = computed(() => {
 
 // ───────── 色相条 ─────────
 
-const hueBar = ref<HTMLElement | null>(null)
-
 function applyHueFromEvent(e: PointerEvent) {
   if (props.disabled) return
   const rect = hueBar.value?.getBoundingClientRect()
@@ -173,6 +188,7 @@ function applyHueFromEvent(e: PointerEvent) {
   const degree = Math.round((y / h) * 360)
   // clamp 0-359，保留 360 用作轮回边界
   const hh = degree >= 360 ? 0 : degree
+  hue.value = hh
   const next = hsvToRgb(hh, hsv.value.s, hsv.value.v)
   emit('update:color', next)
 }
@@ -193,8 +209,9 @@ function onHuePointerUp() {
 }
 
 const hueIndicatorStyle = computed(() => {
-  const hh = (hsv.value.h / 360) * (hueBar.value?.clientHeight || 180)
-  return { top: `${Math.max(0, Math.min(hueBar.value?.clientHeight || 180, hh) - 7)}px` }
+  const height = hueHeight.value || 180
+  const hh = (hsv.value.h / 360) * height
+  return { top: `${Math.max(0, Math.min(height, hh) - 2)}px` }
 })
 
 // ───────── 输入框 ─────────
@@ -213,6 +230,7 @@ function hsvChange(part: 'h' | 's' | 'v', raw: string) {
   let vv = hsv.value.v
   if (part === 'h') {
     hh = Math.max(0, Math.min(360, Math.round(n)))
+    hue.value = hh >= 360 ? 0 : hh
   } else if (part === 's') {
     ss = Math.max(0, Math.min(100, Math.round(n)))
   } else {

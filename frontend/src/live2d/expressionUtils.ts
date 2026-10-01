@@ -14,6 +14,7 @@ import { toFileUrl, pathCombine, pathDirname } from '../path_utils'
  * 文件结构见计划文件：
  *   - .exp.json  (Cubism 2)   { type, fade_in, fade_out, params: [{ id, val, calc? }] }
  *   - .exp3.json (Cubism 3+)  { Type, Parameters: [{ Id, Value, Blend }] }
+ *       Blend 为字符串: "Overwrite" / "Add" / "Multiply"（历史遗留数字值按 Add 处理）
  */
 
 export type CalcKind = 'none' | 'add' | 'mult' | 'set'
@@ -122,8 +123,13 @@ function parseExp3Json(txt: string): ParamSnapshot[] {
     if (!id) continue
     const val = Number(p.Value)
     if (!Number.isFinite(val)) continue
-    const blend = Number(p.Blend)
-    out.push({ id, val, calc: blendToCalc(blend) })
+    const blend = typeof p.Blend === 'string' ? p.Blend.toLowerCase() : ''
+    let calc: CalcKind = 'none'
+    if (blend === 'overwrite') calc = 'set'
+    else if (blend === 'add') calc = 'add'
+    else if (blend === 'multiply') calc = 'mult'
+    else if (typeof p.Blend === 'number') calc = 'add'
+    out.push({ id, val, calc })
   }
   return out
 }
@@ -136,8 +142,7 @@ export function buildExp3Json(snapshot: ParamSnapshot[], fadeIn = 500, fadeOut =
   const Parameters = snapshot.map((p) => ({
     Id: p.id,
     Value: p.val,
-    Blend: calcToBlend(p.calc),
-  }))
+    Blend: calcToBlend(p.calc),  }))
   const obj: Record<string, unknown> = {
     Type: 'Live2D Expression',
     Parameters,
@@ -155,29 +160,15 @@ function normalizeCalc(raw: unknown): CalcKind {
 }
 
 /**
- * Blend 数值 → CalcKind。
- *  - 0 = Override → 'set'
- *  - 1 = Add      → 'add'
- *  - 2 = Multiply → 'mult'
- *  - 其它 / 未指定 → 'none'
+ * CalcKind → Blend 字符串。
+ *  - 'add' / 'none' → "Add"
+ *  - 'mult'         → "Multiply"
+ *  - 'set'          → "Overwrite"
  */
-function blendToCalc(blend: number): CalcKind {
-  if (blend === 0) return 'set'
-  if (blend === 1) return 'add'
-  if (blend === 2) return 'mult'
-  return 'none'
-}
-
-/**
- * CalcKind → Blend 数值。
- *  - 'add' / 'none' → 1
- *  - 'mult'         → 2
- *  - 'set'          → 0
- */
-function calcToBlend(calc: CalcKind): 0 | 1 | 2 {
-  if (calc === 'mult') return 2
-  if (calc === 'set') return 0
-  return 1
+function calcToBlend(calc: CalcKind): 'Overwrite' | 'Add' | 'Multiply' {
+  if (calc === 'mult') return 'Multiply'
+  if (calc === 'set') return 'Overwrite'
+  return 'Add'
 }
 
 // ── 导出入口 ───────────────────────────────────────────────────────────────

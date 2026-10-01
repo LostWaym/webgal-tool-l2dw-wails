@@ -183,6 +183,17 @@ function onParamReset(id: string) {
   emit('apply-params', [buildApplyEntry(entry)])
 }
 
+function onResetAllParams() {
+  const m = selectedModel.value
+  if (!m) return
+  for (const entry of m.initParams) {
+    delete entry.override
+    entry.calc = 'set'
+  }
+  emit('apply-params', m.initParams.map((p) => buildApplyEntry(p)))
+  msg.success('已重置所有参数')
+}
+
 function onCalcTypeChange(id: string, calc: ParamCalc) {
   const m = selectedModel.value
   if (!m) return
@@ -342,6 +353,13 @@ async function onOpenOutputDir() {
               variant="edit"
               placeholder="搜索参数(空格分隔多个关键词)"
             />
+          </div>
+          <div class="params-tab__actions">
+            <button
+              class="toolbar-btn"
+              :disabled="!paramsView.length"
+              @click="onResetAllParams"
+            >重置所有参数</button>
           </div>
           <div class="params-tab__scroll">
             <div v-if="!filteredParams.length" class="empty-hint">无匹配参数</div>
@@ -567,6 +585,14 @@ async function onOpenOutputDir() {
 
 .params-tab__toolbar {
   flex: 0 0 auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+}
+
+.params-tab__actions {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
   padding: 8px 12px;
   border-bottom: 1px solid rgba(60, 68, 80, 0.35);
 }

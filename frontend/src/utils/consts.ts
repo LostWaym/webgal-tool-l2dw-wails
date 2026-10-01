@@ -12,6 +12,9 @@ import type { ColorPickerTarget } from '../composables/useColorPickerModal'
 export const STAGE_WIDTH = 2560
 export const STAGE_HEIGHT = 1440
 
+// Cubism 4 core (moc3) 内存池预留大小，须 >16MB，且须在加载任何模型前调用
+export const CUBISM_CORE_MEMORY = 256 * 1024 * 1024
+
 export interface FilterItemSpec<K extends string = string> {
   key?: K
   label: string

@@ -6,6 +6,7 @@ import ActorEditApp from './components/ActorEditorApp/ActorEditApp.vue'
 import { AppMode, EditorWmdlPath, ActorWmdlPath, ReadWmdlFile } from '../wailsjs/go/main/App'
 import { useWmdlModelEditorStore } from './stores/wmdlModelEditor'
 import './style.css'
+import './live2d/loader'
 
 // 根据 Go 暴露的 AppMode 选择根组件：
 //   - "main"    → 主窗口（App.vue）

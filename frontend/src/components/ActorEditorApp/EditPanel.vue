@@ -45,7 +45,7 @@ const activeExpressionKey = ref<string | null>(null)
 const paramSearch = ref('')
 
 /** 导出用的快照：所有有 override 的参数，按 store.initParams 顺序。
- *  原表情快照外的修改也会被携带。val 取 override；calc 取 entry.calc（默认 'add'）。 */
+ *  calc 缺省按 'set' 处理（界面初始化/手动拖动的语义）；表情加载的条目已在 toRangeCalc 显式写入 calc。 */
 const exportableSnapshot = computed<ParamSnapshot[]>(() => {
   const m = selectedModel.value
   if (!m) return []
@@ -55,7 +55,7 @@ const exportableSnapshot = computed<ParamSnapshot[]>(() => {
     out.push({
       id: entry.id,
       val: entry.override,
-      calc: entry.calc ?? 'add',
+      calc: entry.calc ?? 'set',
     })
   }
   return out
@@ -95,6 +95,12 @@ const filteredParams = computed(() =>
   filterBySearch(paramsView.value, paramSearch.value, (p) => p.id),
 )
 
+const exprSearch = ref('')
+
+const filteredExpressions = computed(() =>
+  filterBySearch(expressions.value, exprSearch.value, (item) => item.name),
+)
+
 const rightTabs: { id: RightTab; label: string }[] = [
   { id: 'expressions', label: '表情' },
   { id: 'params', label: '参数' },
@@ -106,12 +112,12 @@ function toRangeCalc(c: CalcKind | undefined): ParamCalc {
   return 'add'
 }
 
-/** 按 entry 当前 calc + override 状态合成 emit payload。 */
+/** 按 entry 当前 calc + override 状态合成 emit payload。calc 缺省按 'set'（与 range 按钮显示的【覆】一致）。 */
 function buildApplyEntry(entry: { id: string; value: number; override?: number; calc?: ParamCalc }) {
   return {
     id: entry.id,
     val: entry.override !== undefined ? entry.override : entry.value,
-    calc: entry.calc ?? 'add',
+    calc: entry.calc ?? 'set',
   }
 }
 
@@ -299,19 +305,31 @@ async function onOpenOutputDir() {
       <template v-if="activeTab === 'expressions'">
         <div v-if="!hasSelection" class="empty-hint">请先选择模型</div>
         <div v-else-if="!expressions.length" class="empty-hint">该模型暂无表情</div>
-        <ul v-else class="expr-list">
-          <li
-            v-for="item in expressions"
-            :key="item.name + '\u0000' + item.path"
-            class="expr-list__item"
-            :class="{ 'is-active': activeExpressionKey === (item.name + '\u0000' + item.path) }"
-            :title="item.path"
-            @click="onExpressionClick(item)"
-          >
-            <span class="expr-list__name">{{ item.name }}</span>
-            <span class="expr-list__path">{{ item.path }}</span>
-          </li>
-        </ul>
+        <div v-else class="params-tab">
+          <div class="params-tab__toolbar">
+            <SearchInput
+              v-model="exprSearch"
+              variant="edit"
+              placeholder="搜索表情(空格分隔多个关键词)"
+            />
+          </div>
+          <div class="params-tab__scroll">
+            <div v-if="!filteredExpressions.length" class="empty-hint">无匹配表情</div>
+            <ul v-else class="expr-list">
+              <li
+                v-for="item in filteredExpressions"
+                :key="item.name + '\u0000' + item.path"
+                class="expr-list__item"
+                :class="{ 'is-active': activeExpressionKey === (item.name + '\u0000' + item.path) }"
+                :title="item.path"
+                @click="onExpressionClick(item)"
+              >
+                <span class="expr-list__name">{{ item.name }}</span>
+                <span class="expr-list__path">{{ item.path }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </template>
 
       <template v-else>

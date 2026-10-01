@@ -23,7 +23,8 @@ export type ParamCalc = 'set' | 'add' | 'mult'
  * 单条参数/部件初始值。
  *   - value: 加载完成时由 coreModel 抓取的快照（"原始值"）。
  *   - override: 编辑器里拖动产生的用户覆写值；不存在则表示未覆写。
- *   - calc:   override 与当前舞台值合成方式；默认 'add'。
+ *   - calc:   override 与当前舞台值合成方式；缺省（界面初始化/手动拖动）按 'set'；
+ *     仅表情加载的条目由 toRangeCalc 显式写入（表情缺省/none → 'add'）。
  *   - min/max: 仅 initParams 用（部件页签固定 [0,1]，不存）。可选以便后续
  *     部件也能扩展。
  */

@@ -22,7 +22,7 @@ import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
  * 与主 Stage 区别：
  *   - 无背景层（编辑器只关心立绘）
  *   - 无立绘选中/左键拖拽（编辑器后续在 ActionPanel 做）
- *   - 步幅参数常量化（DRAG_SENSITIVITY / ZOOM_SENSITIVITY / MIN_SCALE / MAX_SCALE）
+ *   - 步幅参数常量化（DRAG_SENSITIVITY / ZOOM_FACTOR / MIN_SCALE / MAX_SCALE）
  *   - 使用 wmdlModels store 作为唯一数据源
  */
 
@@ -39,9 +39,9 @@ let textureWatcher: TextureWatcher | null = null
 
 // Root 容器交互常量（与主 Stage 完全一致）
 const DRAG_SENSITIVITY = 1      // 中键拖拽灵敏度
-const ZOOM_SENSITIVITY = 0.0001 // 滚轮缩放灵敏度（每像素 deltaY）
-const MIN_SCALE = 0.1           // 最小缩放
-const MAX_SCALE = 10            // 最大缩放
+const ZOOM_FACTOR = 1.1         // 滚轮缩放倍率（与 Live2dPreview 一致）
+const MIN_SCALE = 0.05          // 最小缩放
+const MAX_SCALE = 20            // 最大缩放
 
 let rootContainer: PIXI.Container | null = null
 let stageMain: PIXI.Container | null = null
@@ -318,8 +318,8 @@ function attachDomHandlers() {
   const onWheel = (e: WheelEvent) => {
     if (!rootContainer) return
     e.preventDefault()
-    const delta = -e.deltaY * ZOOM_SENSITIVITY
-    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x + delta))
+    const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x * factor))
     rootContainer.scale.set(newScale)
   }
 

@@ -66,7 +66,7 @@ export interface ShortcutEntry {
 
 type ShortcutHandlerKey =
   | 'modelFigure' | 'modelTransform' | 'modelSplit' | 'modelMerge' | 'modelHide'
-  | 'bgSetImage' | 'bgTransform' | 'stageTransform'
+  | 'bgSetImage' | 'bgTransform' | 'bgMerge' | 'stageTransform'
   | 'openEditor' | 'openActorEditor'
 
 export interface ShortcutHint {
@@ -346,6 +346,18 @@ const handler = {
     return inst
   },
 
+  bgMerge: (shouldShowToast: boolean = true): Inst | null => {
+    const bgInst = handler.bgSetImage(false)
+    const transformInst = handler.bgTransform(false)
+    if (!bgInst) return null
+
+    bgInst.setParamValue('transform', transformInst?.content ?? '')
+
+    console.log('[Shortcut] bgMerge:', bgInst.toInstString())
+    if (shouldShowToast) useMessage().success(`复制合并背景指令成功!!`)
+    return bgInst
+  },
+
   stageTransform: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const container = previewRuntime.specialContainers.get(SpecialId.StageMain)
@@ -436,6 +448,14 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
     run: () => handler.bgTransform(),
   },
   {
+    key: 'a',
+    keys: 'Ctrl + A',
+    description: '复制合并后的背景指令（含 transform 参数）',
+    targets: ['background', 'figureGroup'],
+    handlerKey: 'bgMerge',
+    run: () => handler.bgMerge(),
+  },
+  {
     key: 't',
     keys: 'Ctrl + T',
     description: '复制主场景变换指令 (setTransform)',
@@ -521,10 +541,15 @@ function runShortcutForFigureGroup(key: string): void {
     }
   }
 
-  // 2) 包含背景时：固定附加一次背景变换指令（与按键无关），放在所有立绘指令之后
+  // 2) 包含背景时：按触发键分发背景对应指令，与按键无关的兜底为 bgTransform
   if (group.includeBackground) {
-    const bgInst = handler.bgTransform(false)
-    if (bgInst) lines.push(bgInst.toInstString())
+    const bgEntry = SHORTCUTS.find(
+      (s) => s.key === key && s.targets.includes('background'),
+    )
+    const bgInst = bgEntry
+      ? bgEntry.run()
+      : handler.bgTransform(false)
+    if (bgInst) lines.push(...resultToLines(bgInst))
   }
 
   if (lines.length === 0) {

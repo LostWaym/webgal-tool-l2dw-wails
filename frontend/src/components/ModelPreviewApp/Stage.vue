@@ -30,6 +30,12 @@ function toggleHints() {
   hintsExpanded.value = !hintsExpanded.value
 }
 
+// 便签块：折叠状态独立于操作提示，由用户手工切换
+const stickyExpanded = ref(true)
+function toggleSticky() {
+  stickyExpanded.value = !stickyExpanded.value
+}
+
 function onShortcutClick(e: MouseEvent, entry: ShortcutEntry) {
   e.stopPropagation()
   runShortcutEntry(entry)
@@ -628,6 +634,24 @@ async function init() {
   const frame = new PIXI.Graphics()
   frame.lineStyle(2, 0x00FF00)
   frame.drawRect(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2, STAGE_WIDTH, STAGE_HEIGHT)
+  // 四个顶点处的横竖延伸线（向外溢出边框）
+  const ext = 1280
+  frame.moveTo(-STAGE_WIDTH / 2 - ext, -STAGE_HEIGHT / 2)
+  frame.lineTo(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
+  frame.moveTo(STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
+  frame.lineTo(STAGE_WIDTH / 2 + ext, -STAGE_HEIGHT / 2)
+  frame.moveTo(-STAGE_WIDTH / 2 - ext, STAGE_HEIGHT / 2)
+  frame.lineTo(-STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  frame.moveTo(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  frame.lineTo(STAGE_WIDTH / 2 + ext, STAGE_HEIGHT / 2)
+  frame.moveTo(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2 - ext)
+  frame.lineTo(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
+  frame.moveTo(-STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  frame.lineTo(-STAGE_WIDTH / 2, STAGE_HEIGHT / 2 + ext)
+  frame.moveTo(STAGE_WIDTH / 2, -STAGE_HEIGHT / 2 - ext)
+  frame.lineTo(STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
+  frame.moveTo(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
+  frame.lineTo(STAGE_WIDTH / 2, STAGE_HEIGHT / 2 + ext)
   frameContainer.addChild(frame)
   rootContainer.addChild(frameContainer)
 
@@ -1670,45 +1694,62 @@ function dispose() {
     <!-- <p v-if="!store.models.length && !backgroundSprite" class="stage__hint">
       点击左上角 “加载模型” 按钮选择 Live2D 模型文件 (.model.json 或 .model3.json)
     </p> -->
-    <div v-if="!isTransforming" class="stage__hints" :class="{ 'is-collapsed': !hintsExpanded }">
-      <button
-        type="button"
-        class="stage__hints-toggle"
-        :aria-expanded="hintsExpanded"
-        :aria-label="hintsExpanded ? '收起操作提示' : '展开操作提示'"
-        @click="toggleHints"
-      >
-        <span class="stage__hints-toggle-text">{{ hints.title }}</span>
-        <span class="stage__hints-toggle-icon" aria-hidden="true">{{ hintsExpanded ? '▾' : '▸' }}</span>
-      </button>
-      <div v-show="hintsExpanded" class="stage__hints-body">
-        <section v-if="hints.mouse.length" class="stage__hints-group">
-          <h4 class="stage__hints-heading">鼠标</h4>
-          <ul class="stage__hints-list">
-            <li v-for="item in hints.mouse" :key="`m-${item.keys}`">
-              <span class="stage__hints-keys">{{ item.keys }}</span>
-              <span class="stage__hints-desc">{{ item.description }}</span>
-            </li>
-          </ul>
-        </section>
-        <section v-if="hints.shortcuts.length" class="stage__hints-group">
-          <h4 class="stage__hints-heading">快捷键  - 可点击触发</h4>
-          <ul class="stage__hints-list">
-            <li v-for="item in hints.shortcuts" :key="item.entry.handlerKey + '-' + item.keys">
-              <button
-                type="button"
-                class="stage__hints-item"
-                :title="`点击触发 ${item.keys}`"
-                @click="onShortcutClick($event, item.entry)"
-              >
+    <div v-if="!isTransforming" class="stage__bottom-blocks">
+      <div class="stage__hints" :class="{ 'is-collapsed': !hintsExpanded }">
+        <button
+          type="button"
+          class="stage__hints-toggle"
+          :aria-expanded="hintsExpanded"
+          :aria-label="hintsExpanded ? '收起操作提示' : '展开操作提示'"
+          @click="toggleHints"
+        >
+          <span class="stage__hints-toggle-text">{{ hints.title }}</span>
+          <span class="stage__hints-toggle-icon" aria-hidden="true">{{ hintsExpanded ? '▾' : '▸' }}</span>
+        </button>
+        <div v-show="hintsExpanded" class="stage__hints-body">
+          <section v-if="hints.mouse.length" class="stage__hints-group">
+            <h4 class="stage__hints-heading">鼠标</h4>
+            <ul class="stage__hints-list">
+              <li v-for="item in hints.mouse" :key="`m-${item.keys}`">
                 <span class="stage__hints-keys">{{ item.keys }}</span>
                 <span class="stage__hints-desc">{{ item.description }}</span>
-              </button>
-            </li>
-          </ul>
-        </section>
-        <section v-if="showSelectFilterBtn || showReloadConfigBtn" class="stage__hints-group">
-          <h4 class="stage__hints-heading">便签</h4>
+              </li>
+            </ul>
+          </section>
+          <section v-if="hints.shortcuts.length" class="stage__hints-group">
+            <h4 class="stage__hints-heading">快捷键  - 可点击触发</h4>
+            <ul class="stage__hints-list">
+              <li v-for="item in hints.shortcuts" :key="item.entry.handlerKey + '-' + item.keys">
+                <button
+                  type="button"
+                  class="stage__hints-item"
+                  :title="`点击触发 ${item.keys}`"
+                  @click="onShortcutClick($event, item.entry)"
+                >
+                  <span class="stage__hints-keys">{{ item.keys }}</span>
+                  <span class="stage__hints-desc">{{ item.description }}</span>
+                </button>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </div>
+      <div
+        v-if="showSelectFilterBtn || showReloadConfigBtn"
+        class="stage__sticky"
+        :class="{ 'is-collapsed': !stickyExpanded }"
+      >
+        <button
+          type="button"
+          class="stage__hints-toggle"
+          :aria-expanded="stickyExpanded"
+          :aria-label="stickyExpanded ? '收起便签' : '展开便签'"
+          @click="toggleSticky"
+        >
+          <span class="stage__hints-toggle-text">便签</span>
+          <span class="stage__hints-toggle-icon" aria-hidden="true">{{ stickyExpanded ? '▾' : '▸' }}</span>
+        </button>
+        <div v-show="stickyExpanded" class="stage__hints-body">
           <div class="stage__hints-buttons">
             <button
               v-if="showSelectFilterBtn"
@@ -1727,7 +1768,7 @@ function dispose() {
               重载模型配置
             </button>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   </section>
@@ -1753,7 +1794,7 @@ function dispose() {
 .stage__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: transparent;
   z-index: 5;
   cursor: crosshair;
 }
@@ -1848,16 +1889,36 @@ function dispose() {
   background: #1f2024;
 }
 
-.stage__hints {
+.stage__bottom-blocks {
   position: absolute;
   left: 16px;
   bottom: 16px;
   max-width: calc(100% - 32px);
   z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none; /* 正文不拦截舞台操作，仅按钮可点击 */
+}
+
+.stage__hints {
   font-size: 12px;
   line-height: 1.5;
   color: #fff;
-  pointer-events: none; /* 正文不拦截舞台操作，仅折叠按钮可点击 */
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 0 2px rgba(0, 0, 0, 0.85);
+  user-select: none;
+}
+
+.stage__sticky {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fff;
   text-shadow:
     -1px -1px 0 #000,
     1px -1px 0 #000,
@@ -1988,7 +2049,8 @@ function dispose() {
   outline: none;
 }
 
-.stage__hints.is-collapsed .stage__hints-toggle {
+.stage__hints.is-collapsed .stage__hints-toggle,
+.stage__sticky.is-collapsed .stage__hints-toggle {
   background: rgba(0, 0, 0, 0.55);
 }
 </style>

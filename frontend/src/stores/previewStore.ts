@@ -163,6 +163,8 @@ export interface ModelEntry {
   wmdlConfig?: WmdlConfig
   /** Cached: whether this is a Cubism 3+ model (true) or Cubism 2 (false). */
   isMoc3: boolean
+  /** 缺省视为 false，老数据兼容。 */
+  ignoreFigureGroupSelect?: boolean
 }
 
 /**
@@ -878,6 +880,12 @@ export const useModelStore = defineStore('models', {
       group.targetGroupIds = group.targetGroupIds.filter((gid) => gid !== groupId && groupIds.has(gid))
     },
 
+    setModelIgnoreFigureGroupSelect(id: string, value: boolean): void {
+      const entry = this.models.find((m) => m.id === id)
+      if (!entry) return
+      entry.ignoreFigureGroupSelect = value
+    },
+
     /**
      * 递归展平立绘组的所有目标立绘 ID（含嵌套立绘组）。
      * includeAllFigures=true 时直接返回当前所有立绘。
@@ -889,12 +897,17 @@ export const useModelStore = defineStore('models', {
       if (!group) return []
 
       if (group.includeAllFigures) {
-        return this.models.map((m) => m.id)
+        return this.models
+          .filter((m) => !m.ignoreFigureGroupSelect)
+          .map((m) => m.id)
       }
 
-      const result: string[] = [...group.targetIds]
+      const ignoreIds = new Set(this.models.filter((m) => m.ignoreFigureGroupSelect).map((m) => m.id))
+      const result: string[] = group.targetIds.filter((id) => !ignoreIds.has(id))
       for (const nestedId of group.targetGroupIds) {
-        result.push(...this.flattenFigureGroupTargets(nestedId, visited))
+        result.push(
+          ...this.flattenFigureGroupTargets(nestedId, visited).filter((id) => !ignoreIds.has(id)),
+        )
       }
       return result
     },

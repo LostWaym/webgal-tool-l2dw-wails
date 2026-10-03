@@ -1413,7 +1413,17 @@ function onLabelDragEnd() {
 
     <!-- 立绘信息 -->
     <div v-else-if="activeTab === 'figureInfo'" class="panel__info">
-      <div class="info-section">
+      <div v-if="store.selectedModel" class="info-section">
+        <div class="info-row">
+          <label class="info-label">忽略立绘组选中</label>
+          <input
+            tabindex="-1"
+            type="checkbox"
+            :checked="!!store.selectedModel.ignoreFigureGroupSelect"
+            @mousedown.prevent
+            @change="store.setModelIgnoreFigureGroupSelect(store.selectedModel.id, ($event.target as HTMLInputElement).checked)"
+          />
+        </div>
         <div class="info-row">
           <label class="info-label">立绘模板</label>
           <button class="reset-btn reset-btn--small" @click="generateFigureTemplate">生成立绘模板</button>

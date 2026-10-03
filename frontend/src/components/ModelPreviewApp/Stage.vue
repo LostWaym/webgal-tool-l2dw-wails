@@ -18,9 +18,11 @@ import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
+import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
 
 const store = useModelStore()
 const filterPresetModal = useFilterPresetModal()
+const snapshotModal = useTransformSnapshotModal()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 
@@ -643,10 +645,20 @@ const showReloadConfigBtn = computed(() => {
   return !!model && model.kind === 'live2d' && !!model.wmdlConfig?.wmdlFilePath
 })
 
+// 便签模块：变换快照列表按钮（背景 / 舞台 / 立绘 可用；立绘组不需要）
+const showSnapshotListBtn = computed(() => {
+  const type = resolveShortcutTargetType(store.selectedId)
+  return type === 'background' || type === 'stage' || type === 'model'
+})
+
 const msg = useMessage()
 
 function onOpenFilterPreset() {
   filterPresetModal.open()
+}
+
+function onOpenSnapshotList() {
+  snapshotModal.open()
 }
 
 function onReloadModelConfig() {
@@ -1862,7 +1874,7 @@ function dispose() {
         </div>
       </div>
       <div
-        v-if="showSelectFilterBtn || showReloadConfigBtn"
+        v-if="showSelectFilterBtn || showReloadConfigBtn || showSnapshotListBtn"
         class="stage__sticky"
         :class="{ 'is-collapsed': !stickyExpanded }"
       >
@@ -1893,6 +1905,14 @@ function dispose() {
               @click="onReloadModelConfig"
             >
               重载模型配置
+            </button>
+            <button
+              v-if="showSnapshotListBtn"
+              type="button"
+              class="stage__hints-sticky-btn"
+              @click="onOpenSnapshotList"
+            >
+              变换快照列表
             </button>
           </div>
         </div>

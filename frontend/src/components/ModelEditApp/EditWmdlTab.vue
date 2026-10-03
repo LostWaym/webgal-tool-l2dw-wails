@@ -138,7 +138,7 @@ function updateTransformTemplate(v: string) {
 }
 
 function generateFigureTemplate() {
-  store.updateConfig({ figureTemplate: 'changeFigure:%conf_path% -id=%name% %me% -writeDefault;' })
+  store.updateConfig({ figureTemplate: 'changeFigure:%conf_path% -id=%name% %me%;' })
 }
 
 function generateTransformTemplate() {

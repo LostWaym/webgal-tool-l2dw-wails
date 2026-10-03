@@ -134,6 +134,8 @@ l2dw-wails/
   - 操作区（一般指"frontend\src\components\ModelPreviewApp\ModelActionPanel.vue"）
   - 页签（一般指操作区上方的页签），页签内容（一般指选择页签后，操作区里展示的panel内容。
 - 立绘组快捷键复制 = useShortcuts.ts 的 runShortcutForFigureGroup（handler.bgTransform / bgSetImage / modelFigure...）
+- 背景相关 = ModelList.vue 特殊行按钮（加载背景 / 历史背景）、Modal/BackgroundHistoryModal.vue、composables/useBackgroundHistoryModal.ts
+- 背景历史数据 = previewStore.bgHistory（setBackground / removeBgHistory）
 
 ### 改模编辑器相关
 
@@ -165,6 +167,7 @@ l2dw-wails/
 - 搜索栏 = SearchInput.vue
 - 轻量数值输入 = `frontend/src/components/common/NumberInput.vue`（展示态为文本，点击进入编辑；支持 min/max/precision/clamp，常用于变换/滤镜等参数）
 - 拖拽调参输入 = `frontend/src/components/ModelEditApp/EditRangeCard.vue`（带重置按钮 + label 拖拽改值，常用于编辑器初始参数/部件参数）
+- 模态通用模式 = composables/useXxxModal.ts（reactive 单例）+ Modal 组件 Teleport 挂 App.vue 顶层（参考 FilterPresetModal / BackgroundHistoryModal）
 
 ### 折叠块设计参考
 

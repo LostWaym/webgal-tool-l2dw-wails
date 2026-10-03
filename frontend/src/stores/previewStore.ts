@@ -370,8 +370,14 @@ export const useModelStore = defineStore('models', {
         return false
       }
 
-      const content = await ReadWmdlFile(entry.wmdlConfig.wmdlFilePath)
-      const { config } = await parseWmdlJson(content, entry.wmdlConfig.wmdlFilePath)
+      const filePath = entry.wmdlConfig.wmdlFilePath
+      // json 来源：内存重建只含主模型的 wmdl（不读盘）；否则按 wmdl 文件解析
+      const config = filePath.toLowerCase().endsWith('.json')
+        ? await buildInMemoryWmdlConfig(filePath)
+        : (await parseWmdlJson(await ReadWmdlFile(filePath), filePath)).config
+      // 重载不覆盖内存中的指令模板
+      config.figureTemplate = entry.wmdlConfig?.figureTemplate ?? config.figureTemplate
+      config.transformTemplate = entry.wmdlConfig?.transformTemplate ?? config.transformTemplate
 
       // 更新配置
       Object.assign(entry, {

@@ -30,6 +30,11 @@ async function onLoad() {
   try {
     const path = await PickWmdlFile()
     if (!path) return
+    // json 路径：内存构造只含主模型的 wmdl（不写盘）
+    if (path.toLowerCase().endsWith('.json')) {
+      await store.loadInMemory(path)
+      return
+    }
     const content = await ReadWmdlFile(path)
     await store.fromJson(content, path)
   } catch (e) {

@@ -47,16 +47,22 @@ async function loadStartupWmdl(pathFn: () => Promise<string>) {
   }
   if (!wmdlPath) return
 
-  let content = ''
-  try {
-    content = await ReadWmdlFile(wmdlPath)
-  } catch (err) {
-    console.error('ReadWmdlFile failed:', err)
-    return
-  }
-
   const store = useWmdlModelEditorStore()
   try {
+    // json 路径：内存构造只含主模型的 wmdl（不写盘）
+    if (wmdlPath.toLowerCase().endsWith('.json')) {
+      await store.loadInMemory(wmdlPath)
+      return
+    }
+
+    let content = ''
+    try {
+      content = await ReadWmdlFile(wmdlPath)
+    } catch (err) {
+      console.error('ReadWmdlFile failed:', err)
+      return
+    }
+
     await store.fromJson(content, wmdlPath)
   } catch (err) {
     console.error('Failed to load startup wmdl:', err)

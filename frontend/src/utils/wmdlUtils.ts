@@ -1,6 +1,7 @@
 import { ReadModelJsonFile } from '../../wailsjs/go/main/App'
 import { pathBasename, pathDirname, pathIsAbsolute, pathRelative, pathCombine, toFileUrl } from '../path_utils'
 import type { WmdlConfig, WmdlModelItem, ExternalWmdl } from '../stores/wmdlTypes'
+import { DEFAULT_FIGURE_TEMPLATE, DEFAULT_TRANSFORM_TEMPLATE } from './consts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -208,3 +209,20 @@ export async function parseWmdlJson(
 }
 
 export { toFileUrl }
+
+/**
+ * Build an in-memory single-main-model WmdlConfig from a live2d model json path.
+ * wmdlFilePath is anchored at the json path itself (no disk write).
+ */
+export async function buildInMemoryWmdlConfig(jsonPath: string): Promise<WmdlConfig> {
+  const name = deriveNameFromPath(jsonPath)
+  const item = await buildModelItem(jsonPath, jsonPath)
+  return {
+    name,
+    figureTemplate: DEFAULT_FIGURE_TEMPLATE,
+    transformTemplate: DEFAULT_TRANSFORM_TEMPLATE,
+    live2dBounds: [0, 0, 0, 0],
+    models: item ? [item] : [],
+    wmdlFilePath: jsonPath,
+  }
+}

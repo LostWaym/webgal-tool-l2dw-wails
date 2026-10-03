@@ -24,7 +24,7 @@ export interface ScannedEntry {
   subFolders: string[]
 }
 export type { WmdlConfig, WmdlModelItem, InitParamEntry }
-import { deriveNameFromFile, buildModelItem, configToJson, parseWmdlJson, sortByName, deepClone, detectModelTypeFromJson, readRawJsonObject, toFileUrl, deriveNameFromPath } from '../utils/wmdlUtils'
+import { deriveNameFromFile, buildModelItem, buildInMemoryWmdlConfig, configToJson, parseWmdlJson, sortByName, deepClone, detectModelTypeFromJson, readRawJsonObject, toFileUrl, deriveNameFromPath } from '../utils/wmdlUtils'
 export { deriveNameFromFile }
 
 export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
@@ -120,6 +120,13 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
     /** Parse external wmdl JSON into currentWmdl and load all model directories. */
     async fromJson(json: string, filePath: string): Promise<void> {
       const { config } = await parseWmdlJson(json, filePath)
+      this.currentWmdl = config
+      this.selectedModelId = config.models.length > 0 ? config.models[0].id : null
+    },
+
+    /** Load a live2d model json as an in-memory single-main-model wmdl (no disk write). */
+    async loadInMemory(jsonPath: string): Promise<void> {
+      const config = await buildInMemoryWmdlConfig(jsonPath)
       this.currentWmdl = config
       this.selectedModelId = config.models.length > 0 ? config.models[0].id : null
     },

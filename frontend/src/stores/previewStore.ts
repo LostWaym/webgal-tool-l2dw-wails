@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { Live2DModel, MotionPriority, baseBlinkParam } from 'pixi-live2d-display-webgal'
 import { PickLive2DModel, PickWmdlFile, ReadWmdlFile, SaveWmdlFile, GetFileModifyTime, PickImageFile, ReadTextFile, WriteTextFile, PickTransformSnapshotFile, SaveTransformSnapshotFileDialog } from '../../wailsjs/go/main/App'
 import { pathDirname, pathRelative } from '../path_utils'
-import { parseWmdlJson } from '../utils/wmdlUtils'
+import { parseWmdlJson, buildInMemoryWmdlConfig } from '../utils/wmdlUtils'
 import { deriveNameFromPath } from '../utils/wmdlUtils'
 import {
   DEFAULT_BG_TEMPLATE,
@@ -285,24 +285,20 @@ export const useModelStore = defineStore('models', {
       }
 
       if (!entry) {
-        const name = deriveNameFromPath(jsonPath)
-        const wmdlDir = pathDirname(wmdlPath)
-        const modelRelativePath = pathRelative(wmdlDir, jsonPath)
-
-        const wmdlContent = JSON.stringify(
-          {
-            name,
-            figureTemplate: DEFAULT_FIGURE_TEMPLATE,
-            transformTemplate: DEFAULT_TRANSFORM_TEMPLATE,
-            live2dBounds: [0, 0, 0, 0] as [number, number, number, number],
-            modelRelativePath,
-            subModels: [],
-          },
-          null,
-          2,
-        )
-        await SaveWmdlFile(wmdlPath, wmdlContent)
-        entry = await this._loadWmdlFromFile(wmdlPath)
+        const config = await buildInMemoryWmdlConfig(jsonPath)
+        const item = config.models[0]
+        entry = {
+          id: crypto.randomUUID(),
+          kind: 'live2d',
+          name: config.name,
+          jsonPath,
+          visible: true,
+          playing: { motion: null, expression: null },
+          state: { ...DEFAULT_TRANSFORM_STATE },
+          wmdlModels: config.models,
+          wmdlConfig: config,
+          isMoc3: item?.isMoc3 ?? false,
+        }
       }
 
       if (entry) {

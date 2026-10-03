@@ -59,14 +59,14 @@ const TAB_CONFIGS: Record<TabKey, TabConfig> = {
   figureInfo: { key: 'figureInfo', label: '立绘信息' },
   figureGroupInfo: { key: 'figureGroupInfo', label: '立绘组信息' },
 }
-// 搜索词持久化在 store 中，操作区关闭后仍保留
+// 搜索词按模型 id 持久化在 store 中，操作区关闭后仍保留
 const motionSearch = computed({
   get: () => store.motionSearch,
-  set: (v: string) => { store.motionSearch = v },
+  set: (v: string) => { store.setMotionSearch(v) },
 })
 const expressionSearch = computed({
   get: () => store.expressionSearch,
-  set: (v: string) => { store.expressionSearch = v },
+  set: (v: string) => { store.setExpressionSearch(v) },
 })
 const motionCollapsed = ref(false)
 const expressionCollapsed = ref(false)

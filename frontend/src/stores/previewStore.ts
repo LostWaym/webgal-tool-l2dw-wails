@@ -197,10 +197,10 @@ export const useModelStore = defineStore('models', {
   state: () => ({
     models: [] as ModelEntry[],
     figureGroups: [] as FigureGroupEntry[],
-    /** 动作页签搜索词（组件卸载后仍保留） */
-    motionSearch: '',
-    /** 表情页签搜索词（组件卸载后仍保留） */
-    expressionSearch: '',
+    /** 动作页签搜索词：按模型 id 索引（组件卸载后仍保留） */
+    motionSearchMap: {} as Record<string, string>,
+    /** 表情页签搜索词：按模型 id 索引（组件卸载后仍保留） */
+    expressionSearchMap: {} as Record<string, string>,
     selectedId: null as string | null,
     backgroundUrl: null as string | null,
     bgTemplate: DEFAULT_BG_TEMPLATE,
@@ -239,6 +239,12 @@ export const useModelStore = defineStore('models', {
       if (!id || !isFigureGroupId(id)) return null
       return state.figureGroups.find((g) => g.id === id) ?? null
     },
+    motionSearch(state): string {
+      return state.selectedId ? (state.motionSearchMap[state.selectedId] ?? '') : ''
+    },
+    expressionSearch(state): string {
+      return state.selectedId ? (state.expressionSearchMap[state.selectedId] ?? '') : ''
+    },
     getPlayingState: (state) => (modelId: string): PlayingState => {
       return state.models.find((m) => m.id === modelId)?.playing ?? { motion: null, expression: null }
     },
@@ -268,6 +274,14 @@ export const useModelStore = defineStore('models', {
     },
   },
   actions: {
+    setMotionSearch(v: string): void {
+      if (!this.selectedId) return
+      this.motionSearchMap[this.selectedId] = v
+    },
+    setExpressionSearch(v: string): void {
+      if (!this.selectedId) return
+      this.expressionSearchMap[this.selectedId] = v
+    },
     /** 统一加载入口：按扩展名路由到 json / wmdl 加载逻辑 */
     async addFromPicker(): Promise<ModelEntry | null> {
       const path = await PickLive2DModelOrWmdl()

@@ -421,6 +421,9 @@ export const useModelStore = defineStore('models', {
         this.bgHistory = filtered.slice(0, 10)
       }
     },
+    removeBgHistory(path: string): void {
+      this.bgHistory = this.bgHistory.filter((p) => p !== path)
+    },
     setBgTemplate(template: string): void {
       this.bgTemplate = template
     },

@@ -5,6 +5,7 @@ import Stage from './components/ModelPreviewApp/Stage.vue'
 import ModelActionPanel from './components/ModelPreviewApp/ModelActionPanel.vue'
 import TransformSnapshotModal from './components/ModelPreviewApp/Modal/TransformSnapshotModal.vue'
 import FilterPresetModal from './components/ModelPreviewApp/Modal/FilterPresetModal.vue'
+import BackgroundHistoryModal from './components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue'
 import ColorPickerModal from './components/common/ColorPickerModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
 import { useModelStore } from './stores/previewStore'
@@ -39,6 +40,7 @@ onBeforeUnmount(() => {
     <ModelActionPanel v-if="store.selectedId" />
     <TransformSnapshotModal />
     <FilterPresetModal />
+    <BackgroundHistoryModal />
     <ColorPickerModal />
     <MessageHost />
   </div>

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useModelStore } from '../../stores/previewStore'
-import { SPECIAL_IDS, getSpecialName } from '../../live2d/specialIds'
+import { SPECIAL_IDS, SpecialId, getSpecialName } from '../../live2d/specialIds'
+import { PickImageFile } from '../../../wailsjs/go/main/App'
+import { useBackgroundHistoryModal } from '../../composables/useBackgroundHistoryModal'
 import eyeIcon from '../../assets/icons/eye.png'
 import eyeOffIcon from '../../assets/icons/eye-off.png'
 
 const store = useModelStore()
+const bgHistoryModal = useBackgroundHistoryModal()
 const dragFromIndex = ref<number | null>(null)
 
 async function onAdd() {
@@ -46,6 +49,17 @@ function onRemoveFigureGroup(id: string, event: MouseEvent) {
 function onToggleVisible(id: string, event: MouseEvent) {
   event.stopPropagation()
   store.toggleVisible(id)
+}
+
+async function onLoadBackground(event: MouseEvent) {
+  event.stopPropagation()
+  const imagePath = await PickImageFile()
+  if (imagePath) store.setBackground(imagePath)
+}
+
+function onOpenBgHistory(event: MouseEvent) {
+  event.stopPropagation()
+  bgHistoryModal.open()
 }
 
 function onDragStart(event: DragEvent, index: number) {
@@ -96,6 +110,18 @@ function onDragEnd() {
         @click="onSelect(id)"
       >
         <span class="model-row__name">{{ getSpecialName(id) }}</span>
+        <button
+          v-if="id === SpecialId.BgContainer"
+          class="model-row__bg-load"
+          title="加载背景"
+          @click="onLoadBackground($event)"
+        >🖼️</button>
+        <button
+          v-if="id === SpecialId.BgContainer"
+          class="model-row__bg-load"
+          title="历史背景"
+          @click="onOpenBgHistory($event)"
+        >🕘</button>
       </li>
     </ul>
     <hr v-if="store.models.length" class="model-list__divider" />
@@ -285,6 +311,27 @@ function onDragEnd() {
   margin-left: 6px;
   padding: 0;
   transition: background 0.12s ease, color 0.12s ease;
+}
+
+.model-row__bg-load {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 6px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease;
+}
+
+.model-row__bg-load:hover {
+  background: #3a3f4b;
 }
 
 .model-row__close:hover {

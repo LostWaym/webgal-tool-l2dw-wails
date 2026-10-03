@@ -17,7 +17,6 @@ import {
 } from '../../utils/consts'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { isSpecialId, getSpecialName, SpecialId, isFigureGroupId } from '../../live2d/specialIds'
-import { PickImageFile } from '../../../wailsjs/go/main/App'
 import { filterBySearch } from '../../utils/searchUtils'
 import emitter, { StageEvents } from '../../stores/emitter'
 import { reloadAllModelTextures } from '../../live2d/textureUtils'
@@ -658,26 +657,6 @@ function generateStageTransformTemplate() {
   store.setStageTransformTemplate(DEFAULT_STAGE_TRANSFORM_TEMPLATE)
 }
 
-// 背景历史：图片资源 URL 转 Wails 可访问的绝对路径
-function bgImageSrc(path: string): string {
-  // 已是 http(s) 或 data 开头则直接返回
-  if (/^(https?:|data:)/i.test(path)) return path
-  // 否则视为绝对文件路径，转换为 Wails AssetServer 可访问 URL
-  const encoded = encodeURI(path)
-  return `/abs_files/${encoded}`
-}
-
-async function onLoadBackground() {
-  const imagePath = await PickImageFile()
-  if (imagePath) {
-    store.setBackground(imagePath)
-  }
-}
-
-function onSelectHistory(path: string) {
-  store.setBackground(path)
-}
-
 // 过滤后的动作列表
 const filteredMotions = computed(() =>
   filterBySearch(motions.value, motionSearch.value, (m) => m.name),
@@ -987,7 +966,7 @@ function onLabelDragEnd() {
               </div>
             </li>
             <li class="list-item list-item--row">
-              <div class="form-row">
+              <div class="form-row form-row--pair">
                 <label @mousedown="(e) => onLabelDragStart('x', e)">X</label>
                 <NumberInput
                   :model-value="transformState.x"
@@ -995,10 +974,6 @@ function onLabelDragEnd() {
                   :precision="2"
                   @update:model-value="(v: number) => { transformState.x = v; onTransformInput() }"
                 />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
                 <label @mousedown="(e) => onLabelDragStart('y', e)">Y</label>
                 <NumberInput
                   :model-value="transformState.y"
@@ -1009,7 +984,7 @@ function onLabelDragEnd() {
               </div>
             </li>
             <li class="list-item list-item--row">
-              <div class="form-row">
+              <div class="form-row form-row--pair">
                 <label @mousedown="(e) => onLabelDragStart('scaleX', e)">X 缩放</label>
                 <NumberInput
                   :model-value="transformState.scale.x"
@@ -1019,10 +994,6 @@ function onLabelDragEnd() {
                   :precision="3"
                   @update:model-value="(v: number) => { transformState.scale.x = v; onTransformInput() }"
                 />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
                 <label @mousedown="(e) => onLabelDragStart('scaleY', e)">Y 缩放</label>
                 <NumberInput
                   :model-value="transformState.scale.y"
@@ -1353,27 +1324,8 @@ function onLabelDragEnd() {
           class="form-input form-input--textarea"
           rows="3"
         />
-        <div class="form-row form-row--btn">
-          <button class="reset-btn" @click="onLoadBackground">加载背景</button>
-        </div>
-      </div>
-      <div class="history-grid">
-        <div
-          v-for="path in store.bgHistory"
-          :key="path"
-          class="history-item"
-          :class="{ 'is-current': path === store.backgroundUrl }"
-          @click="onSelectHistory(path)"
-        >
-          <img :src="bgImageSrc(path)" :alt="path" class="history-thumb" />
-          <span class="history-name">{{ path.split(/[/\\]/).pop() }}</span>
-        </div>
-        <div v-if="store.bgHistory.length === 0" class="history-empty">
-          暂无历史记录
-        </div>
       </div>
     </div>
-
     <!-- 主场景信息 -->
     <div v-else-if="activeTab === 'stageInfo'" class="panel__info">
       <div class="info-section">
@@ -1820,6 +1772,17 @@ function onLabelDragEnd() {
   gap: 8px;
 }
 
+/* 一行放两个维度（X/Y、X缩放/Y缩放） */
+.form-row--pair {
+  gap: 6px;
+}
+
+.form-row--pair label {
+  width: auto;
+  min-width: 32px;
+  padding: 4px 2px;
+}
+
 .form-row label {
   width: 40px;
   color: #8a93a3;
@@ -1983,64 +1946,6 @@ function onLabelDragEnd() {
 
 .list-item.is-current {
   border-left-color: #2f80ed;
-}
-
-.history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 8px;
-  padding: 8px 12px;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-  border-top: 1px solid #2c313a;
-}
-
-.history-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  border-radius: 6px;
-  padding: 6px;
-  transition: background 0.12s;
-}
-
-.history-item:hover {
-  background: #262b34;
-}
-
-.history-item.is-current {
-  outline: 2px solid #2f80ed;
-}
-
-.history-thumb {
-  width: 100%;
-  max-height: 80px;
-  object-fit: contain;
-  border-radius: 4px;
-  background: #1a1d23;
-  display: block;
-}
-
-.history-name {
-  color: #fff;
-  font-size: 11px;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-  text-shadow: 0 1px 2px #000, 0 -1px 2px #000, 1px 0 2px #000, -1px 0 2px #000;
-}
-
-.history-empty {
-  grid-column: 1 / -1;
-  color: #6b7280;
-  font-size: 13px;
-  text-align: center;
-  padding: 24px 0;
 }
 
 /* ───────── 滤镜 ───────── */

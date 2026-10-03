@@ -4,13 +4,13 @@ import * as PIXI from 'pixi.js'
 import { LoaderResource } from 'pixi.js'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
 import { useModelStore } from '../../stores/previewStore'
-import type { FigureGroupEntry } from '../../stores/previewStore'
+import type { FigureGroupEntry, FocusState } from '../../stores/previewStore'
 import { toFileUrl } from '../../path_utils'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
 import { OpenEditor, OpenActorEditor } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
-import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
+import { STAGE_WIDTH, STAGE_HEIGHT, FOCUS_BOX_SIZE } from '../../utils/consts'
 import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
 import { useMessage } from '../../composables/useMessage'
 import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
@@ -52,12 +52,17 @@ function onNextModeChange(e: Event) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Blender 风格变换操作（g/s/r + x/y 轴锁定）
 // ─────────────────────────────────────────────────────────────────────────────
-type TransformMode = 'none' | 'g' | 's' | 'r'
+type TransformMode = 'none' | 'g' | 's' | 'r' | 'l'
 type AxisLock = 'none' | 'x' | 'y'
 
 const transformMode = ref<TransformMode>('none')
 const axisLock = ref<AxisLock>('none')
 const isTransforming = computed(() => transformMode.value !== 'none')
+
+// 注视模式（l）状态
+let focusTargetId: string | null = null
+let focusSavedState: FocusState | null = null
+let focusBox: PIXI.Graphics | null = null
 
 // 变换操作的初始值（用于右键取消时还原）
 let startX = 0
@@ -191,6 +196,15 @@ function refreshTransformHint() {
     transformHint.modeName = ''
     return
   }
+  // 注视模式：显示注视坐标
+  if (transformMode.value === 'l' && focusTargetId) {
+    const f = store.getFocusState(focusTargetId)
+    transformHint.modeName = '注视'
+    transformHint.axis = '无'
+    transformHint.x = f.x.toFixed(2)
+    transformHint.y = f.y.toFixed(2)
+    return
+  }
   const id = store.selectedId
   if (id && isFigureGroupId(id)) {
     // 立绘组：显示组中心
@@ -222,6 +236,47 @@ function refreshTransformHint() {
 }
 
 function startTransform(mode: TransformMode) {
+  // 注视模式（l）：仅 live2d 立绘支持，单独初始化
+  if (mode === 'l') {
+    const id = store.selectedId
+    const model = store.selectedModel
+    if (!id || !model || model.kind !== 'live2d') {
+      msg.warning('仅 Live2D 立绘支持注视调整')
+      return
+    }
+    const target = getTransformTarget()
+    if (!target) return
+
+    transformMode.value = mode
+    axisLock.value = 'none'
+    baseInitialized = false
+
+    // 快照当前注视状态（取消时完整复原，含 enabled）
+    focusTargetId = id
+    const cur = store.getFocusState(id)
+    focusSavedState = { ...cur }
+    // 自动启用注视
+    if (!cur.enabled) {
+      store.setFocusState(id, { enabled: true })
+    }
+
+    // 画注视方框（挂 wrapper 下，天然跟随模型 rts）
+    const half = FOCUS_BOX_SIZE / 2
+    focusBox = new PIXI.Graphics()
+    focusBox.lineStyle(4, 0x2f80ed, 0.9)
+    focusBox.drawRect(-half, -half, FOCUS_BOX_SIZE, FOCUS_BOX_SIZE)
+    focusBox.lineStyle(2, 0x2f80ed, 0.5)
+    focusBox.moveTo(-half, 0)
+    focusBox.lineTo(half, 0)
+    focusBox.moveTo(0, -half)
+    focusBox.lineTo(0, half)
+    target.addChild(focusBox)
+
+    emitter.emit(StageEvents.TransformStart, true)
+    refreshTransformHint()
+    return
+  }
+
   transformMode.value = mode
   axisLock.value = 'none'
   baseInitialized = false
@@ -354,6 +409,15 @@ function startTransform(mode: TransformMode) {
 }
 
 function cancelTransform() {
+  // 注视模式：复原快照（含 enabled）
+  if (transformMode.value === 'l') {
+    if (focusTargetId && focusSavedState) {
+      store.setFocusState(focusTargetId, { ...focusSavedState })
+    }
+    cleanupFocusMode()
+    return
+  }
+
   const id = store.selectedId
   if (id && isFigureGroupId(id)) {
     // 立绘组：还原每个 target 到 startTransform 前的 rts（其 parent 未变）
@@ -393,6 +457,12 @@ function cancelTransform() {
 }
 
 function endTransform() {
+  // 注视模式结束：仅清理，保留当前注视值
+  if (transformMode.value === 'l') {
+    cleanupFocusMode()
+    return
+  }
+
   const id = store.selectedId
   if (id && isFigureGroupId(id)) {
 
@@ -428,6 +498,49 @@ function endTransform() {
   }
   refreshTransformHint()
   updateFigureGroupCrosshair()
+}
+
+/** 清理注视模式：销毁方框并复位模式状态（不改动注视值） */
+function cleanupFocusMode() {
+  if (focusBox) {
+    focusBox.destroy()
+    focusBox = null
+  }
+  focusTargetId = null
+  focusSavedState = null
+  transformMode.value = 'none'
+  axisLock.value = 'none'
+  baseInitialized = false
+  emitter.emit(StageEvents.TransformStart, false)
+  refreshTransformHint()
+}
+
+/**
+ * 注视模式：把鼠标位置经 wrapper toLocal 映射到 [-1,1]（自动含模型 rts）。
+ * y 取反：focus 参数向上为正（与 FocusPicker 一致）。
+ */
+function applyFocusFromPointer(clientX: number, clientY: number) {
+  if (!app || !focusTargetId) return
+  const wrapper = previewRuntime.modelWrappers.get(focusTargetId)
+  if (!wrapper) return
+
+  const canvas = app.view as HTMLCanvasElement
+  const rect = canvas.getBoundingClientRect()
+  if (rect.width === 0 || rect.height === 0) return
+  const px = (clientX - rect.left) * (app.screen.width / rect.width)
+  const py = (clientY - rect.top) * (app.screen.height / rect.height)
+
+  const local = wrapper.toLocal(new PIXI.Point(px, py))
+  const half = FOCUS_BOX_SIZE / 2
+  // 中心→鼠标线段与方框边界的交点（框内即鼠标本身，框外取边交点）
+  const k = Math.min(half / Math.max(Math.abs(local.x), Math.abs(local.y)), 1)
+  const nx = (local.x * k) / half
+  const ny = (-local.y * k) / half
+  store.setFocusState(focusTargetId, {
+    x: Math.round(nx * 100) / 100,
+    y: Math.round(ny * 100) / 100,
+  })
+  refreshTransformHint()
 }
 
 interface MouseHint { keys: string; description: string }
@@ -504,7 +617,7 @@ const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
 const MOUSE_HINTS_BY_TYPE: Record<ReturnType<typeof resolveShortcutTargetType>, MouseHint[]> = {
   background: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
   stage: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
-  model: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
+  model: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}, {keys: '注视操作', description: 'L-鼠标调整注视方向'}],
   figureGroup: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转（按组中心）'}],
   none: [],
 }
@@ -1151,6 +1264,12 @@ function attachDomHandlers() {
     if (isTransforming.value) {
       if (!rootContainer) return
 
+      // 注视模式：鼠标位置映射到方框内的 [-1,1]
+      if (transformMode.value === 'l') {
+        applyFocusFromPointer(e.clientX, e.clientY)
+        return
+      }
+
       // 立绘组：按"组中心为基准"应用 GRS 到所有目标
       if (isCurrentFigureGroup()) {
         handleFigureGroupPointerMove(e)
@@ -1409,8 +1528,8 @@ function attachDomHandlers() {
     // 输入框焦点时不响应变换快捷键
     if (isInputFocused()) return
 
-    // g / s / r 进入变换模式
-    if (e.key === 'g' || e.key === 's' || e.key === 'r') {
+    // g / s / r / l 进入变换模式（l = 注视）
+    if (e.key === 'g' || e.key === 's' || e.key === 'r' || e.key === 'l') {
       if (!store.selectedId) return
       if (transformMode.value === e.key) {
         // 按同键：取消并回滚
@@ -1423,6 +1542,14 @@ function attachDomHandlers() {
         startTransform(e.key as TransformMode)
       }
       e.preventDefault()
+      return
+    }
+
+    // 注视模式下：屏蔽轴锁定 / 其它模式切换（l 键已在上面处理）
+    if (transformMode.value === 'l') {
+      if (e.key === 'x' || e.key === 'y' || e.key === 'g' || e.key === 's' || e.key === 'r') {
+        e.preventDefault()
+      }
       return
     }
 

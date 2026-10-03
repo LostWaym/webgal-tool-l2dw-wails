@@ -12,6 +12,9 @@ import type { ColorPickerTarget } from '../composables/useColorPickerModal'
 export const STAGE_WIDTH = 2560
 export const STAGE_HEIGHT = 1440
 
+// 注视模式（l 快捷键）方框边长（舞台单位，受模型缩放影响）
+export const FOCUS_BOX_SIZE = 512
+
 // Cubism 4 core (moc3) 内存池预留大小，须 >16MB，且须在加载任何模型前调用
 export const CUBISM_CORE_MEMORY = 256 * 1024 * 1024
 

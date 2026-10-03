@@ -12,15 +12,11 @@ const bgHistoryModal = useBackgroundHistoryModal()
 const dragFromIndex = ref<number | null>(null)
 
 async function onAdd() {
-  await store.add()
+  await store.addFromPicker()
 }
 
 async function onAddImage() {
   await store.addImageFigure()
-}
-
-async function onLoadWmdl() {
-  await store.loadWmdl()
 }
 
 function onAddFigureGroup() {
@@ -95,7 +91,6 @@ function onDragEnd() {
     <header class="model-list__header">
       <button class="add-btn" @click="onAdd">加载模型</button>
       <button class="add-btn" @click="onAddImage">加载图片</button>
-      <button class="add-btn" @click="onLoadWmdl">加载 Wmdl</button>
     </header>
     <header class="model-list__header model-list__header--secondary">
       <button class="add-btn add-btn--group" @click="onAddFigureGroup">新建立绘组</button>

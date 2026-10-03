@@ -240,6 +240,20 @@ func (a *App) PickLive2DModel() (string, error) {
 	)
 }
 
+// PickLive2DModelOrWmdl opens a native file dialog accepting both Live2D
+// descriptor json and .wmdl files. Returns the absolute path, or "" if cancelled.
+func (a *App) PickLive2DModelOrWmdl() (string, error) {
+	return a.runPicker(
+		runtime.OpenDialogOptions{
+			Title: "Select Live2D Model / WMDL File",
+			Filters: []runtime.FileFilter{
+				{DisplayName: "Live2D Model / WMDL", Pattern: "*.json;*.wmdl"},
+			},
+		},
+		slotModel, pickerFile,
+	)
+}
+
 // PickImageFile opens a native file dialog for choosing an image file.
 // Returns the absolute path the user picked, or "" if cancelled.
 func (a *App) PickImageFile() (string, error) {

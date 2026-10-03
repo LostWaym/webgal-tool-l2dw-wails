@@ -59,8 +59,15 @@ const TAB_CONFIGS: Record<TabKey, TabConfig> = {
   figureInfo: { key: 'figureInfo', label: '立绘信息' },
   figureGroupInfo: { key: 'figureGroupInfo', label: '立绘组信息' },
 }
-const motionSearch = ref('')
-const expressionSearch = ref('')
+// 搜索词持久化在 store 中，操作区关闭后仍保留
+const motionSearch = computed({
+  get: () => store.motionSearch,
+  set: (v: string) => { store.motionSearch = v },
+})
+const expressionSearch = computed({
+  get: () => store.expressionSearch,
+  set: (v: string) => { store.expressionSearch = v },
+})
 const motionCollapsed = ref(false)
 const expressionCollapsed = ref(false)
 const panelWidth = ref(280)
@@ -725,6 +732,53 @@ async function playRandomExpression() {
   expressionScroll.scrollToItem(item.index)
 }
 
+// 瞬时滚动到当前播放的动作/表情项
+async function scrollToCurrent(type: 'motion' | 'expression') {
+  if (type === 'motion') {
+    const playing = currentState.value?.motion
+    if (!playing) {
+      msg.info('当前没有播放中的动作')
+      return
+    }
+    if (motionCollapsed.value) motionCollapsed.value = false
+    await nextTick()
+    motionScroll.scrollToItem(`${playing.group}_${playing.index}`, { immediate: true })
+  } else {
+    const playing = currentState.value?.expression
+    if (!playing) {
+      msg.info('当前没有播放中的表情')
+      return
+    }
+    if (expressionCollapsed.value) expressionCollapsed.value = false
+    await nextTick()
+    expressionScroll.scrollToItem(playing.index, { immediate: true })
+  }
+}
+
+// 瞬时滚动到当前播放项（列表已渲染才有 data-key，故需 nextTick）
+function scrollToPlayingIfNeeded() {
+  const id = store.selectedId
+  if (!id || activeTab.value !== 'motionExpression') return
+  const entry = store.models.find((m) => m.id === id)
+  if (!entry || entry.kind === 'image') return
+  if (isSpecialId(id) || isFigureGroupId(id)) return
+  nextTick(() => {
+    const playing = currentState.value
+    if (playing?.motion && !motionCollapsed.value && !motionScroll.isDragging.value) {
+      motionScroll.scrollToItem(`${playing.motion.group}_${playing.motion.index}`, { immediate: true })
+    }
+    if (playing?.expression && !expressionCollapsed.value && !expressionScroll.isDragging.value) {
+      expressionScroll.scrollToItem(playing.expression.index, { immediate: true })
+    }
+  })
+}
+
+// 选中立绘或切到动作/表情页签时触发
+watch([() => store.selectedId, activeTab], scrollToPlayingIfNeeded, { immediate: true })
+
+// 操作区重开后列表异步填充完成，列表数据变化时再触发一次
+watch([motions, expressions], scrollToPlayingIfNeeded)
+
 // 拖拽宽度
 function onDragStart(e: MouseEvent) {
   e.preventDefault()
@@ -866,6 +920,14 @@ function onLabelDragEnd() {
           <button
             type="button"
             class="list-region-shuffle"
+            title="滚动到当前播放的动作"
+            @click="scrollToCurrent('motion')"
+          >
+            当前
+          </button>
+          <button
+            type="button"
+            class="list-region-shuffle"
             title="随机播放动作"
             @click="playRandomMotion"
           >
@@ -907,6 +969,14 @@ function onLabelDragEnd() {
       <div class="panel__list-region" :class="{ 'is-collapsed': expressionCollapsed }">
         <div class="list-region-header">
           <span class="list-region-title">表情</span>
+          <button
+            type="button"
+            class="list-region-shuffle"
+            title="滚动到当前播放的表情"
+            @click="scrollToCurrent('expression')"
+          >
+            当前
+          </button>
           <button
             type="button"
             class="list-region-shuffle"

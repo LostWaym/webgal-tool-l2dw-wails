@@ -4,6 +4,7 @@ import { isSpecialId, getSpecialName } from '../../../live2d/specialIds'
 import { useModelStore } from '../../../stores/previewStore'
 import type { TransformSnapshot } from '../../../stores/previewStore'
 import { useTransformSnapshotModal } from '../../../composables/useTransformSnapshotModal'
+import { useMessage } from '../../../composables/useMessage'
 
 /**
  * 变换快照模态。
@@ -23,6 +24,7 @@ import { useTransformSnapshotModal } from '../../../composables/useTransformSnap
 
 const { state, close } = useTransformSnapshotModal()
 const store = useModelStore()
+const msg = useMessage()
 
 // 列表项展示辅助：保留最多 3 位小数（去掉无意义的尾零）
 function fmt3(n: number): string {
@@ -101,6 +103,30 @@ function onEditKey(e: KeyboardEvent) {
     cancelEdit()
   }
 }
+
+async function onSave() {
+  try {
+    const ok = await store.exportTransformSnapshots()
+    if (ok) msg.success('变换快照已保存')
+  } catch (err) {
+    msg.error(`保存失败：${err}`)
+  }
+}
+
+async function onLoad() {
+  try {
+    const count = await store.importTransformSnapshots()
+    if (count > 0) msg.success(`已导入 ${count} 个快照`)
+  } catch (err) {
+    msg.error(`读取失败：${err}`)
+  }
+}
+
+function onClearAll() {
+  if (store.transformSnapshots.length === 0) return
+  if (!window.confirm('确定清空当前所有的变换快照？')) return
+  store.clearTransformSnapshots()
+}
 </script>
 
 <template>
@@ -113,6 +139,15 @@ function onEditKey(e: KeyboardEvent) {
               变换快照
               <span class="snapshot-modal__subtitle" v-if="selectedName">（{{ selectedName }}）</span>
             </h2>
+            <div class="snapshot-modal__toolbar">
+              <button class="toolbar-btn" @click="onSave">保存</button>
+              <button class="toolbar-btn" @click="onLoad">读取</button>
+              <button
+                class="toolbar-btn toolbar-btn--danger"
+                :disabled="store.transformSnapshots.length === 0"
+                @click="onClearAll"
+              >清空</button>
+            </div>
             <button class="icon-btn" aria-label="关闭" @click="onMaskClick">×</button>
           </header>
 
@@ -220,6 +255,41 @@ function onEditKey(e: KeyboardEvent) {
   font-weight: 400;
   color: #b0b8c4;
   margin-left: 4px;
+}
+
+.snapshot-modal__toolbar {
+  display: flex;
+  gap: 6px;
+  margin-right: 10px;
+}
+
+.toolbar-btn {
+  padding: 4px 12px;
+  background-color: rgba(44, 49, 58, 0.7);
+  border: 1px solid rgba(60, 68, 80, 0.7);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.toolbar-btn:hover {
+  background-color: rgba(53, 60, 71, 0.9);
+}
+
+.toolbar-btn--danger {
+  border-color: rgba(90, 48, 48, 0.8);
+  color: #ffd9d9;
+}
+
+.toolbar-btn--danger:hover {
+  background-color: rgba(74, 31, 31, 0.85);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .icon-btn {

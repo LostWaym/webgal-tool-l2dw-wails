@@ -479,6 +479,35 @@ func (a *App) SaveWmdlFileDialog() (string, error) {
 	})
 }
 
+// PickTransformSnapshotFile opens a native file dialog for choosing a
+// transform snapshot json file. Returns the chosen path, or an empty string
+// if the user cancelled.
+func (a *App) PickTransformSnapshotFile() (string, error) {
+	return a.runPicker(
+		runtime.OpenDialogOptions{
+			Title: "选择变换快照文件",
+			Filters: []runtime.FileFilter{
+				{DisplayName: "JSON File", Pattern: "*.json"},
+			},
+		},
+		"transformSnapshot", pickerFile,
+	)
+}
+
+// SaveTransformSnapshotFileDialog opens a native save dialog for selecting the
+// destination of a transform snapshot json file. Returns the chosen path, or
+// an empty string if the user cancelled.
+func (a *App) SaveTransformSnapshotFileDialog() (string, error) {
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:                "保存变换快照",
+		DefaultFilename:      "transform_snapshots.json",
+		CanCreateDirectories: true,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSON File", Pattern: "*.json"},
+		},
+	})
+}
+
 // ReadWmdlFile reads the contents of a wmdl file.
 func (a *App) ReadWmdlFile(path string) (string, error) {
 	data, err := os.ReadFile(path)

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { Live2DModel, MotionPriority, baseBlinkParam } from 'pixi-live2d-display-webgal'
-import { PickLive2DModel, PickWmdlFile, ReadWmdlFile, SaveWmdlFile, GetFileModifyTime, PickImageFile } from '../../wailsjs/go/main/App'
+import { PickLive2DModel, PickWmdlFile, ReadWmdlFile, SaveWmdlFile, GetFileModifyTime, PickImageFile, ReadTextFile, WriteTextFile, PickTransformSnapshotFile, SaveTransformSnapshotFileDialog } from '../../wailsjs/go/main/App'
 import { pathDirname, pathRelative } from '../path_utils'
 import { parseWmdlJson } from '../utils/wmdlUtils'
 import { deriveNameFromPath } from '../utils/wmdlUtils'
@@ -132,6 +132,9 @@ export interface BlinkState {
 export const DEFAULT_BLINK_STATE: BlinkState = {
   enabled: false,
   ...baseBlinkParam,
+  // 覆盖库默认值
+  blinkInterval: 5000,
+  blinkIntervalRandom: 2000,
 }
 
 export interface ModelEntry {
@@ -192,6 +195,10 @@ export const useModelStore = defineStore('models', {
   state: () => ({
     models: [] as ModelEntry[],
     figureGroups: [] as FigureGroupEntry[],
+    /** 动作页签搜索词（组件卸载后仍保留） */
+    motionSearch: '',
+    /** 表情页签搜索词（组件卸载后仍保留） */
+    expressionSearch: '',
     selectedId: null as string | null,
     backgroundUrl: null as string | null,
     bgTemplate: DEFAULT_BG_TEMPLATE,
@@ -595,6 +602,46 @@ export const useModelStore = defineStore('models', {
     renameTransformSnapshot(id: string, name: string): void {
       const snap = this.transformSnapshots.find((s) => s.id === id)
       if (snap) snap.name = name
+    },
+
+    /** 导出全部快照到 json 文件；用户取消返回 false */
+    async exportTransformSnapshots(): Promise<boolean> {
+      if (this.transformSnapshots.length === 0) return false
+      const path = await SaveTransformSnapshotFileDialog()
+      if (!path) return false
+      const content = JSON.stringify({ version: 1, snapshots: this.transformSnapshots }, null, 2)
+      await WriteTextFile(path, content)
+      return true
+    },
+
+    /** 从 json 文件追加导入快照；返回导入数量（0 = 取消或内容无效） */
+    async importTransformSnapshots(): Promise<number> {
+      const path = await PickTransformSnapshotFile()
+      if (!path) return 0
+      const content = await ReadTextFile(path)
+      const parsed = JSON.parse(content)
+      const list = Array.isArray(parsed?.snapshots) ? parsed.snapshots : Array.isArray(parsed) ? parsed : null
+      if (!list) return 0
+      const imported: TransformSnapshot[] = []
+      for (const raw of list) {
+        if (typeof raw?.name !== 'string' || typeof raw?.x !== 'number' || typeof raw?.y !== 'number') continue
+        if (typeof raw?.rotation !== 'number' || typeof raw?.scale?.x !== 'number' || typeof raw?.scale?.y !== 'number') continue
+        imported.push({
+          id: typeof raw.id === 'string' && raw.id ? raw.id : crypto.randomUUID(),
+          name: raw.name,
+          x: raw.x,
+          y: raw.y,
+          scale: { x: raw.scale.x, y: raw.scale.y },
+          rotation: raw.rotation,
+        })
+      }
+      this.transformSnapshots.push(...imported)
+      return imported.length
+    },
+
+    /** 清空全部快照 */
+    clearTransformSnapshots(): void {
+      this.transformSnapshots = []
     },
 
     /** 缓存当前选中模型的变换（模态打开时调用） */

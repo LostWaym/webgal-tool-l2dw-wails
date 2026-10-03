@@ -75,7 +75,7 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
   // 滚动容器内通过 [data-key] 定位项并滚到视口（默认居中、平滑滚动）。
   function scrollToItem(
     key: string | number,
-    opts?: { block?: ScrollLogicalPosition; behavior?: ScrollBehavior },
+    opts?: { block?: ScrollLogicalPosition; behavior?: ScrollBehavior; immediate?: boolean },
   ) {
     stopInertia()
     const el = containerRef.value
@@ -84,7 +84,7 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
     if (!target || target.classList.contains('list-item--empty')) return
     target.scrollIntoView({
       block: opts?.block ?? 'center',
-      behavior: opts?.behavior ?? 'smooth',
+      behavior: opts?.immediate ? 'auto' : opts?.behavior ?? 'smooth',
     })
   }
 

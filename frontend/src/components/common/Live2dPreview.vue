@@ -514,6 +514,35 @@ defineExpose({
   getLoadedModels(): Live2DModel[] {
     return [...subModels]
   },
+  /**
+   * 抓取当前预览视口（app.view）画面到不透明底色的离屏 canvas。
+   * 目标尺寸由 targetW/targetH 指定（等比缩放由调用方算好传入）；
+   * 抓帧前先手动 render 一次，保证参数写入后画面即时生效。
+   */
+  captureViewportFrame(bgColor: string, targetW: number, targetH: number): HTMLCanvasElement | null {
+    if (!app) return null
+    try {
+      app.renderer.render(app.stage)
+    } catch (e) {
+      console.warn('captureViewportFrame render error:', e)
+      return null
+    }
+    const view = app.view as HTMLCanvasElement
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(targetW))
+    canvas.height = Math.max(1, Math.round(targetH))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.fillStyle = bgColor
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(view, 0, 0, canvas.width, canvas.height)
+    return canvas
+  },
+  /** 当前视口画布的实际像素尺寸（含 devicePixelRatio）。 */
+  getViewportPixelSize(): { width: number; height: number } | null {
+    if (!app) return null
+    return { width: app.renderer.width, height: app.renderer.height }
+  },
 })
 </script>
 

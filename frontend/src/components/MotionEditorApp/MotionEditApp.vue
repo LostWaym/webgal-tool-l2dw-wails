@@ -12,6 +12,7 @@ import MotionStage from './MotionStage.vue'
 import MotionTrackPanel from './MotionTrackPanel.vue'
 import FrameSettingsModal from './FrameSettingsModal.vue'
 import MotionExportModal from './MotionExportModal.vue'
+import MotionGifRenderModal from './MotionGifRenderModal.vue'
 import MessageHost from '../common/MessageHost.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
@@ -25,6 +26,7 @@ import {
 import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
 import { useMotionExportModal } from '../../composables/useMotionExportModal'
+import { useMotionGifRenderModal } from '../../composables/useMotionGifRenderModal'
 import {
   PickLanimJsonFile,
   SaveLanimFileDialog,
@@ -40,8 +42,31 @@ const store = useMotionEditorStore()
 const msg = useMessage()
 const frameModal = useFrameSettingsModal()
 const exportModal = useMotionExportModal()
+const gifModal = useMotionGifRenderModal()
 
 const stageRef = ref<InstanceType<typeof MotionStage> | null>(null)
+
+// GIF 渲染抓帧桥接：转发 store 播放桥接 + Live2dPreview 抓帧能力给渲染模态。
+// 写参数后逐模型显式 update：模型视觉求值（deform/physics）只发生在 update 里，
+// ticker 驱动的 autoUpdate 与抓帧节奏无关，不手动 update 会抓到重复帧。
+watch(stageRef, (stage) => {
+  const preview = stage?.getPreview() ?? null
+  if (preview) {
+    gifModal.setBridge({
+      applyParameters: (params) => {
+        preview.applyParameters(params)
+        const FIXED_DT = 1000 / 60
+        for (const m of preview.getLoadedModels()) {
+          ;(m as any).update?.(FIXED_DT)
+        }
+      },
+      captureViewportFrame: (bg, w, h) => preview.captureViewportFrame(bg, w, h),
+      getViewportPixelSize: () => preview.getViewportPixelSize(),
+    })
+  } else {
+    gifModal.setBridge(null)
+  }
+})
 
 const wmdlName = computed(() => wmdlStore.currentWmdl.name || '未加载 wmdl')
 
@@ -282,6 +307,14 @@ async function onLoad() {
         {{ store.playhead }} / {{ store.lanim.durationFrames }}帧 ({{ (store.lanim.durationFrames / (store.lanim.fps || 60)).toFixed(2) }}s)
       </button>
       <button type="button" class="he-btn" @click="exportModal.open()">导出</button>
+      <button
+        type="button"
+        class="he-btn"
+        title="将当前动画渲染为 GIF 并导出"
+        @click="gifModal.open(store.lanim.durationFrames - 1)"
+      >
+        渲染
+      </button>
       <button type="button" class="he-btn" @click="onSave" :disabled="saving">保存</button>
       <button type="button" class="he-btn" @click="onSaveAs">另存为</button>
       <button type="button" class="he-btn" @click="onLoad">加载</button>
@@ -297,6 +330,7 @@ async function onLoad() {
     </div>
     <FrameSettingsModal />
     <MotionExportModal />
+    <MotionGifRenderModal />
     <MessageHost />
   </div>
 </template>

@@ -889,6 +889,40 @@ func (a *App) WriteTextFile(path string, content string) error {
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
+// SaveGifFileDialog opens a native save dialog for exporting a rendered GIF
+// animation. `defaultName` provides the suggested filename.
+func (a *App) SaveGifFileDialog(defaultName string) (string, error) {
+	opts := runtime.SaveDialogOptions{
+		Title:                "导出 GIF",
+		DefaultFilename:      "animation.gif",
+		CanCreateDirectories: true,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "GIF Animation", Pattern: "*.gif"},
+		},
+	}
+	if defaultName != "" {
+		opts.DefaultFilename = defaultName
+	}
+	return runtime.SaveFileDialog(a.ctx, opts)
+}
+
+// WriteBase64File decodes base64Data and writes the binary payload to an
+// arbitrary absolute path. Intended as a generic IO helper for writing binary
+// artifacts (e.g. rendered GIF) produced in the frontend.
+func (a *App) WriteBase64File(path string, base64Data string) error {
+	if path == "" {
+		return fmt.Errorf("WriteBase64File: path is empty")
+	}
+	payload, err := base64.StdEncoding.DecodeString(base64Data)
+	if err != nil {
+		return fmt.Errorf("WriteBase64File: decode base64 failed: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, payload, 0644)
+}
+
 // screenshotDir 返回截图保存目录的绝对路径。优先使用环境变量
 // L2DW_SCREENSHOTS_DIR 覆盖；否则相对于可执行文件所在目录下的 screenshots
 // 解析；解析失败时回退到当前工作目录下的 screenshots。

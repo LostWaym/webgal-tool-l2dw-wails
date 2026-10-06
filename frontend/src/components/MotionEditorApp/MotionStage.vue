@@ -60,6 +60,9 @@ defineExpose({
   applyParameters(params: Array<{ id: string; val: number; calc: ParamCalc }>) {
     previewRef.value?.applyParameters(params)
   },
+  getPreview() {
+    return previewRef.value
+  },
 })
 </script>
 

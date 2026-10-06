@@ -27,7 +27,8 @@
 | 播放头 / 时间轴线 | 红色竖线覆盖层，不随滚动 | `MotionTrackPanel.vue` 覆盖层 |
 | 帧设置模态 | fps / 时长（帧）编辑，截帧风险确认 | `FrameSettingsModal.vue` + `useFrameSettingsModal.ts` |
 | 导出模态 | 动作导出：格式（.mtn / .motion3.json）、名称、fade 时长、压缩输出 | `MotionExportModal.vue` + `useMotionExportModal.ts` |
-| 主 header | 顶部工具栏：播放/暂停（合并单按钮）、停止、当前帧显示（可点击开模态）、导出、保存/另存/加载 | `MotionEditApp.vue` |
+| 渲染模态 | GIF 渲染导出：输出 fps（决定采样步长）、帧范围、尺寸（视口倍率/固定宽度）、底色、循环、色数、帧间差分 | `MotionGifRenderModal.vue` + `useMotionGifRenderModal.ts` + `utils/gifRender.ts` |
+| 主 header | 顶部工具栏：播放/暂停（合并单按钮）、停止、当前帧显示（可点击开模态）、导出、渲染、保存/另存/加载 | `MotionEditApp.vue` |
 | 参数预设下拉 | 搜索栏旁「预设 ▾」，按正则批量筛选参数显示（与搜索关键字共同筛选） | `MotionTrackPanel.vue` 搜索行，预设目录 `assets/motion_part_presets` |
 
 ## 交互速查
@@ -85,6 +86,17 @@
 - 确认后 `SaveMotionExportFileDialog(defaultName)`（Filter `*.mtn;*.motion3.json`）选路径 + `WriteTextFile` 写入
 - 生成规则：逐帧采样（`sampleTrack`）——mtn 输出值序列（全帧同值仅单值常量）；motion3 每轨道一条 `Parameter` 曲线、线性段（type 0），Meta 计数实算
 - **格式规格与 lanim 映射详见 `MOTION_FORMAT.md`**；paramId 原样输出，跨 Cubism 版本喂模型时注意 ID 体系（`PARAM_X` vs `ParamX`）
+
+## GIF 渲染
+
+- 入口：主 header「渲染」按钮 → 渲染模态；完成后 `SaveGifFileDialog` 选路径 + `WriteBase64File` 落盘（GIF 二进制，不走 WriteTextFile）
+- 输出 fps 语义 = 采样密度：步长 = `animFps / outFps`，采样帧数 = `ceil(durationFrames / 步长)`，每帧 delay = `1000 / outFps`，总时长与原动画一致（如 60fps/180帧 输出 12fps → 步长 5 → 36 帧 / 3 秒）
+- 取景 = 预览视口（所见即所得，含用户平移缩放）；尺寸支持视口倍率 / 固定宽度二选一，等比输出
+- 编码用 `gifenc`（非 gif.js）：全动画共享一个调色板（均匀抽至多 8 帧构建，预留 1 个透明索引位）+ 完全重复帧去重（delay 累加）+ 帧间差分（未变化像素写透明索引，dispose=1 露出上一帧；模态可关）
+- 色数下拉 256/128/64/32（默认 128），越少体积越小
+- 抓帧链路：`sampleLanim` → 写参数 → **逐模型 `model.update(1000/60)`**（关键！模型视觉求值只发生在 update 里，ticker 的 autoUpdate 与抓帧节奏无关，不手动 update 会抓到重复帧）→ `captureViewportFrame`（手动 render + 不透明底色重绘到离屏 canvas）
+- 抓帧桥接：`MotionEditApp` watch stageRef 注册到 `useMotionGifRenderModal` 的 bridge（applyParameters / captureViewportFrame / getViewportPixelSize）；`Live2dPreview` expose `captureViewportFrame` / `getViewportPixelSize`，`MotionStage` expose `getPreview()`
+- Go 绑定：`SaveGifFileDialog(defaultName)` + `WriteBase64File(path, base64)`（app.go，通用二进制落盘）
 
 ## 气泡消息
 

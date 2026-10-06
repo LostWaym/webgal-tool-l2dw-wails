@@ -11,6 +11,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import MotionStage from './MotionStage.vue'
 import MotionTrackPanel from './MotionTrackPanel.vue'
 import FrameSettingsModal from './FrameSettingsModal.vue'
+import MotionExportModal from './MotionExportModal.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import {
@@ -21,6 +22,7 @@ import {
 } from '../../stores/motionEditor'
 import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
+import { useMotionExportModal } from '../../composables/useMotionExportModal'
 import {
   SaveModelJsonFileDialog,
   SaveModelJsonFile,
@@ -32,6 +34,7 @@ const wmdlStore = useWmdlModelEditorStore()
 const store = useMotionEditorStore()
 const msg = useMessage()
 const frameModal = useFrameSettingsModal()
+const exportModal = useMotionExportModal()
 
 const stageRef = ref<InstanceType<typeof MotionStage> | null>(null)
 
@@ -213,6 +216,7 @@ async function onLoad() {
       >
         {{ store.playhead }} / {{ store.lanim.durationFrames }}帧 ({{ (store.lanim.durationFrames / (store.lanim.fps || 60)).toFixed(2) }}s)
       </button>
+      <button type="button" class="he-btn" @click="exportModal.open()">导出</button>
       <button type="button" class="he-btn" @click="onSave" :disabled="saving">保存</button>
       <button type="button" class="he-btn" @click="onSaveAs">另存为</button>
       <button type="button" class="he-btn" @click="onLoad">加载</button>
@@ -227,6 +231,7 @@ async function onLoad() {
       </div>
     </div>
     <FrameSettingsModal />
+    <MotionExportModal />
   </div>
 </template>
 

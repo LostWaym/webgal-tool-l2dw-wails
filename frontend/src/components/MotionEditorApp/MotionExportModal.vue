@@ -24,7 +24,7 @@ watch(
   (v) => {
     if (v) {
       nameText.value = store.lanim.name || 'untitled'
-      fadeInText.value = '0'
+      fadeInText.value = '1000'
       fadeOutText.value = '1000'
       minify.value = false
     }

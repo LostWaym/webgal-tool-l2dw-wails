@@ -20,6 +20,7 @@ import {
   sampleLanim,
   parseLanimJson,
   normalizeLanim,
+  restoreParamDefaults,
 } from '../../stores/motionEditor'
 import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
@@ -29,7 +30,9 @@ import {
   SaveLanimFileDialog,
   SaveModelJsonFile,
   ReadTextFile,
+  EnsureDirAndOpenInExplorer,
 } from '../../../wailsjs/go/main/App'
+import { pathBasename, pathDirname } from '../../path_utils'
 import type { ParamCalc } from '../../stores/wmdlTypes'
 
 const wmdlStore = useWmdlModelEditorStore()
@@ -41,6 +44,40 @@ const exportModal = useMotionExportModal()
 const stageRef = ref<InstanceType<typeof MotionStage> | null>(null)
 
 const wmdlName = computed(() => wmdlStore.currentWmdl.name || '未加载 wmdl')
+
+// ── wmdl 文件指示按钮：点击打开所在文件夹 ──────────────────────────────────
+
+const wmdlFilePath = computed(() => wmdlStore.currentWmdl.wmdlFilePath ?? null)
+
+async function onOpenWmdlDir() {
+  if (!wmdlFilePath.value) {
+    msg.info('当前 wmdl 未关联文件')
+    return
+  }
+  try {
+    await EnsureDirAndOpenInExplorer(pathDirname(wmdlFilePath.value))
+  } catch (err) {
+    msg.error(`打开文件夹失败：${err}`)
+  }
+}
+
+// ── lanim 文件指示按钮：点击打开所在文件夹 ─────────────────────────────────
+
+const lanimName = computed(() =>
+  store.lanimFilePath ? pathBasename(store.lanimFilePath) : '未加载',
+)
+
+async function onOpenLanimDir() {
+  if (!store.lanimFilePath) {
+    msg.info('尚未加载动画文件')
+    return
+  }
+  try {
+    await EnsureDirAndOpenInExplorer(pathDirname(store.lanimFilePath))
+  } catch (err) {
+    msg.error(`打开文件夹失败：${err}`)
+  }
+}
 
 // ── 三栏布局：预览区固定宽度，时间轴吸收全部伸缩量 ─────────────────────────
 
@@ -123,6 +160,15 @@ watch(
   },
 )
 
+/** 关键帧变动（拖动/插帧/删帧）→ 非播放态下重新采样当前帧刷新预览。 */
+watch(
+  () => store.lanim.tracks,
+  () => {
+    if (!store.playing) applySampled(store.playhead)
+  },
+  { deep: true },
+)
+
 onBeforeUnmount(() => {
   cancelAnimationFrame(rafId)
   store.applier = null
@@ -185,6 +231,8 @@ async function onLoad() {
       msg.error('文件不是有效的 lanim 动画文件')
       return
     }
+    // 换文件前把旧轨道的动画残留值恢复为参数默认值
+    restoreParamDefaults(store.lanim.tracks.map((tr) => tr.paramId))
     store.lanim = lanim
     store.lanimFilePath = picked
     store.playhead = 0
@@ -199,8 +247,23 @@ async function onLoad() {
   <div class="motion-editor">
     <div class="motion-editor__header">
       <span class="motion-editor__title">动作编辑器</span>
-      <span class="motion-editor__wmdl" :title="wmdlName">{{ wmdlName }}</span>
+      <button
+        type="button"
+        class="motion-editor__wmdl"
+        :title="wmdlFilePath ?? '当前 wmdl 未关联文件'"
+        @click="onOpenWmdlDir"
+      >
+        {{ wmdlName }}
+      </button>
       <span class="motion-editor__spacer" />
+      <button
+        type="button"
+        class="motion-editor__time motion-editor__lanim"
+        :title="store.lanimFilePath ?? '未加载动画文件'"
+        @click="onOpenLanimDir"
+      >
+        {{ lanimName }}
+      </button>
       <button
         type="button"
         class="he-btn"
@@ -270,8 +333,19 @@ async function onLoad() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  padding: 4px 10px;
+  background: #2c313a;
+  border: 1px solid #3a4150;
+  border-radius: 4px;
   color: #8a93a3;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.motion-editor__wmdl:hover {
+  border-color: #2f80ed;
+  color: #5fa8ff;
 }
 
 .motion-editor__spacer {
@@ -294,6 +368,12 @@ async function onLoad() {
 .motion-editor__time:hover {
   border-color: #2f80ed;
   color: #5fa8ff;
+}
+
+.motion-editor__lanim {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .he-btn {

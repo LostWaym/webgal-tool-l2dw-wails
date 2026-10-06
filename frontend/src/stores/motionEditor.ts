@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import { listParameters, writeParameter } from '../live2d/coreAdapter'
+import { useWmdlModelEditorStore } from './wmdlModelEditor'
 
 /** 关键帧插值方式（全局，不存进 lanim 文件），可改为 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'。 */
 export type InterpKind = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'
@@ -130,8 +132,26 @@ export function parseLanimJson(text: string): LanimFile | null {
   })
 }
 
-interface MotionEditorState {
-  lanim: LanimFile
+/**
+ * 把参数恢复为模型默认值（listParameters 的 value 双核均为 defaultValue），
+ * 用于轨道被删空/移除后清掉动画残留值。同步 liveValues 让行头立即反映。
+ */
+export function restoreParamDefaults(paramIds: string[]) {
+  if (!paramIds.length) return
+  const wmdlStore = useWmdlModelEditorStore()
+  const modelId = wmdlStore.selectedModelId
+  if (!modelId) return
+  const entries = listParameters(modelId)
+  for (const id of paramIds) {
+    const e = entries.find((p) => p.id === id)
+    if (!e) continue
+    writeParameter(modelId, id, e.value)
+    const store = useMotionEditorStore()
+    store.liveValues[id] = e.value
+  }
+}
+
+interface MotionEditorState {  lanim: LanimFile
   /** 当前编辑的 wmdl 关联的动画文件路径；保存过则为绝对路径。 */
   lanimFilePath: string | null
   selectedTrackId: string | null
@@ -182,8 +202,10 @@ export const useMotionEditorStore = defineStore('motionEditor', {
       this.lanim.tracks.push({ paramId, keys: [] })
     },
     removeTrack(paramId: string) {
+      const existed = this.lanim.tracks.some((tr) => tr.paramId === paramId)
       this.lanim.tracks = this.lanim.tracks.filter((tr) => tr.paramId !== paramId)
       if (this.selectedTrackId === paramId) this.selectedTrackId = null
+      if (existed) restoreParamDefaults([paramId])
     },
     /** 按 paramOrder（参数列表显示顺序）同步轨道顺序，保证行头与车道一一平齐。 */
     sortTracksByParamOrder(paramOrder: string[]) {
@@ -235,6 +257,8 @@ export const useMotionEditorStore = defineStore('motionEditor', {
       })
       if (bestIdx < 0) return false
       track.keys.splice(bestIdx, 1)
+      // 删到没有帧数据：轨道无意义，恢复参数默认值清掉动画残留
+      if (!track.keys.length) restoreParamDefaults([paramId])
       return true
     },
     /** 拖动关键帧：把轨道上 fromFrame 的帧移动到 toFrame（帧吸附，目标帧被占则不动）。 */
@@ -258,17 +282,21 @@ export const useMotionEditorStore = defineStore('motionEditor', {
       const newFps = Math.max(1, Math.round(fps))
       const newDur = Math.max(1, Math.round(durationFrames))
       let removed = 0
+      const emptied: string[] = []
       for (const track of this.lanim.tracks) {
         const before = track.keys.length
         track.keys = track.keys.filter((k) => k.frame <= newDur)
         removed += before - track.keys.length
+        if (before > 0 && !track.keys.length) emptied.push(track.paramId)
       }
+      if (emptied.length) restoreParamDefaults(emptied)
       this.lanim.fps = newFps
       this.lanim.durationFrames = newDur
       this.playhead = Math.min(this.playhead, newDur)
       return removed
     },
     reset() {
+      restoreParamDefaults(this.lanim.tracks.map((tr) => tr.paramId))
       this.lanim = createDefaultLanim()
       this.lanimFilePath = null
       this.selectedTrackId = null

@@ -41,6 +41,8 @@ const props = withDefaults(
     showCalcSwitch?: boolean
     /** 当前 calc 类型。默认 'set'。 */
     calcType?: ParamCalc
+    /** 禁用交互（拖动/编辑），仅展示。默认 false。 */
+    disabled?: boolean
   }>(),
   {
     precision: 3,
@@ -48,6 +50,7 @@ const props = withDefaults(
     showReset: false,
     showCalcSwitch: false,
     calcType: 'set',
+    disabled: false,
   },
 )
 
@@ -95,6 +98,7 @@ const fillRatio = computed(() => {
 })
 
 function onPointerDown(e: PointerEvent) {
+  if (props.disabled) return
   // 进入输入态时让 input 自身处理点击，避免触发拖拽
   if (isEditing.value) return
   e.preventDefault()
@@ -129,6 +133,7 @@ function onPointerUp(e: PointerEvent) {
 }
 
 async function startEdit() {
+  if (props.disabled) return
   if (isDragging.value) return
   isEditing.value = true
   editingText.value = format(props.modelValue)
@@ -151,7 +156,7 @@ function cancelEdit() {
 </script>
 
 <template>
-  <div class="range-card" :class="{ 'is-dragging': isDragging, 'is-highlight': props.highlight }">
+  <div class="range-card" :class="{ 'is-dragging': isDragging, 'is-highlight': props.highlight, 'is-disabled': props.disabled }">
     <!-- 重置按钮：绝对定位脱离 flex 流，按钮显隐不改变卡片尺寸 -->
     <button
       v-show="showReset"
@@ -237,6 +242,15 @@ function cancelEdit() {
 
 .range-card.is-highlight {
   border-color: #2f80ed;
+}
+
+.range-card.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.range-card.is-disabled .range-card__track {
+  cursor: not-allowed;
 }
 
 /* 未高亮时（即无 override）整体降饱和，让"未改 vs 已改"一眼可辨 */

@@ -14,10 +14,14 @@ function fmtNum(n: number): string {
   return s.replace(/\.?0+$/, '')
 }
 
-/** 按帧采样整条轨道，返回帧数长度的值序列（帧 i 对应时间 i/fps）。 */
+/**
+ * 按帧采样整条轨道。尾部裁剪：只采样到末关键帧帧号，
+ * 之后的值运行时由 sampleTrack 钳制在末关键帧值，烘焙无意义。
+ */
 function sampleFrames(lanim: LanimFile, keys: Parameters<typeof sampleTrack>[0]): number[] {
+  const lastFrame = keys.length ? keys[keys.length - 1].frame : 0
   const values: number[] = []
-  for (let i = 0; i <= lanim.durationFrames; i++) {
+  for (let i = 0; i <= lastFrame; i++) {
     values.push(sampleTrack(keys, i))
   }
   return values

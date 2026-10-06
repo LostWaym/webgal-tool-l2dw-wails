@@ -133,12 +133,12 @@ lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 tr
 ### lanim → .mtn
 
 1. 首行魔数 `$fps=<lanim.fps>`，随后 `$fadein` / `$fadeout`（模态内可编辑，空行分隔与样例一致）。
-2. 每条轨道用 `sampleTrack` 逐帧采样 `durationFrames + 1` 个值（帧 0..durationFrames），逗号拼接为 `PARAM_ID=...`。
+2. 每条轨道用 `sampleTrack` 逐帧采样（帧 0..末关键帧帧号，**尾部裁剪**：末关键帧之后的值运行时钳制在末帧值，烘焙无意义），逗号拼接为 `PARAM_ID=...`。
 3. 全帧同值的轨道只输出单值（常量参数）。
 
 ### lanim → motion3.json
 
-1. 每条轨道一个 Curve：`Target="Parameter"`，逐帧采样生成线性段——首点 `(0, v0)`，每帧追加 `0, i/fps, v[i]`（type 0）；常量参数仅首点、0 段。
+1. 每条轨道一个 Curve：`Target="Parameter"`，逐帧采样生成线性段（帧 0..末关键帧帧号，尾部裁剪）——首点 `(0, v0)`，每帧追加 `0, i/fps, v[i]`（type 0）；常量参数仅首点、0 段。`Meta.Duration` 仍为全局 `durationFrames/fps`，不随单轨道缩短。
 2. `Meta`：`Duration = durationFrames/fps`、`Fps`、`Loop: true`、`AreBeziersRestricted: true`、`FadeInTime/FadeOutTime`（模态内 ms 输入 ÷ 1000）、`CurveCount / TotalSegmentCount / TotalPointCount` 实算，UserData 置 0。
 3. `Version` 固定 `3`；`minify` 选项控制是否单行 JSON。
 

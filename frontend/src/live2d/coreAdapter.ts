@@ -189,6 +189,70 @@ export function listParts(selectedModelId: string | null): PartEntry[] {
   return readPartsInternal(model)
 }
 
+/* 物理输出参数查询：结果按模型 id 缓存（物理 rig 编译后恒定）。
+   physics 对象未挂载（异步加载中/无物理）时返回 [] 且不写缓存，待就绪后下一轮提取。 */
+const physicsOutputCache = new Map<string, string[]>()
+
+/** 列出被 Live2D 物理系统驱动的参数 id（去重）。模型不存在或物理未就绪返回空数组。 */
+export function listPhysicsOutputIds(selectedModelId: string | null): string[] {
+  if (!selectedModelId) return []
+  const cached = physicsOutputCache.get(selectedModelId)
+  if (cached) return cached
+  if (!getModelById(selectedModelId)) return []
+
+  const physics: any = (getModelById(selectedModelId) as any)?.internalModel?.physics
+  if (!physics) return []
+
+  const ids = readPhysicsOutputIdsInternal(physics)
+  // 空结果不缓存：可能是提取路径未命中，下一轮重试（防止失败被永久缓存）
+  if (ids.length) physicsOutputCache.set(selectedModelId, ids)
+  return ids
+}
+
+function readPhysicsOutputIdsInternal(physics: any): string[] {
+  const out = new Set<string>()
+
+  // Cubism 4（首选）：编译后的物理 rig，outputs[].destination.id（构造时已写入）
+  const outputs = physics._physicsRig?.outputs
+  if (Array.isArray(outputs)) {
+    for (const output of outputs) {
+      const id = output?.destination?.id
+      if (typeof id === 'string' && id) out.add(id)
+    }
+    return [...out]
+  }
+
+  // Cubism 4（fallback）：physics3.json 原始数据
+  const settings4 = physics._json?.PhysicsSettings
+  if (Array.isArray(settings4)) {
+    for (const setting of settings4) {
+      if (!Array.isArray(setting?.Output)) continue
+      for (const output of setting.Output) {
+        const id = output?.Destination?.Id
+        if (typeof id === 'string' && id) out.add(id)
+      }
+    }
+    return [...out]
+  }
+
+  // Cubism 2：physicsHairs[] 的 target 参数数组为混淆字段 _$qP，
+  // 每项的参数 id 在基类字段 _$wL（addTargetParam(type, id, ...) 的 id）
+  const hairs = physics.physicsHairs
+  if (Array.isArray(hairs)) {
+    for (const hair of hairs) {
+      const targets = hair?._$qP
+      if (!Array.isArray(targets)) continue
+      for (const t of targets) {
+        const id = t?._$wL
+        if (typeof id === 'string' && id) out.add(id)
+      }
+    }
+    return [...out]
+  }
+
+  return [...out]
+}
+
 /** 写入参数。id 不存在或核心未就绪时静默忽略。 */
 export function writeParameter(selectedModelId: string | null, id: string, value: number): void {
   const core = getCoreById(selectedModelId)

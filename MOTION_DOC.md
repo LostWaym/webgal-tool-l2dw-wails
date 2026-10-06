@@ -21,12 +21,14 @@
 | 轨道面板 | 右侧整体：参数行头 + 时间轴车道 | `MotionTrackPanel.vue` |
 | 轨道 header / 行头 | 每行左侧的参数卡片（EditRangeCard）+ 按钮，固定列宽可拖（180~460） | `MotionTrackPanel.vue` 左列 |
 | 车道 | 每行右侧的时间轴区域，双向滚动 | `MotionTrackPanel.vue` 右列 |
+| 采样线 | 车道内按帧采样的折线（SVG，上下各 10% 保护带，按参数值域映射 y；帧点 y 同步跟随值） | `MotionTrackPanel.vue`，搜索栏旁「显示采样线」开关 |
 | 标尺 / 刻度 | 车道顶部刻度行，可拖拽移动播放头 | `MotionTrackPanel.vue` |
 | 帧点 / 关键帧点 | 车道上的蓝色圆点（关键帧） | `MotionTrackPanel.vue` |
 | 播放头 / 时间轴线 | 红色竖线覆盖层，不随滚动 | `MotionTrackPanel.vue` 覆盖层 |
 | 帧设置模态 | fps / 时长（帧）编辑，截帧风险确认 | `FrameSettingsModal.vue` + `useFrameSettingsModal.ts` |
 | 导出模态 | 动作导出：格式（.mtn / .motion3.json）、名称、fade 时长、压缩输出 | `MotionExportModal.vue` + `useMotionExportModal.ts` |
 | 主 header | 顶部工具栏：播放/暂停（合并单按钮）、停止、当前帧显示（可点击开模态）、导出、保存/另存/加载 | `MotionEditApp.vue` |
+| 参数预设下拉 | 搜索栏旁「预设 ▾」，按正则批量筛选参数显示（与搜索关键字共同筛选） | `MotionTrackPanel.vue` 搜索行，预设目录 `assets/motion_part_presets` |
 
 ## 交互速查
 
@@ -35,11 +37,13 @@
 - `+`/`−`（行头右上）= 增删轨道；`+` 会在当前帧插一帧
 - `✕`（行头，条件显示）= 删除当前播放头帧的关键帧；**按钮出现 = 播放头正对准一帧**
 - 拖车道/标尺 = 移动播放头（整数帧吸附）；双击车道 = 插帧；双击帧点 = 播放头跳到该帧；右键帧点 = 删帧
+- 采样线/帧点 y = 值相对参数 [min,max] 的百分比映射（上下 10% 保护带）；拖帧/改值/缩放自动重算，播放头移动不触发
 - **Ctrl + 滚轮**（车道上）= 缩放刻度密度（0.5~40 px/帧，鼠标锚点）
 - 刻度密度固定（每格 ≥80px，1/2/5×10ⁿ 自动换档），不随面板宽度变化
 - 车道右侧有 120px 安全距离（不参与帧映射）
 - 行头显示值 = 有轨道时为当前帧采样值（随播放头刷新），无轨道为实时值
 - 布局自适应：窗口缩放时时间轴吸收全部伸缩量，预览区不动
+- 参数预设：格式同 part_presets 的开关版——每行 `正则=1/0`（`#` 注释，非法正则忽略），按行顺序覆盖，未匹配参数默认显示；筛选链 = 物理开关 → 预设 → 搜索；重复点同一预设取消选中；Go 绑定 `ListMotionPresetFiles` / `ReadMotionPresetFile`（目录可由 env `L2DW_MOTION_PART_PRESETS_DIR` 覆盖）
 
 ## 数据与核心文件
 

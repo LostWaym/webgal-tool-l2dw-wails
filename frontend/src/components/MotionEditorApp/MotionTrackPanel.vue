@@ -19,24 +19,29 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SearchInput from '../common/SearchInput.vue'
 import EditRangeCard from '../ModelEditApp/EditRangeCard.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
-import { listParameters, type ParamEntry } from '../../live2d/coreAdapter'
+import { listParameters, listPhysicsOutputIds, type ParamEntry } from '../../live2d/coreAdapter'
 import { filterBySearch } from '../../utils/searchUtils'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { useMotionEditorStore, sampleTrack } from '../../stores/motionEditor'
-import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
+import { ListMotionPresetFiles, ReadMotionPresetFile } from '../../../wailsjs/go/main/App'
 
 const wmdlStore = useWmdlModelEditorStore()
 const store = useMotionEditorStore()
-const frameModal = useFrameSettingsModal()
 
 const search = ref('')
 const params = ref<ParamEntry[]>([])
+/** 是否在列表中显示被物理驱动的参数（显示时禁用交互 + 遮罩提示）。 */
+const showPhysics = ref(false)
+/** 是否在车道上绘制采样折线。 */
+const showCurve = ref(true)
+const physicsIdSet = ref<Set<string>>(new Set())
 
 const pollTimer = window.setInterval(refreshParams, 500)
 
 function refreshParams() {
   if (!wmdlStore.currentWmdl.models.length) return
   const next = listParameters(wmdlStore.selectedModelId)
+  physicsIdSet.value = new Set(listPhysicsOutputIds(wmdlStore.selectedModelId))
   const prev = params.value
   if (
     prev.length !== next.length ||
@@ -55,7 +60,101 @@ function refreshParams() {
 
 onBeforeUnmount(() => window.clearInterval(pollTimer))
 
-const filtered = computed(() => filterBySearch(params.value, search.value, (p) => p.id))
+function isPhysics(id: string): boolean {
+  return physicsIdSet.value.has(id)
+}
+
+const filtered = computed(() => {
+  const base = showPhysics.value ? params.value : params.value.filter((p) => !isPhysics(p.id))
+  const presetVis = presetVisibility.value
+  const afterPreset = presetVis
+    ? base.filter((p) => presetVis.get(p.id) !== false)
+    : base
+  return filterBySearch(afterPreset, search.value, (p) => p.id)
+})
+
+// ── 预设筛选（motion_part_presets） ────────────────────────────────────────
+
+const presetFiles = ref<string[]>([])
+const presetOpen = ref(false)
+const activePreset = ref<string | null>(null)
+const presetRules = ref<Array<{ regex: RegExp; visible: boolean }>>([])
+
+/** 参数可见性映射：按行顺序逐行覆盖；未匹配的参数默认显示。空规则 = 不过滤。 */
+const presetVisibility = computed(() => {
+  if (!presetRules.value.length) return null
+  const vis = new Map<string, boolean>()
+  for (const p of params.value) {
+    let visible = true
+    for (const r of presetRules.value) {
+      if (r.regex.test(p.id)) visible = r.visible
+    }
+    vis.set(p.id, visible)
+  }
+  return vis
+})
+
+async function loadPresetFiles() {
+  try {
+    presetFiles.value = await ListMotionPresetFiles()
+  } catch {
+    presetFiles.value = []
+  }
+}
+
+async function togglePreset() {
+  if (!presetOpen.value) {
+    await loadPresetFiles()
+  }
+  presetOpen.value = !presetOpen.value
+}
+
+function closePreset() {
+  presetOpen.value = false
+}
+
+async function onPresetPick(filename: string) {
+  // 点中选项不关闭下拉框；重复点同一项 = 取消选中
+  if (activePreset.value === filename) {
+    activePreset.value = null
+    presetRules.value = []
+    return
+  }
+  try {
+    const content = await ReadMotionPresetFile(filename)
+    activePreset.value = filename
+    applyPresetContent(content)
+  } catch (e) {
+    console.error('failed to read motion preset', filename, e)
+  }
+}
+
+function applyPresetContent(content: string) {
+  const rules: Array<{ regex: RegExp; visible: boolean }> = []
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const eqIdx = line.lastIndexOf('=')
+    if (eqIdx <= 0) continue
+    const pattern = line.slice(0, eqIdx)
+    const valueStr = line.slice(eqIdx + 1).trim()
+    if (valueStr !== '0' && valueStr !== '1') continue
+    try {
+      rules.push({ regex: new RegExp(pattern), visible: valueStr === '1' })
+    } catch {
+      // 忽略非法正则
+    }
+  }
+  presetRules.value = rules
+}
+
+function onDocClick(e: MouseEvent) {
+  if (!presetOpen.value) return
+  const root = document.getElementById('motion-preset-root')
+  if (root && !root.contains(e.target as Node)) {
+    presetOpen.value = false
+  }
+}
 
 function isTracked(id: string): boolean {
   return store.trackParamIds.has(id)
@@ -100,6 +199,55 @@ function onRemoveKeyAtPlayhead(p: ParamEntry) {
 function onKeyframeDblClick(frame: number, e: MouseEvent) {
   e.stopPropagation()
   store.playhead = frame
+}
+
+// ── 采样折线几何 ────────────────────────────────────────────────────────────
+
+/** 车道上下保护带（占行高比例）。 */
+const CURVE_PAD = 0.1
+
+/** 值 → 归一化比例（0=下界, 1=上界），clamp 到 [0,1]。 */
+function v2t(paramId: string, v: number): number {
+  const [min, max] = store.paramRanges[paramId] ?? [0, 1]
+  const span = max - min || 1
+  return Math.max(0, Math.min(1, (v - min) / span))
+}
+
+/** 归一化比例 → 行内 y 百分比（保护区映射：1=顶, 0=底）。 */
+function t2topPct(t: number): number {
+  return ((1 - t) * (1 - CURVE_PAD * 2) + CURVE_PAD) * 100
+}
+
+/** 帧点的行内 y 百分比（按关键帧值映射）。 */
+function keyTopPct(paramId: string, v: number): number {
+  return t2topPct(v2t(paramId, v))
+}
+
+/** 曲线几何参数：宽度（帧区像素）与帧号序列，供 polyline 采样。 */
+const curveGeom = computed(() => {
+  const width = durationFrames.value * effectivePpf()
+  const frames: number[] = []
+  for (let f = 0; f <= durationFrames.value; f++) frames.push(f)
+  return { width, frames }
+})
+
+/** 每条 tracked 轨道的 polyline points（值 → y 百分比，viewBox 高度固定 100）。 */
+const curves = computed(() => {
+  const { width, frames } = curveGeom.value
+  const out: Array<{ paramId: string; points: string }> = []
+  for (const track of store.lanim.tracks) {
+    if (!track.keys.length) continue
+    const pts = frames.map((f) => {
+      const y = t2topPct(v2t(track.paramId, sampleTrack(track.keys, f)))
+      return `${f2x(f).toFixed(2)},${y.toFixed(2)}`
+    })
+    out.push({ paramId: track.paramId, points: pts.join(' ') })
+  }
+  return out
+})
+
+function curveOf(paramId: string): string | null {
+  return curves.value.find((c) => c.paramId === paramId)?.points ?? null
 }
 
 // ── 帧几何 ──────────────────────────────────────────────────────────────────
@@ -149,6 +297,8 @@ let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
   refreshWidth()
+  loadPresetFiles()
+  document.addEventListener('mousedown', onDocClick)
   if (typeof ResizeObserver !== 'undefined' && lanesEl.value) {
     resizeObserver = new ResizeObserver(refreshWidth)
     resizeObserver.observe(lanesEl.value)
@@ -160,6 +310,7 @@ onBeforeUnmount(() => {
   resizeObserver = null
   window.removeEventListener('mousemove', onWindowMove)
   window.removeEventListener('mouseup', onWindowUp)
+  document.removeEventListener('mousedown', onDocClick)
 })
 
 function onLanesScroll() {
@@ -285,6 +436,7 @@ function onRulerDown(e: MouseEvent) {
 }
 
 function onLaneDblClick(paramId: string, e: MouseEvent) {
+  if (isPhysics(paramId)) return
   const track = trackOf(paramId)
   if (!track) return
   const f = x2f(e.clientX)
@@ -315,14 +467,37 @@ function onHeadDrag(dx: number) {
   <div class="track-panel">
     <div class="track-panel__search">
       <SearchInput v-model="search" variant="edit" placeholder="搜索参数..." />
-      <button
-        type="button"
-        class="track-panel__settings"
-        title="帧率与时长设置"
-        @click="frameModal.open()"
-      >
-        {{ store.lanim.fps }}fps · {{ store.lanim.durationFrames }}帧 ({{ fmtTime(store.lanim.durationFrames) }}s)
-      </button>
+      <div id="motion-preset-root" class="preset-root">
+        <button
+          class="preset-toggle"
+          :class="{ 'is-open': presetOpen }"
+          @click="togglePreset"
+        >
+          预设 <span class="caret">▾</span>
+        </button>
+        <ul v-if="presetOpen" class="preset-menu">
+          <li
+            v-for="name in presetFiles"
+            :key="name"
+            class="preset-item"
+            :class="{ 'is-active': activePreset === name }"
+            @click="onPresetPick(name)"
+          >
+            {{ name }}
+          </li>
+          <li v-if="presetFiles.length === 0" class="preset-empty">
+            无可用预设
+          </li>
+        </ul>
+      </div>
+      <label class="track-panel__physics-toggle" title="显示被 Live2D 物理系统驱动的参数（只读）">
+        <input v-model="showPhysics" type="checkbox" />
+        <span>显示物理参数</span>
+      </label>
+      <label class="track-panel__physics-toggle" title="在车道上按帧绘制采样线段">
+        <input v-model="showCurve" type="checkbox" />
+        <span>显示采样线</span>
+      </label>
     </div>
     <div class="track-panel__body">
       <!-- 左列：行头（垂直滚动由右列 scroll 事件同步） -->
@@ -344,8 +519,12 @@ function onHeadDrag(dx: number) {
               :max="p.max"
               :model-value="displayValue(p)"
               :highlight="isTracked(p.id)"
+              :disabled="isPhysics(p.id)"
               @update:model-value="onValueChange(p, $event)"
             />
+            <div v-if="isPhysics(p.id)" class="head-row__physics-mask">
+              <span>该参数由物理驱动</span>
+            </div>
             <button
               v-if="hasKeyAtPlayhead(p)"
               type="button"
@@ -359,7 +538,8 @@ function onHeadDrag(dx: number) {
               type="button"
               class="head-row__btn"
               :class="{ 'is-tracked': isTracked(p.id) }"
-              :title="isTracked(p.id) ? '移除轨道' : '添加为轨道（当前帧插帧）'"
+              :disabled="!isTracked(p.id) && isPhysics(p.id)"
+              :title="isTracked(p.id) ? '移除轨道' : isPhysics(p.id) ? '该参数由物理驱动，无法建轨' : '添加为轨道（当前帧插帧）'"
               @click.stop="onToggleTrack(p)"
             >
               {{ isTracked(p.id) ? '−' : '+' }}
@@ -392,11 +572,20 @@ function onHeadDrag(dx: number) {
             @dblclick="onLaneDblClick(p.id, $event)"
           >
             <template v-if="isTracked(p.id)">
+              <svg
+                v-if="showCurve && curveOf(p.id)"
+                class="lane-row__curve"
+                :viewBox="`0 0 ${curveGeom.width} 100`"
+                preserveAspectRatio="none"
+                :style="{ width: curveGeom.width + 'px' }"
+              >
+                <polyline :points="curveOf(p.id)!" :vector-effect="'non-scaling-stroke'" />
+              </svg>
               <div
                 v-for="key in trackOf(p.id)?.keys ?? []"
                 :key="key.frame"
                 class="lane-row__key"
-                :style="{ left: f2x(key.frame) + 'px' }"
+                :style="{ left: f2x(key.frame) + 'px', top: keyTopPct(p.id, key.v) + '%' }"
                 title="拖动改帧 / 双击移动播放头 / 右键删除"
                 @mousedown="onKeyframeDown(p.id, key.frame, $event)"
                 @dblclick.stop="onKeyframeDblClick(key.frame, $event)"
@@ -436,21 +625,96 @@ function onHeadDrag(dx: number) {
   flex-shrink: 0;
 }
 
-.track-panel__settings {
+/* SearchInput 默认 width:100%，这里改为弹性收缩，给右侧开关/按钮让位 */
+.track-panel__search :deep(.search-box) {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+.track-panel__physics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
-  padding: 5px 10px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
-  border-radius: 4px;
-  color: #cfd4dc;
   font-size: 12px;
+  color: #8a93a3;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.track-panel__physics-toggle input {
+  cursor: pointer;
+}
+
+.preset-root {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.preset-toggle {
+  background: #2c313a;
+  border: 1px solid #3a404b;
+  border-radius: 4px;
+  color: #e6e6e6;
+  font-size: 13px;
+  padding: 6px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.preset-toggle:hover,
+.preset-toggle.is-open {
+  border-color: #2f80ed;
+}
+
+.caret {
+  font-size: 10px;
+  color: #8a93a3;
+}
+
+.preset-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #2c313a;
+  border: 1px solid #3a404b;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.preset-item {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #e6e6e6;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.track-panel__settings:hover {
-  border-color: #2f80ed;
+.preset-item:hover {
+  background: #3a404b;
+}
+
+.preset-item.is-active {
   color: #5fa8ff;
+}
+
+.preset-empty {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: default;
 }
 
 .track-panel__body {
@@ -539,6 +803,26 @@ function onHeadDrag(dx: number) {
   color: #5fa8ff;
 }
 
+/* 物理参数遮罩：盖住卡片，黑底红字提示；pointer-events 穿透（卡片本身已禁用） */
+.head-row__physics-mask {
+  position: absolute;
+  inset: 3px 26px 3px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.head-row__physics-mask span {
+  color: #ff5c5c;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* 删帧按钮：由 v-if 控制显隐，出现本身即提示"已对准帧" */
 .head-row__btn--del {
   right: 28px;
@@ -598,9 +882,23 @@ function onHeadDrag(dx: number) {
   white-space: nowrap;
 }
 
+.lane-row__curve {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.lane-row__curve polyline {
+  fill: none;
+  stroke: rgba(47, 128, 237, 0.4);
+  stroke-width: 1.5;
+}
+
 .lane-row__key {
   position: absolute;
-  top: 50%;
   width: 10px;
   height: 10px;
   box-sizing: border-box;

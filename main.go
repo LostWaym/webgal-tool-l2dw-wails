@@ -28,6 +28,13 @@ var actorFlag bool
 // actorWmdlPath 由 --actor-wmdl 参数携带；演出编辑器进程启动时若非空，会自动加载该 wmdl 文件。
 var actorWmdlPath string
 
+// motionFlag 标记当前进程是否以"动作编辑器"模式启动。
+// 主进程启动时不会带此 flag；子进程（由 App.OpenMotionEditor 拉起）会带。
+var motionFlag bool
+
+// motionWmdlPath 由 --motion-wmdl 参数携带；动作编辑器进程启动时若非空，会自动加载该 wmdl 文件。
+var motionWmdlPath string
+
 // hasFlag 手动扫描 os.Args，避免引入 flag 包带来的额外输出副作用。
 func hasFlag(args []string, name string) bool {
 	for _, a := range args {
@@ -53,6 +60,8 @@ func main() {
 	editorWmdlPath = hasValue(os.Args[1:], "--wmdl")
 	actorFlag = hasFlag(os.Args[1:], "--actor")
 	actorWmdlPath = hasValue(os.Args[1:], "--actor-wmdl")
+	motionFlag = hasFlag(os.Args[1:], "--motion")
+	motionWmdlPath = hasValue(os.Args[1:], "--motion-wmdl")
 
 	app := NewApp()
 
@@ -82,6 +91,9 @@ func main() {
 	} else if actorFlag {
 		title = "L2DW-Wails - 演出编辑器"
 		width, height = 1200, 800
+	} else if motionFlag {
+		title = "L2DW-Wails - 动作编辑器"
+		width, height = 1600, 900
 	}
 
 	err := wails.Run(&options.App{

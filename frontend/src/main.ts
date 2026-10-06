@@ -3,7 +3,8 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import ModelEditApp from './components/ModelEditApp/ModelEditApp.vue'
 import ActorEditApp from './components/ActorEditorApp/ActorEditApp.vue'
-import { AppMode, EditorWmdlPath, ActorWmdlPath, ReadWmdlFile } from '../wailsjs/go/main/App'
+import MotionEditApp from './components/MotionEditorApp/MotionEditApp.vue'
+import { AppMode, EditorWmdlPath, ActorWmdlPath, MotionWmdlPath, ReadWmdlFile } from '../wailsjs/go/main/App'
 import { useWmdlModelEditorStore } from './stores/wmdlModelEditor'
 import './style.css'
 import './live2d/loader'
@@ -12,6 +13,7 @@ import './live2d/loader'
 //   - "main"    → 主窗口（App.vue）
 //   - "editor"  → 模型编辑器（ModelEditApp.vue）
 //   - "actor"   → 演出编辑器（ActorEditApp.vue）
+//   - "motion"  → 动作编辑器（MotionEditApp.vue）
 // AppMode 是异步绑定（wails runtime 初始化后才可用），所以包一层 async IIFE。
 async function bootstrap() {
   let mode = 'main'
@@ -24,6 +26,7 @@ async function bootstrap() {
   let rootComponent: any = App
   if (mode === 'editor') rootComponent = ModelEditApp
   else if (mode === 'actor') rootComponent = ActorEditApp
+  else if (mode === 'motion') rootComponent = MotionEditApp
 
   const app = createApp(rootComponent).use(createPinia())
 
@@ -32,6 +35,8 @@ async function bootstrap() {
     void loadStartupWmdl(EditorWmdlPath)
   } else if (mode === 'actor') {
     void loadStartupWmdl(ActorWmdlPath)
+  } else if (mode === 'motion') {
+    void loadStartupWmdl(MotionWmdlPath)
   }
 
   app.mount('#app')

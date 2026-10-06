@@ -14,25 +14,10 @@ defineEmits<{
 </script>
 
 <template>
-  <div class="expressions-toolbar">
-    <ListToolbar
-      kind="expression"
-      :disabled="disabled"
-      style="flex: 1"
-      @batch-add="$emit('batch-add')"
-      @batch-modify="$emit('batch-modify')"
-    />
-  </div>
+  <ListToolbar
+    kind="expression"
+    :disabled="disabled"
+    @batch-add="$emit('batch-add')"
+    @batch-modify="$emit('batch-modify')"
+  />
 </template>
-
-<style scoped>
-.expressions-toolbar {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #2c313a;
-  flex-shrink: 0;
-  background: #1d2026;
-}
-</style>

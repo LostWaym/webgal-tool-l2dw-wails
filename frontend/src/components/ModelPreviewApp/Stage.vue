@@ -8,7 +8,7 @@ import type { FigureGroupEntry, FocusState } from '../../stores/previewStore'
 import { toFileUrl } from '../../path_utils'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
-import { OpenEditor, OpenActorEditor } from '../../../wailsjs/go/main/App'
+import { OpenEditor, OpenActorEditor, OpenMotionEditor } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
 import { STAGE_WIDTH, STAGE_HEIGHT, FOCUS_BOX_SIZE } from '../../utils/consts'
 import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
@@ -608,6 +608,37 @@ const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
           return
         }
         OpenActorEditor(wmdlPath).catch((err: unknown) =>
+          msg.error(`打开失败：${err}`),
+        )
+      },
+    },
+  },
+  {
+    keys: 'F3',
+    description: '打开动作编辑器窗口',
+    entry: {
+      key: 'F3',
+      keys: 'F3',
+      description: '打开动作编辑器窗口',
+      targets: ['model', 'background', 'stage', 'figureGroup', 'none'],
+      handlerKey: 'openMotionEditor',
+      run: () => {
+        const msg = useMessage()
+        const entry = store.selectedModel
+        if (!entry) {
+          msg.warning('请先选中一个立绘')
+          return
+        }
+        if (entry.kind !== 'live2d') {
+          msg.warning('仅 Live2D 模型支持此操作')
+          return
+        }
+        const wmdlPath = entry.wmdlConfig?.wmdlFilePath
+        if (!wmdlPath) {
+          msg.error('未找到对应的 wmdl 文件')
+          return
+        }
+        OpenMotionEditor(wmdlPath).catch((err: unknown) =>
           msg.error(`打开失败：${err}`),
         )
       },
@@ -1533,6 +1564,29 @@ function attachDomHandlers() {
       }
       OpenActorEditor(wmdlPath).catch((err: unknown) =>
         useMessage().error(`打开失败：${err}`),
+      )
+      return
+    }
+
+    if (e.key === 'F3') {
+      e.preventDefault()
+      const msg = useMessage()
+      const entry = store.selectedModel
+      if (!entry) {
+        msg.warning('请先选中一个立绘')
+        return
+      }
+      if (entry.kind !== 'live2d') {
+        msg.warning('仅 Live2D 模型支持此操作')
+        return
+      }
+      const wmdlPath = entry.wmdlConfig?.wmdlFilePath
+      if (!wmdlPath) {
+        msg.error('未找到对应的 wmdl 文件')
+        return
+      }
+      OpenMotionEditor(wmdlPath).catch((err: unknown) =>
+        msg.error(`打开失败：${err}`),
       )
       return
     }

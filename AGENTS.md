@@ -6,7 +6,7 @@ Wails v2 + Vue 3 + PixiJS 桌面应用，用于加载并展示本地 Live2D 模�
 
 - 在搜寻代码细节的时候，常用 grep 搜寻相关关键字来找到相关文件，而不是读取粗暴的读取所有文件，减少上下文消耗。
 - 本文档只记录相关模块的大概位置，不会记录具体的落地细节，具体地方需要自寻进行探索。
-- 在对话的第一轮一开始必须强制添加上 **我已阅读本项目规范，现在让我来处理你的需求** ，只需要一次即可。
+- 在会话的第一次回答必须强制添加上 **我已阅读本项目规范，现在让我来处理你的需求** ，只需要一次即可。
 
 ## 技术栈
 
@@ -155,6 +155,13 @@ l2dw-wails/
 - 相关PiniaStore = "frontend/src/stores/wmdlModelEditor.ts"（与模型编辑器共用 store id，但 Pinia 按 app 实例隔离）
 - 导出状态 = "frontend/src/composables/useActorEditorState.ts"（reactive 单例，导出覆盖层状态）
 - 数据结构 = "frontend/src/stores/wmdlTypes.ts"
+
+### 动作编辑器相关
+
+非必要不读取这部分的内容
+
+- 入口vue = MotionEditApp.vue
+- 只在用户需要开发这部分内容的时候，才去读取工作目录的 'MOTION_DOC.md' 文件
 
 ### 通用气泡信息功能
 

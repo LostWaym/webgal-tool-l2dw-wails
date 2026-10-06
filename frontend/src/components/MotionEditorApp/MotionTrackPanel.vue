@@ -274,6 +274,8 @@ function beginDrag(state: DragState, e: MouseEvent) {
   window.addEventListener('mousemove', onWindowMove)
   window.addEventListener('mouseup', onWindowUp)
   if (state.kind === 'playhead') {
+    // 播放中抓取播放头 → 先暂停，拖动由 playhead watch 实时采样
+    store.onPlayheadGrab?.()
     store.playhead = x2f(e.clientX)
   }
 }

@@ -59,6 +59,14 @@ store.onLiveValueChange = () => {
   }
 }
 
+// 播放中用户抓取播放头 → 暂停（拖动后由 playhead watch 实时采样）
+store.onPlayheadGrab = () => {
+  if (store.playing) {
+    store.playing = false
+    cancelAnimationFrame(rafId)
+  }
+}
+
 // ── 播放（帧步进） ──────────────────────────────────────────────────────────
 
 let rafId = 0
@@ -114,6 +122,7 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(rafId)
   store.applier = null
   store.onLiveValueChange = null
+  store.onPlayheadGrab = null
 })
 
 // ── 保存 / 加载 ─────────────────────────────────────────────────────────────
@@ -187,8 +196,14 @@ async function onLoad() {
       <span class="motion-editor__title">动作编辑器</span>
       <span class="motion-editor__wmdl" :title="wmdlName">{{ wmdlName }}</span>
       <span class="motion-editor__spacer" />
-      <button type="button" class="he-btn" :disabled="!store.lanim.tracks.length || store.playing" @click="play">▶ 播放</button>
-      <button type="button" class="he-btn" :disabled="!store.playing" @click="pause">⏸ 暂停</button>
+      <button
+        type="button"
+        class="he-btn"
+        :disabled="!store.playing && !store.lanim.tracks.length"
+        @click="store.playing ? pause() : play()"
+      >
+        {{ store.playing ? '⏸ 暂停' : '▶ 播放' }}
+      </button>
       <button type="button" class="he-btn" @click="stop">⏹ 停止</button>
       <button
         type="button"

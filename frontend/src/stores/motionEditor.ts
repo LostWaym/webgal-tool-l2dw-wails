@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 
 /** 关键帧插值方式（全局，不存进 lanim 文件），可改为 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'。 */
 export type InterpKind = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'
-export const DEFAULT_INTERP: InterpKind = 'easeIn'
+export const DEFAULT_INTERP: InterpKind = 'easeInOut'
 
 function applyEasing(ratio: number, kind: InterpKind): number {
   switch (kind) {
@@ -148,6 +148,8 @@ interface MotionEditorState {
   applier: ((params: Array<{ id: string; val: number; calc: 'set' }>) => void) | null
   /** 实时值变化回调，由 MotionEditApp 注册；播放中修改值时用于打断播放。 */
   onLiveValueChange: (() => void) | null
+  /** 用户抓取播放头（开始拖拽）回调，由 MotionEditApp 注册；播放中用于暂停。 */
+  onPlayheadGrab: (() => void) | null
 }
 
 export const useMotionEditorStore = defineStore('motionEditor', {
@@ -161,6 +163,7 @@ export const useMotionEditorStore = defineStore('motionEditor', {
     paramRanges: {},
     applier: null,
     onLiveValueChange: null,
+    onPlayheadGrab: null,
   }),
 
   getters: {

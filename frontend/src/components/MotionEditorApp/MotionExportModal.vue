@@ -8,7 +8,7 @@ import { useMotionExportModal, type MotionExportFormat } from '../../composables
 import { useMotionEditorStore } from '../../stores/motionEditor'
 import { useMessage } from '../../composables/useMessage'
 import { buildMtn, buildMotion3Json } from '../../utils/motionExport'
-import { SaveModelJsonFileDialog, WriteTextFile } from '../../../wailsjs/go/main/App'
+import { SaveMotionExportFileDialog, WriteTextFile } from '../../../wailsjs/go/main/App'
 
 const { state, close, setFormat } = useMotionExportModal()
 const store = useMotionEditorStore()
@@ -73,7 +73,7 @@ async function onConfirm() {
 
   exporting.value = true
   try {
-    const picked = await SaveModelJsonFileDialog(targetFileName.value)
+    const picked = await SaveMotionExportFileDialog(targetFileName.value)
     if (!picked) return
     await WriteTextFile(picked, content)
     close()

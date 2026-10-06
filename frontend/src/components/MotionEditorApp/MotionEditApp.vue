@@ -12,6 +12,7 @@ import MotionStage from './MotionStage.vue'
 import MotionTrackPanel from './MotionTrackPanel.vue'
 import FrameSettingsModal from './FrameSettingsModal.vue'
 import MotionExportModal from './MotionExportModal.vue'
+import MessageHost from '../common/MessageHost.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import {
@@ -24,7 +25,8 @@ import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
 import { useMotionExportModal } from '../../composables/useMotionExportModal'
 import {
-  SaveModelJsonFileDialog,
+  PickLanimJsonFile,
+  SaveLanimFileDialog,
   SaveModelJsonFile,
   ReadTextFile,
 } from '../../../wailsjs/go/main/App'
@@ -146,7 +148,7 @@ async function onSave() {
   try {
     let path = store.lanimFilePath
     if (!path) {
-      const picked = await SaveModelJsonFileDialog('')
+      const picked = await SaveLanimFileDialog('')
       if (!picked) return
       path = withLanimExt(picked)
     }
@@ -162,7 +164,7 @@ async function onSave() {
 
 async function onSaveAs() {
   try {
-    const picked = await SaveModelJsonFileDialog(store.lanimFilePath ?? '')
+    const picked = await SaveLanimFileDialog(store.lanimFilePath ?? '')
     if (!picked) return
     const path = withLanimExt(picked)
     await SaveModelJsonFile(path, serialize())
@@ -175,7 +177,7 @@ async function onSaveAs() {
 
 async function onLoad() {
   try {
-    const picked = await SaveModelJsonFileDialog(store.lanimFilePath ?? '')
+    const picked = await PickLanimJsonFile()
     if (!picked) return
     const text = await ReadTextFile(picked)
     const lanim = parseLanimJson(text)
@@ -232,6 +234,7 @@ async function onLoad() {
     </div>
     <FrameSettingsModal />
     <MotionExportModal />
+    <MessageHost />
   </div>
 </template>
 
@@ -251,7 +254,8 @@ async function onLoad() {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  padding: 6px 12px;
+  height: 38px;
+  padding: 0 12px;
   background: #242830;
   border-bottom: 1px solid #3a4150;
 }
@@ -283,6 +287,8 @@ async function onLoad() {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .motion-editor__time:hover {

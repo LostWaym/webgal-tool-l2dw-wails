@@ -328,6 +328,21 @@ func (a *App) PickExpressionFile() (string, error) {
 	)
 }
 
+// PickLanimJsonFile opens a native file dialog for choosing a motion editor
+// animation file (.lanim.json). Returns the chosen path, or an empty string
+// if the user cancelled.
+func (a *App) PickLanimJsonFile() (string, error) {
+	return a.runPicker(
+		runtime.OpenDialogOptions{
+			Title: "选择动画文件",
+			Filters: []runtime.FileFilter{
+				{DisplayName: "Lanim Motion", Pattern: "*.lanim.json"},
+			},
+		},
+		slotMotion, pickerFile,
+	)
+}
+
 // PickDirectory opens a native directory-selection dialog.
 // `kind` is "motion" or "expression" and determines which lastDir slot is used
 // for DefaultDirectory and persistence. Returns the chosen directory, or "" if
@@ -584,6 +599,47 @@ func (a *App) ReadModelJsonFile(path string) (string, error) {
 // an absolute path returned from a picker / save dialog.
 func (a *App) SaveModelJsonFile(path string, content string) error {
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// SaveLanimFileDialog opens a native save dialog for selecting the destination
+// of a motion editor animation file (.lanim.json). If `currentPath` is
+// provided, its directory and filename are used as defaults.
+func (a *App) SaveLanimFileDialog(currentPath string) (string, error) {
+	opts := runtime.SaveDialogOptions{
+		Title:                "保存动画文件",
+		DefaultFilename:      "untitled.lanim.json",
+		CanCreateDirectories: true,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Lanim Motion", Pattern: "*.lanim.json"},
+		},
+	}
+	if currentPath != "" {
+		if dir := filepath.Dir(currentPath); dir != "" {
+			opts.DefaultDirectory = dir
+		}
+		if base := filepath.Base(currentPath); base != "" {
+			opts.DefaultFilename = base
+		}
+	}
+	return runtime.SaveFileDialog(a.ctx, opts)
+}
+
+// SaveMotionExportFileDialog opens a native save dialog for exporting motion
+// files (Cubism 2 .mtn / Cubism 3+ .motion3.json). `defaultName` provides the
+// suggested filename.
+func (a *App) SaveMotionExportFileDialog(defaultName string) (string, error) {
+	opts := runtime.SaveDialogOptions{
+		Title:                "导出动作",
+		DefaultFilename:      "motion.motion3.json",
+		CanCreateDirectories: true,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Motion", Pattern: "*.mtn;*.motion3.json"},
+		},
+	}
+	if defaultName != "" {
+		opts.DefaultFilename = defaultName
+	}
+	return runtime.SaveFileDialog(a.ctx, opts)
 }
 
 // SaveModelJsonFileDialog opens a native save dialog for selecting the

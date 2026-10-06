@@ -42,8 +42,9 @@ async function syncRuntimeAndPopulate() {
   }
 }
 
+// 与 Live2dPreview 相同的模型组指纹：重载后自动重同步 runtime Map
 watch(
-  () => store.currentWmdl.models.length,
+  () => (store.currentWmdl?.models ?? []).map((m) => `${m.id}:${m.jsonAbsPath}`).join('|'),
   () => {
     void syncRuntimeAndPopulate()
   },

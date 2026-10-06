@@ -52,14 +52,17 @@ onMounted(async () => {
   await init()
 })
 
+// 模型组加载指纹：只有 id/jsonAbsPath 变化才重载，避免深层编辑（如 initParams）触发整体重建重置视口
+let loadSeq = 0
+
 watch(
-  () => props.wmdlConfig,
-  async (newConfig) => {
-    if (!newConfig) return
+  () => (props.wmdlConfig?.models ?? []).map((m) => `${m.id}:${m.jsonAbsPath}`).join('|'),
+  async () => {
+    if (!props.wmdlConfig) return
     if (!app) {
       await init()
     } else {
-      await loadWmdlModels(newConfig)
+      await loadWmdlModels(props.wmdlConfig)
     }
   },
 )
@@ -106,10 +109,18 @@ async function init() {
 
   resizeObserver = new ResizeObserver(() => {
     if (!app || !host) return
+    const oldW = app.renderer.width
+    const oldH = app.renderer.height
     app.renderer.resize(host.clientWidth, host.clientHeight)
     if (rootContainer) {
-      rootContainer.x = host.clientWidth / 2
-      rootContainer.y = host.clientHeight / 2
+      // 按比例保留用户平移的视口位置，避免尺寸变化时被拉回中心
+      if (oldW > 0 && oldH > 0) {
+        rootContainer.x = (rootContainer.x / oldW) * host.clientWidth
+        rootContainer.y = (rootContainer.y / oldH) * host.clientHeight
+      } else {
+        rootContainer.x = host.clientWidth / 2
+        rootContainer.y = host.clientHeight / 2
+      }
     }
   })
   resizeObserver.observe(host)
@@ -223,6 +234,7 @@ function attachDomHandlers() {
 
 async function loadWmdlModels(config: WmdlConfig | null | undefined) {
   if (!app || !rootContainer || !stageMain) return
+  const token = ++loadSeq
 
   // 销毁旧的子模型与 wrapper
   for (const m of subModels) {
@@ -255,6 +267,12 @@ async function loadWmdlModels(config: WmdlConfig | null | undefined) {
         idleMotionGroup: '',
         autoInteract: false,
       })
+
+      // 加载期间发生了更新的重载请求，丢弃本次结果
+      if (token !== loadSeq) {
+        model.destroy()
+        return
+      }
 
       const scaleX = STAGE_WIDTH / model.width
       const scaleY = STAGE_HEIGHT / model.height

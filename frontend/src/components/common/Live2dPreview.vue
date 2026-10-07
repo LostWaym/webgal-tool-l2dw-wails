@@ -427,31 +427,50 @@ async function copyScreenFromView() {
   await copyBlobToClipboard(blob)
 }
 
-/** 从 app.view 抽取 stageMain 内容，保留原始 stage 坐标系（无视口变换）。 */
-async function copyOriginalFromView() {
+/** 以 scale 倍分辨率离屏渲染 stageMain，无视口变换，保留透明通道。 */
+async function copyOriginalFromView(scale: number) {
   if (!app || !stageMain) {
     msg.warning('模型尚未加载')
     return
   }
-  let raw: HTMLCanvasElement
-  try {
-    raw = (app.renderer as any).extract.canvas(stageMain) as HTMLCanvasElement
-  } catch (err) {
-    msg.error('PIXI 抽帧失败：' + (err instanceof Error ? err.message : String(err)))
+  const parent = stageMain.parent
+  if (!parent) {
+    msg.error('PIXI 抽帧失败：stageMain 未挂载')
     return
   }
-  // 手动将内容重绘到新 canvas 以保留透明通道
-  const canvas = document.createElement('canvas')
-  canvas.width = raw.width
-  canvas.height = raw.height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.drawImage(raw, 0, 0)
-  const blob = await canvasToBlob(canvas)
-  if (!blob) return
-  await saveBlobToDisk(blob, 'original')
-  await copyBlobToClipboard(blob)
+
+  let tempRoot: PIXI.Container | null = null
+  try {
+    // 临时摘下 stageMain 挂到缩放容器上（同 tick 内即挂回，主画面无感知），
+    // 再走与旧版一致的 extract.canvas(container) 路径（内部 generateTexture 自行处理）
+    // Live2D 绘制依赖主 renderer 的 GL 上下文，不能另开 Renderer（会得到黑图/空图）
+    // 缩放必须放在内层容器：extract/generateTexture 按 tempRoot 的局部包围盒（不含自身
+    // scale）决定 RT 尺寸，scale 放外层只会放大内容导致裁剪
+    tempRoot = new PIXI.Container()
+    const scaleHolder = new PIXI.Container()
+    scaleHolder.addChild(stageMain)
+    scaleHolder.scale.set(scale)
+    tempRoot.addChild(scaleHolder)
+
+    const raw = (app.renderer as any).plugins.extract.canvas(tempRoot) as HTMLCanvasElement
+    // 手动重绘到新 canvas 以保留透明通道（与旧版一致）
+    const canvas = document.createElement('canvas')
+    canvas.width = raw.width
+    canvas.height = raw.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(raw, 0, 0)
+    const blob = await canvasToBlob(canvas)
+    if (!blob) return
+    await saveBlobToDisk(blob, 'original')
+    await copyBlobToClipboard(blob)
+  } catch (err) {
+    msg.error('PIXI 抽帧失败：' + (err instanceof Error ? err.message : String(err)))
+  } finally {
+    // 挂回原父容器并释放临时容器
+    if (stageMain && parent) parent.addChild(stageMain)
+    tempRoot?.destroy({ children: true })
+  }
 }
 
 function dispose() {
@@ -566,11 +585,19 @@ defineExpose({
     </button>
     <button
       class="reset-view-btn"
-      title="复制原图到剪贴板"
-      aria-label="复制原图到剪贴板"
-      @click="copyOriginalFromView"
+      title="复制原图到剪贴板（2倍分辨率）"
+      aria-label="复制原图到剪贴板（2倍分辨率）"
+      @click="copyOriginalFromView(2)"
     >
       &#x1F3A8;
+    </button>
+    <button
+      class="reset-view-btn"
+      title="复制原图到剪贴板（3倍分辨率）"
+      aria-label="复制原图到剪贴板（3倍分辨率）"
+      @click="copyOriginalFromView(3)"
+    >
+      &#x1F3A8;<sup>3</sup>
     </button>
   </div>
 </template>
@@ -618,12 +645,16 @@ defineExpose({
   transform: scale(0.95);
 }
 
-/* 后续按钮相对前一个按钮偏移 32px，避免逐个硬编码 left */
-.reset-view-btn + .reset-view-btn {
+/* 按 DOM 顺序固定按钮位置，避免相邻选择器链条错位 */
+.reset-view-btn:nth-child(2) {
   left: 40px;
 }
 
-.reset-view-btn + .reset-view-btn + .reset-view-btn {
+.reset-view-btn:nth-child(3) {
   left: 72px;
+}
+
+.reset-view-btn:nth-child(4) {
+  left: 104px;
 }
 </style>

@@ -42,7 +42,21 @@ const targetFileName = computed(() => {
   return `${exportName.value}${f.ext}`
 })
 
-const trackCount = computed(() => store.lanim.tracks.filter((tr) => tr.keys.length).length)
+/**
+ * 可实际产出导出内容的轨道数：普通轨道有 key 即算；
+ * 组合器轨道需 def 存在且至少一个有效成员（与 collectExportTracks 的跳过条件对齐）。
+ */
+const trackCount = computed(() => {
+  let n = store.lanim.tracks.filter((tr) => tr.keys.length).length
+  for (const c of store.lanim.composers ?? []) {
+    if (!c.keys.length) continue
+    const def = store.composerDefs[c.id]
+    if (!def) continue
+    if (!def.resolvedMembers.some((pid) => pid != null)) continue
+    n++
+  }
+  return n
+})
 
 const exporting = ref(false)
 

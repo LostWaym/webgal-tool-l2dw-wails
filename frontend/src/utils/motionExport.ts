@@ -1,4 +1,6 @@
-import { sampleTrack, type LanimFile } from '../stores/motionEditor'
+import { sampleTrack, sampleComposerIndex, type LanimFile } from '../stores/motionEditor'
+import type { ComposerDef } from './motionComposors'
+import { isMemberValid } from './motionComposors'
 
 export interface MotionExportOptions {
   fadeInMs: number
@@ -27,12 +29,62 @@ function sampleFrames(lanim: LanimFile, keys: Parameters<typeof sampleTrack>[0])
   return values
 }
 
+/**
+ * 组合器轨道展开为成员参数的值序列（逐帧采样到末关键帧）。
+ * switch 无插值意义：帧间取所在 key 的激活项，首帧前/末帧后延伸端点。
+ * 激活帧写 def.range.active，其余帧写 def.range.inactive。
+ * def 缺失或激活成员无效的帧写 inactive（保持互斥语义）。
+ */
+function expandComposerFrames(
+  lanim: LanimFile,
+  track: { keys: Array<{ frame: number; v: number }> },
+  def: ComposerDef,
+  memberIndex: number,
+): number[] {
+  const lastFrame = track.keys.length ? track.keys[track.keys.length - 1].frame : 0
+  const values: number[] = []
+  for (let i = 0; i <= lastFrame; i++) {
+    const idx = sampleComposerIndex(track.keys, i)
+    const active = idx === memberIndex && isMemberValid(def, memberIndex)
+    values.push(active ? def.range.active : def.range.inactive)
+  }
+  return values
+}
+
+/** 把组合器轨道展开成成员参数的虚拟轨道，追加进输出轨道列表。 */
+export function collectExportTracks(
+  lanim: LanimFile,
+  defOf: (id: string) => ComposerDef | null,
+): Array<{ paramId: string; keys: Parameters<typeof sampleTrack>[0] }> {
+  const out: Array<{ paramId: string; keys: Parameters<typeof sampleTrack>[0] }> = []
+  for (const track of lanim.tracks) {
+    out.push({ paramId: track.paramId, keys: track.keys })
+  }
+  for (const c of lanim.composers ?? []) {
+    const def = defOf(c.id)
+    if (!def || !c.keys.length) continue
+    def.resolvedMembers.forEach((pid, memberIndex) => {
+      if (pid == null) return
+      const values = expandComposerFrames(lanim, c, def, memberIndex)
+      // 全 inactive 序列无意义，跳过（导出该参数恒为 inactive 无信息量）
+      if (values.every((v) => v === def.range.inactive)) return
+      const keys = values.map((v, frame) => ({ frame, v }))
+      out.push({ paramId: pid, keys })
+    })
+  }
+  return out
+}
+
 /** 导出 Cubism 2 .mtn 文本（逐帧采样格式）。 */
-export function buildMtn(lanim: LanimFile, opts: MotionExportOptions): string {
+export function buildMtn(
+  lanim: LanimFile,
+  opts: MotionExportOptions,
+  defOf: (id: string) => ComposerDef | null = () => null,
+): string {
   const lines: string[] = ['# Live2D Animator Motion Data', `$fps=${lanim.fps}`]
   lines.push('', `$fadein=${Math.max(0, Math.round(opts.fadeInMs))}`)
   lines.push('', `$fadeout=${Math.max(0, Math.round(opts.fadeOutMs))}`)
-  for (const track of lanim.tracks) {
+  for (const track of collectExportTracks(lanim, defOf)) {
     if (!track.keys.length) continue
     const values = sampleFrames(lanim, track.keys)
     const allSame = values.every((v) => v === values[0])
@@ -50,12 +102,16 @@ interface Motion3Curve {
 }
 
 /** 导出 Cubism 3+ motion3.json 文本（逐帧采样线性段）。 */
-export function buildMotion3Json(lanim: LanimFile, opts: MotionExportOptions): string {
+export function buildMotion3Json(
+  lanim: LanimFile,
+  opts: MotionExportOptions,
+  defOf: (id: string) => ComposerDef | null = () => null,
+): string {
   const curves: Motion3Curve[] = []
   let totalSegmentCount = 0
   let totalPointCount = 0
 
-  for (const track of lanim.tracks) {
+  for (const track of collectExportTracks(lanim, defOf)) {
     if (!track.keys.length) continue
     const values = sampleFrames(lanim, track.keys)
     const segments: number[] = [0, values[0]]

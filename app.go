@@ -777,6 +777,62 @@ func (a *App) ReadMotionPresetFile(filename string) (string, error) {
 	return string(data), nil
 }
 
+// composerDir 返回动作编辑器组合器定义目录的绝对路径。
+// 优先使用环境变量 L2DW_MOTION_COMPOSORS_DIR 覆盖；否则相对于
+// 可执行文件所在目录下的 assets/motion_composors 解析；解析失败时
+// 回退到当前工作目录下的 assets/motion_composors。
+func composerDir() string {
+	if v := os.Getenv("L2DW_MOTION_COMPOSORS_DIR"); v != "" {
+		return v
+	}
+	if exe, err := os.Executable(); err == nil {
+		return filepath.Join(filepath.Dir(exe), "assets", "motion_composors")
+	}
+	return filepath.Join("assets", "motion_composors")
+}
+
+// ListComposerFiles 列出组合器定义目录下所有 .json 文件的 basename。
+// 不存在的目录返回空切片（不报错），以便前端可以无感降级。
+func (a *App) ListComposerFiles() ([]string, error) {
+	dir := composerDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+	out := []string{}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasSuffix(strings.ToLower(name), ".json") {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out, nil
+}
+
+// ReadComposerFile 读取指定组合器定义文件的内容。filename 必须是
+// ListComposerFiles 返回的 basename 之一，防止越界读取目录之外的文件。
+func (a *App) ReadComposerFile(filename string) (string, error) {
+	if filename == "" {
+		return "", fmt.Errorf("ReadComposerFile: filename is empty")
+	}
+	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
+		return "", fmt.Errorf("ReadComposerFile: invalid filename %q", filename)
+	}
+	path := filepath.Join(composerDir(), filename)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // filterPresetDir 返回滤镜预设目录的绝对路径。优先使用环境变量
 // L2DW_FILTER_PRESETS_DIR 覆盖；否则相对于可执行文件所在目录下的
 // assets/filter_presets 解析；解析失败时回退到当前工作目录下的

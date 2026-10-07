@@ -99,6 +99,7 @@ async function onRender() {
       },
       (p) => setProgress(p.phase, p.percent, p.label),
       () => abortFlag,
+      store.composerDefOf,
     )
     if (!result) {
       msg.info('渲染已中止')

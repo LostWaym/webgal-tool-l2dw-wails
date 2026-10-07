@@ -18,12 +18,23 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SearchInput from '../common/SearchInput.vue'
 import EditRangeCard from '../ModelEditApp/EditRangeCard.vue'
+import ComposerHeadCard from './ComposerHeadCard.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
 import { listParameters, listPhysicsOutputIds, type ParamEntry } from '../../live2d/coreAdapter'
 import { filterBySearch } from '../../utils/searchUtils'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
-import { useMotionEditorStore, sampleTrack } from '../../stores/motionEditor'
-import { ListMotionPresetFiles, ReadMotionPresetFile } from '../../../wailsjs/go/main/App'
+import { useMotionEditorStore, sampleTrack, sampleComposerIndex } from '../../stores/motionEditor'
+import {
+  resolveComposerMembers,
+  isMemberValid,
+  loadComposerDefsByIds,
+  type ComposerDef,
+} from '../../utils/motionComposors'
+import {
+  ListMotionPresetFiles,
+  ReadMotionPresetFile,
+  ListComposerFiles,
+} from '../../../wailsjs/go/main/App'
 
 const wmdlStore = useWmdlModelEditorStore()
 const store = useMotionEditorStore()
@@ -52,6 +63,7 @@ function refreshParams() {
     for (const p of next) ranges[p.id] = [p.min, p.max]
     store.paramRanges = ranges
     store.sortTracksByParamOrder(next.map((p) => p.id))
+    resolveAllComposers()
   }
   for (const p of next) {
     if (!(p.id in store.liveValues)) store.liveValues[p.id] = p.value
@@ -67,9 +79,10 @@ function isPhysics(id: string): boolean {
 const filtered = computed(() => {
   const base = showPhysics.value ? params.value : params.value.filter((p) => !isPhysics(p.id))
   const presetVis = presetVisibility.value
+  const memberIds = store.composerMemberParamIds
   const afterPreset = presetVis
-    ? base.filter((p) => presetVis.get(p.id) !== false)
-    : base
+    ? base.filter((p) => presetVis.get(p.id) !== false && !memberIds.has(p.id))
+    : base.filter((p) => !memberIds.has(p.id))
   return filterBySearch(afterPreset, search.value, (p) => p.id)
 })
 
@@ -153,6 +166,106 @@ function onDocClick(e: MouseEvent) {
   const root = document.getElementById('motion-preset-root')
   if (root && !root.contains(e.target as Node)) {
     presetOpen.value = false
+  }
+}
+
+// ── 组合器（motion_composors） ─────────────────────────────────────────────
+
+const composerFiles = ref<string[]>([])
+const composerOpen = ref(false)
+/** 添加下拉选中的文件名（仅添加入口用，非轨道状态） */
+const composerLoading = ref(false)
+
+/** 模型参数变化时重解析所有 def 的成员（唯一 resolve 入口）。 */
+function resolveAllComposers() {
+  const ids = params.value.map((p) => p.id)
+  for (const def of Object.values(store.composerDefs)) {
+    resolveComposerMembers(def, ids)
+  }
+}
+
+async function loadComposerFiles() {
+  try {
+    composerFiles.value = await ListComposerFiles()
+  } catch {
+    composerFiles.value = []
+  }
+}
+
+async function toggleComposer() {
+  if (!composerOpen.value) {
+    await loadComposerFiles()
+  }
+  composerOpen.value = !composerOpen.value
+}
+
+async function onComposerPick(filename: string) {
+  if (composerLoading.value) return
+  composerLoading.value = true
+  try {
+    const id = filename.replace(/\.json$/i, '')
+    const { defs, failed } = await loadComposerDefsByIds([id])
+    const def = defs[id]
+    if (!def) {
+      console.error('failed to load composer', id, failed[0]?.reason)
+      return
+    }
+    resolveComposerMembers(def, params.value.map((p) => p.id))
+    store.composerDefs[id] = def
+    store.addComposerTrack(def)
+  } catch (e) {
+    console.error('failed to read composer file', filename, e)
+  } finally {
+    composerLoading.value = false
+  }
+}
+
+/** 已建轨的组合器轨道（渲染行头与车道用）。 */
+const composerTracks = computed(() => store.lanim.composers ?? [])
+
+/** 组合器行同样受搜索栏过滤：匹配目标 = def 显示名（缺失时用 id）。 */
+const filteredComposerTracks = computed(() => {
+  return filterBySearch(composerTracks.value, search.value, (c) => {
+    return composerDefOf(c.id)?.name ?? c.id
+  })
+})
+
+function composerDefOf(id: string): ComposerDef | null {
+  return store.composerDefs[id] ?? null
+}
+
+/** 组合器轨道 def 是否缺失（灰显不可 k 帧）。 */
+function isComposerMissing(id: string): boolean {
+  return !composerDefOf(id)
+}
+
+/** 组合器轨道在播放头帧的激活成员索引。 */
+function composerDisplayIndex(id: string): number {
+  const track = composerTracks.value.find((c) => c.id === id)
+  if (!track) return -1
+  return sampleComposerIndex(track.keys, store.playhead)
+}
+
+function onComposerValueChange(id: string, index: number) {
+  store.applyComposerValue(id, index)
+}
+
+function hasComposerKeyAtPlayhead(id: string): boolean {
+  const track = composerTracks.value.find((c) => c.id === id)
+  if (!track) return false
+  return track.keys.some((k) => k.frame === store.playhead)
+}
+
+function onRemoveComposerKeyAtPlayhead(id: string) {
+  store.removeComposerKeyNear(id, store.playhead)
+}
+
+function onToggleComposerTrack(id: string) {
+  if (composerTracks.value.some((c) => c.id === id)) {
+    store.removeComposerTrack(id)
+  } else {
+    const def = composerDefOf(id)
+    if (def) store.addComposerTrack(def)
   }
 }
 
@@ -394,8 +507,9 @@ function fmtTime(frame: number): string {
 // ── 拖拽（播放头 / 关键帧） ─────────────────────────────────────────────────
 
 interface DragState {
-  kind: 'key' | 'playhead'
+  kind: 'key' | 'playhead' | 'composerKey'
   paramId?: string
+  composerId?: string
   fromFrame?: number
 }
 
@@ -408,6 +522,9 @@ function onWindowMove(e: MouseEvent) {
     store.playhead = f
   } else if (drag.kind === 'key' && drag.paramId !== undefined && drag.fromFrame !== undefined) {
     store.moveKeyframe(drag.paramId, drag.fromFrame, f)
+    drag.fromFrame = f
+  } else if (drag.kind === 'composerKey' && drag.composerId !== undefined && drag.fromFrame !== undefined) {
+    store.moveComposerKey(drag.composerId, drag.fromFrame, f)
     drag.fromFrame = f
   }
 }
@@ -455,6 +572,20 @@ function onKeyframeContext(paramId: string, frame: number, e: MouseEvent) {
   store.removeKeyframeNear(paramId, frame)
 }
 
+function onComposerKeyDown(id: string, frame: number, e: MouseEvent) {
+  beginDrag({ kind: 'composerKey', composerId: id, fromFrame: frame }, e)
+}
+
+function onComposerKeyDblClick(frame: number, e: MouseEvent) {
+  e.stopPropagation()
+  store.playhead = frame
+}
+
+function onComposerKeyContext(id: string, frame: number, e: MouseEvent) {
+  e.preventDefault()
+  store.removeComposerKeyNear(id, frame)
+}
+
 // 左列垂直同步目标
 const headEl = ref<HTMLElement | null>(null)
 
@@ -487,6 +618,28 @@ function onHeadDrag(dx: number) {
           </li>
           <li v-if="presetFiles.length === 0" class="preset-empty">
             无可用预设
+          </li>
+        </ul>
+      </div>
+      <div id="motion-composer-root" class="preset-root">
+        <button
+          class="preset-toggle"
+          :class="{ 'is-open': composerOpen }"
+          @click="toggleComposer"
+        >
+          组合器 <span class="caret">▾</span>
+        </button>
+        <ul v-if="composerOpen" class="preset-menu">
+          <li
+            v-for="name in composerFiles"
+            :key="name"
+            class="preset-item"
+            @click="onComposerPick(name)"
+          >
+            {{ name }}
+          </li>
+          <li v-if="composerFiles.length === 0" class="preset-empty">
+            无可用组合器
           </li>
         </ul>
       </div>
@@ -545,6 +698,44 @@ function onHeadDrag(dx: number) {
               {{ isTracked(p.id) ? '−' : '+' }}
             </button>
           </div>
+          <!-- 组合器轨道行头 -->
+          <div
+            v-for="c in filteredComposerTracks"
+            :key="'composer-' + c.id"
+            class="head-row"
+            :class="{ 'is-selected': store.selectedTrackId === 'composer:' + c.id }"
+            :style="{ height: ROW_H + 'px' }"
+          >
+            <ComposerHeadCard
+              v-if="composerDefOf(c.id)"
+              :def="composerDefOf(c.id)!"
+              :model-value="composerDisplayIndex(c.id)"
+              :highlight="true"
+              :disabled="false"
+              @update:model-value="onComposerValueChange(c.id, $event)"
+            />
+            <div v-else class="head-row__missing">
+              <span>组合器 {{ c.id }} 定义缺失</span>
+            </div>
+            <button
+              v-if="hasComposerKeyAtPlayhead(c.id)"
+              type="button"
+              class="head-row__btn head-row__btn--del"
+              :title="`移除第 ${store.playhead} 帧的关键帧`"
+              @click.stop="onRemoveComposerKeyAtPlayhead(c.id)"
+            >
+              ✕
+            </button>
+            <button
+              type="button"
+              class="head-row__btn"
+              :class="{ 'is-tracked': true }"
+              title="移除组合器轨道"
+              @click.stop="onToggleComposerTrack(c.id)"
+            >
+              −
+            </button>
+          </div>
         </div>
       </div>
       <ResizeHandle side="right" @drag="onHeadDrag" />
@@ -593,6 +784,26 @@ function onHeadDrag(dx: number) {
               />
             </template>
           </div>
+          <!-- 组合器车道（只显示帧点，垂直居中） -->
+          <div
+            v-for="c in filteredComposerTracks"
+            :key="'composer-' + c.id"
+            class="lane-row"
+            :class="{ 'is-selected': store.selectedTrackId === 'composer:' + c.id }"
+            :style="{ height: ROW_H + 'px' }"
+          >
+            <div
+              v-for="key in c.keys"
+              :key="key.frame"
+              class="lane-row__key lane-row__key--composer"
+              :class="{ 'is-missing': isComposerMissing(c.id) }"
+              :style="{ left: f2x(key.frame) + 'px', top: '50%' }"
+              :title="isComposerMissing(c.id) ? '组合器定义缺失' : '拖动改帧 / 双击移动播放头 / 右键删除'"
+              @mousedown="onComposerKeyDown(c.id, key.frame, $event)"
+              @dblclick.stop="onComposerKeyDblClick(key.frame, $event)"
+              @contextmenu="onComposerKeyContext(c.id, key.frame, $event)"
+            />
+          </div>
         </div>
       </div>
       <!-- 播放头覆盖层（不随滚动；left 随 lanesOffsetX/scrollLeft 修正） -->
@@ -604,7 +815,7 @@ function onHeadDrag(dx: number) {
         }"
       />
     </div>
-    <div v-if="!filtered.length" class="track-panel__empty">无匹配参数</div>
+    <div v-if="!filtered.length && !filteredComposerTracks.length" class="track-panel__empty">无匹配参数</div>
   </div>
 </template>
 
@@ -911,6 +1122,44 @@ function onHeadDrag(dx: number) {
 
 .lane-row__key:hover {
   background: #56a0ff;
+}
+
+/* 组合器帧点：绿色系以示区分；定义缺失时灰显 */
+.lane-row__key--composer {
+  background: #2ea043;
+  border-color: #1a6b2c;
+}
+
+.lane-row__key--composer:hover {
+  background: #4bcc64;
+}
+
+.lane-row__key--composer.is-missing {
+  background: #4a5160;
+  border-color: #33383f;
+  cursor: not-allowed;
+}
+
+/* 组合器定义缺失的行头灰显提示 */
+.head-row__missing {
+  flex: 1;
+  min-width: 0;
+  height: calc(100% - 6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #14171c;
+  border: 1px solid #2c313a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.head-row__missing span {
+  color: #6b7280;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 播放头覆盖层（层级低于行头列，高于车道） */

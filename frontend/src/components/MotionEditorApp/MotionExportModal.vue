@@ -68,8 +68,8 @@ async function onConfirm() {
 
   const content =
     state.format === 'mtn'
-      ? buildMtn(store.lanim, { fadeInMs, fadeOutMs })
-      : buildMotion3Json(store.lanim, { fadeInMs, fadeOutMs, minify: minify.value })
+      ? buildMtn(store.lanim, { fadeInMs, fadeOutMs }, store.composerDefOf)
+      : buildMotion3Json(store.lanim, { fadeInMs, fadeOutMs, minify: minify.value }, store.composerDefOf)
 
   exporting.value = true
   try {

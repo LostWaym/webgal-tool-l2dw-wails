@@ -23,6 +23,8 @@ import {
   normalizeLanim,
   restoreParamDefaults,
 } from '../../stores/motionEditor'
+import { resolveComposerMembers, loadComposerDefsByIds } from '../../utils/motionComposors'
+import { listParameters } from '../../live2d/coreAdapter'
 import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
 import { useMotionExportModal } from '../../composables/useMotionExportModal'
@@ -116,7 +118,54 @@ function onStageDrag(dx: number) {
 
 // ── store 桥接 ──────────────────────────────────────────────────────────────
 
-store.applier = (params) => stageRef.value?.applyParameters(params)
+/**
+ * 组合器写入探针（常驻诊断）：本次写入与组合器成员有交集时，
+ * 写后立即与 update 后各读回一次参数值，用于区分「写入未落地」与「逐帧求值覆盖」。
+ */
+function composerReadback(
+  models: Array<any>,
+  writes: Array<{ id: string; val: number; calc: ParamCalc }>,
+  tag: string,
+) {
+  return models.map((m, mi) => {
+    const core = m?.internalModel?.coreModel
+    if (!core) return { model: mi, error: 'no coreModel' }
+    const read = (id: string) =>
+      typeof core.getParameterValueById === 'function'
+        ? core.getParameterValueById(id)
+        : typeof core.getParamFloat === 'function'
+          ? core.getParamFloat(id)
+          : undefined
+    const snap: Record<string, number | undefined> = {}
+    for (const { id } of writes) snap[id] = read(id)
+    return { model: mi, values: snap, tag }
+  })
+}
+
+store.applier = (params) => {
+  const stage = stageRef.value
+  if (!stage) return
+  const memberIds = store.composerMemberParamIds
+  const hitsComposer = params.some((p) => memberIds.has(p.id))
+  if (!hitsComposer) {
+    stage.applyParameters(params)
+    return
+  }
+  const preview = stage.getPreview()
+  const models = preview?.getLoadedModels() ?? []
+  const probe = {
+    writes: params,
+    subModelCount: models.length,
+    writeback: null as unknown,
+    afterUpdate: null as unknown,
+  }
+  stage.applyParameters(params)
+  probe.writeback = composerReadback(models, params, 'writeback')
+  const FIXED_DT = 1000 / 60
+  for (const m of models) (m as any).update?.(FIXED_DT)
+  probe.afterUpdate = composerReadback(models, params, 'afterUpdate')
+  console.log('[composer] write-probe', probe)
+}
 
 // 播放中任何实时值修改 → 立即打断播放（停在当前位置）
 store.onLiveValueChange = () => {
@@ -140,7 +189,7 @@ let rafId = 0
 let playStart = 0
 
 function applySampled(frame: number) {
-  const sampled = sampleLanim(store.lanim, frame)
+  const sampled = sampleLanim(store.lanim, frame, store.composerDefOf)
   if (!sampled.size) return
   const params: Array<{ id: string; val: number; calc: ParamCalc }> = []
   sampled.forEach((val, id) => params.push({ id, val, calc: 'set' }))
@@ -185,9 +234,9 @@ watch(
   },
 )
 
-/** 关键帧变动（拖动/插帧/删帧）→ 非播放态下重新采样当前帧刷新预览。 */
+/** 关键帧变动（拖动/插帧/删帧，含组合器轨道）→ 非播放态下重新采样当前帧刷新预览。 */
 watch(
-  () => store.lanim.tracks,
+  () => [store.lanim.tracks, store.lanim.composers],
   () => {
     if (!store.playing) applySampled(store.playhead)
   },
@@ -256,11 +305,36 @@ async function onLoad() {
       msg.error('文件不是有效的 lanim 动画文件')
       return
     }
-    // 换文件前把旧轨道的动画残留值恢复为参数默认值
+    // 换文件前把旧轨道（含组合器成员参数）的动画残留值恢复为参数默认值
     restoreParamDefaults(store.lanim.tracks.map((tr) => tr.paramId))
+    const oldComposerMemberIds: string[] = []
+    for (const track of store.lanim.composers ?? []) {
+      const def = store.composerDefs[track.id]
+      if (!def) continue
+      for (const pid of def.resolvedMembers) {
+        if (pid != null) oldComposerMemberIds.push(pid)
+      }
+    }
+    restoreParamDefaults(oldComposerMemberIds)
+
     store.lanim = lanim
     store.lanimFilePath = picked
     store.playhead = 0
+    store.resetComposerLog()
+
+    // 补载 lanim 引用的组合器 def（会话内尚未加载的）；缺失的逐条弹提示
+    const ids = (lanim.composers ?? []).map((c) => c.id)
+    const missing = ids.filter((id) => !store.composerDefs[id])
+    if (missing.length) {
+      const { defs, failed } = await loadComposerDefsByIds(missing)
+      for (const [id, def] of Object.entries(defs)) {
+        store.composerDefs[id] = def
+        resolveComposerMembers(def, listParameters(wmdlStore.selectedModelId).map((p) => p.id))
+      }
+      for (const f of failed) {
+        msg.warning(`组合器「${f.id}」加载失败：${f.reason}`)
+      }
+    }
     msg.success('加载成功')
   } catch (err) {
     msg.error(`加载失败：${err}`)

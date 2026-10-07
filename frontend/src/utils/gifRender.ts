@@ -1,5 +1,6 @@
 import { GIFEncoder, quantize, applyPalette } from 'gifenc'
 import { sampleLanim, type LanimFile } from '../stores/motionEditor'
+import type { ComposerDef } from './motionComposors'
 import type { ParamCalc } from '../stores/wmdlTypes'
 
 /** 抓帧用：调用方（MotionEditApp）注入的预览桥接能力。 */
@@ -115,6 +116,7 @@ export async function renderLanimToGif(
   opts: GifRenderOptions,
   onProgress: (p: GifRenderProgress) => void,
   shouldAbort: () => boolean,
+  composerDefOf: (id: string) => ComposerDef | null = () => null,
 ): Promise<GifRenderResult | null> {
   const viewport = bridge.getViewportPixelSize()
   if (!viewport || viewport.width <= 0 || viewport.height <= 0) {
@@ -133,7 +135,7 @@ export async function renderLanimToGif(
   for (let i = 0; i < frames.length; i++) {
     if (shouldAbort()) return null
     const frame = frames[i]
-    const sampled = sampleLanim(lanim, frame)
+    const sampled = sampleLanim(lanim, frame, composerDefOf)
     const params: Array<{ id: string; val: number; calc: ParamCalc }> = []
     sampled.forEach((val, id) => params.push({ id, val, calc: 'set' }))
     bridge.applyParameters(params)

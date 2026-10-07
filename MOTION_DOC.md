@@ -30,6 +30,9 @@
 | 渲染模态 | GIF 渲染导出：输出 fps（决定采样步长）、帧范围、尺寸（视口倍率/固定宽度）、底色、循环、色数、帧间差分 | `MotionGifRenderModal.vue` + `useMotionGifRenderModal.ts` + `utils/gifRender.ts` |
 | 主 header | 顶部工具栏：播放/暂停（合并单按钮）、停止、当前帧显示（可点击开模态）、导出、渲染、保存/另存/加载 | `MotionEditApp.vue` |
 | 参数预设下拉 | 搜索栏旁「预设 ▾」，按正则批量筛选参数显示（与搜索关键字共同筛选） | `MotionTrackPanel.vue` 搜索行，预设目录 `assets/motion_part_presets` |
+| 组合器 | 将多个互斥参数（值域一般 0~1）合并为一条轨道，类型仅 `switch`：任一时刻只激活一个成员（写激活值，其余写非激活值） | 行头 `ComposerHeadCard.vue`，数据 `utils/motionComposors.ts`，目录 `assets/motion_composors` |
+| 组合器下拉 | 搜索栏旁「组合器 ▾」，点选即按定义文件建轨 | `MotionTrackPanel.vue` 搜索行 |
+| 组合器行头卡片 | 复用 range-card 壳但值区为 dropdown（无滑条/无 min-max）；点选项 = 当前帧打帧 + 实时写模型 | `ComposerHeadCard.vue` |
 
 ## 交互速查
 
@@ -45,6 +48,36 @@
 - 行头显示值 = 有轨道时为当前帧采样值（随播放头刷新），无轨道为实时值
 - 布局自适应：窗口缩放时时间轴吸收全部伸缩量，预览区不动
 - 参数预设：格式同 part_presets 的开关版——每行 `正则=1/0`（`#` 注释，非法正则忽略），按行顺序覆盖，未匹配参数默认显示；筛选链 = 物理开关 → 预设 → 搜索；重复点同一预设取消选中；Go 绑定 `ListMotionPresetFiles` / `ReadMotionPresetFile`（目录可由 env `L2DW_MOTION_PART_PRESETS_DIR` 覆盖）
+- 组合器（switch）：dropdown 点选项 = 当前帧打帧并把激活成员写激活值、其余成员写非激活值（静态切换即时生效）；建轨时默认激活第一个成员并打帧；建轨会移除成员参数的普通轨道
+- 组合器车道只显示帧点（垂直居中，绿色，无采样折线）；拖动改帧 / 双击跳播放头 / 右键删帧与普通轨道一致
+- 组合器成员参数从普通参数列表中排除；组合器行受搜索栏过滤（匹配 def 显示名）
+- 组合器行头 dropdown 弹层 Teleport 到 body（fixed 定位）：底部行向上翻转 + 视口内夹紧；菜单内滚轮/拖滚动条不关闭，外部滚动/resize 关闭
+- 删组合器帧 / 拖帧点（非播放态）→ 预览即时重采样（关键帧变动 watch 同时覆盖 tracks 与 composers）
+
+## 组合器定义文件（assets/motion_composors/*.json）
+
+- 一个文件 = 一个组合器；文件名去 `.json` 后缀 = 组合器 id（lanim 中的引用键）
+- Go 绑定 `ListComposerFiles` / `ReadComposerFile`（目录可由 env `L2DW_MOTION_COMPOSORS_DIR` 覆盖）；解析在前端 `utils/motionComposors.ts`
+
+```jsonc
+{
+  "type": "switch",            // 目前仅 switch，非法值整个文件忽略
+  "name": "右手切换",           // 显示名；缺失时回退 id
+  "ignoreNameCase": true,      // 可选，默认 false；成员 ID 匹配模型参数时忽略大小写
+  "range": { "active": 0, "inactive": -1 },  // 可选，默认 1/0；激活/非激活写入值（适配 -1~0 参数域的模型）
+  "members": ["hand_R_01", "..."]  // 成员参数 ID，顺序 = dropdown 顺序；自动去重
+}
+```
+
+- 解析失败（type 非法 / members 非法 / range 非法）→ 整个文件忽略；成员解析不到模型参数时该成员无效（dropdown 灰显划线，采样/导出跳过）
+- 成员 resolve 的唯一入口是 `resolveComposerMembers`（模型参数列表变化时全量重算）
+- 加载含 composer 引用的 lanim 时自动补载缺失 def（`loadComposerDefsByIds`）；加载失败逐条弹 warning，def 缺失的轨道灰显「定义缺失」且采样/导出跳过，不静默删除
+
+## 采样与导出中的组合器
+
+- `sampleLanim` 内部统一处理组合器展开（激活成员 = active 值，其余 = inactive 值），播放 / 播放头拖动 / GIF 渲染走同一出口
+- 导出时组合器轨道展开为成员参数的值序列（无插值，帧间取所在 key 的激活项，端点延伸；全 inactive 序列跳过）
+- 诊断 log（常驻）：`[composer] apply` = 手动切换/建轨（含 writes、skippedInvalid、hasApplier）；`[composer] sample` = 采样激活状态变化时；`[composer] write-probe` = 写入后与 update 后的 coreModel 读回（仅组合器写入触发）
 
 ## 数据与核心文件
 
@@ -60,6 +93,8 @@
 | `frontend/src/composables/useMotionExportModal.ts` | 导出模态 reactive 单例状态（visible / format） |
 | `frontend/src/components/ModelEditApp/ResizeHandle.vue` | 通用拖拽分隔条（本编辑器两处复用） |
 | `frontend/src/components/ModelEditApp/EditRangeCard.vue` | 通用参数滑条卡片（行头复用） |
+| `frontend/src/utils/motionComposors.ts` | 组合器定义文件解析 + 成员 resolve + 批量补载（唯一入口） |
+| `frontend/src/components/MotionEditorApp/ComposerHeadCard.vue` | 组合器行头卡片（dropdown，Teleport 弹层） |
 
 ## 数据格式（.lanim.json）
 
@@ -71,6 +106,9 @@
   "durationFrames": 180,   // 总时长（帧）
   "tracks": [
     { "paramId": "ParamEyeLOpen", "keys": [ { "frame": 0, "v": 0 }, { "frame": 60, "v": 1 } ] }
+  ],
+  "composers": [           // 可选；组合器轨道，只存 id 引用 + 帧数据，def 结构不写入
+    { "id": "hand_R", "keys": [ { "frame": 0, "v": 0 }, { "frame": 60, "v": 2 } ] }  // v = 成员索引
   ]
 }
 ```
@@ -109,4 +147,6 @@
 - 行高是固定像素（标尺 26 / 行 70），行头与车道靠 `@scroll` 的 translateY 同步，改行高要两列同步改（`RULER_H` / `ROW_H` 常量）
 - `Live2dPreview` 加载时已传 `idleMotionGroup:''` + `autoInteract:false`，外部写参数不会被 motion 覆盖
 - `Live2dPreview` 的重载 watch 是**模型组指纹**（`id:jsonAbsPath`）而非 deep watch——深层编辑（initParams 等）不会触发重载；`loadWmdlModels` 内有 loadSeq token 防晚到竞态；`MotionStage` 的 runtime 同步 watch 用同款指纹（不要改回 `models.length`，否则重载后 Map 指向已销毁的旧实例）
+- 组合器 dropdown 弹层：必须先 `open = true` 再调度 `nextTick` 测量高度（反序时回调先于渲染执行、高度为 0，翻转逻辑失效）；多实例卡片禁止用重复 id + `getElementById` 定位弹层，需用组件内 ref；菜单自身滚动与外部滚动要按事件 target 区分（capture 级 scroll 监听会误伤菜单内滚轮/滚动条）
+- 部分模型切换组参数的值域不是 0~1（如 -1~0），组合器写死 1/0 会越界失效——用 def 的 `range` 字段适配，勿改回硬编码
 - 修改 Go 绑定后需 `wails generate module` 重新生成 wailsjs

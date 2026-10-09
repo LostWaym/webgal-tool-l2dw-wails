@@ -478,6 +478,17 @@ const ticks = computed(() => {
   return out
 })
 
+/** 行头列滚轮：转发垂直滚动到车道容器（边界时放行冒泡）。 */
+function onHeadsWheel(e: WheelEvent) {
+  const el = lanesEl.value
+  if (!el) return
+  const maxTop = el.scrollHeight - el.clientHeight
+  const next = el.scrollTop + e.deltaY
+  if ((e.deltaY < 0 && el.scrollTop <= 0) || (e.deltaY > 0 && next >= maxTop)) return
+  e.preventDefault()
+  el.scrollTop = next
+}
+
 /** Ctrl + 滚轮：以鼠标所在帧为中心缩放刻度密度。 */
 function onLanesWheel(e: WheelEvent) {
   if (!e.ctrlKey) return
@@ -654,7 +665,7 @@ function onHeadDrag(dx: number) {
     </div>
     <div class="track-panel__body">
       <!-- 左列：行头（垂直滚动由右列 scroll 事件同步） -->
-      <div class="track-panel__heads" :style="{ width: headWidth + 'px' }">
+      <div class="track-panel__heads" :style="{ width: headWidth + 'px' }" @wheel="onHeadsWheel">
         <div ref="headEl" class="track-panel__heads-inner">
           <div class="head-row head-row--ruler" :style="{ height: RULER_H + 'px' }">
             <span class="head-row__ruler-info">{{ store.playhead }}帧 ({{ fmtTime(store.playhead) }}s)</span>

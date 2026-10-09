@@ -123,6 +123,11 @@ export function buildMotion3Json(
         pointCount++
         segmentCount++
       }
+    } else {
+      // 常量曲线补 1 段延伸到 Duration：runtime parse 对 0 段曲线会越界写 segments[totalSegmentCount]
+      segments.push(0, lanim.durationFrames / lanim.fps, values[0])
+      pointCount++
+      segmentCount++
     }
     curves.push({
       Target: 'Parameter',

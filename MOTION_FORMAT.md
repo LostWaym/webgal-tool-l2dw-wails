@@ -138,7 +138,7 @@ lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 tr
 
 ### lanim → motion3.json
 
-1. 每条轨道一个 Curve：`Target="Parameter"`，逐帧采样生成线性段（帧 0..末关键帧帧号，尾部裁剪）——首点 `(0, v0)`，每帧追加 `0, i/fps, v[i]`（type 0）；常量参数仅首点、0 段。`Meta.Duration` 仍为全局 `durationFrames/fps`，不随单轨道缩短。
+1. 每条轨道一个 Curve：`Target="Parameter"`，逐帧采样生成线性段（帧 0..末关键帧帧号，尾部裁剪）——首点 `(0, v0)`，每帧追加 `0, i/fps, v[i]`（type 0）；常量参数补 1 段线性延伸到 `Meta.Duration`（值恒定，视觉等价；0 段会导致 runtime parse 越界写 segments）。`Meta.Duration` 仍为全局 `durationFrames/fps`，不随单轨道缩短。
 2. `Meta`：`Duration = durationFrames/fps`、`Fps`、`Loop: true`、`AreBeziersRestricted: true`、`FadeInTime/FadeOutTime`（模态内 ms 输入 ÷ 1000）、`CurveCount / TotalSegmentCount / TotalPointCount` 实算，UserData 置 0。
 3. `Version` 固定 `3`；`minify` 选项控制是否单行 JSON。
 
@@ -147,7 +147,7 @@ lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 tr
 1. 头部映射：`$fps` → `Meta.Fps`；最长参数曲线长度算出 `Meta.Duration`；`$fadein/$fadeout`(ms) → `Meta.FadeInTime/FadeOutTime`(s)；逐参 fadeout → 各 Curve 的 `FadeInTime/FadeOutTime`(s，未设则 -1)。
 2. 每个 `PARAM_X=v0,v1,...` 生成一个 Curve：`Target="Parameter"`（若该 ID 映射到部件透明度则用 `PartOpacity`），`Id` 按参数映射表转换。
 3. 值序列转 Segments：首点 `(0, v0)`，每帧追加 `0, i/fps, v[i]`（type 0）。若需压缩体积，共线连续点可合并成一段线性（同时更新 TotalSegmentCount/TotalPointCount）。
-4. 常量参数仍导出一条 Curve：`Segments=[0, v]`（只有首点、0 段），建议保留以维持参数表完整性。
+4. 常量参数仍导出一条 Curve：`Segments=[0, v, 0, Duration, v]`（补 1 段延伸到 Duration，避免 runtime parse 越界），建议保留以维持参数表完整性。
 5. `Loop` 与 `AreBeziersRestricted` 置 `true` 安全（mtn 逐帧格式天然无缝循环）；`UserDataCount/TotalUserDataSize` 置 0，可省略顶层 `UserData` 数组。
 
 ### ID 体系注意事项

@@ -8,7 +8,7 @@
  * 不直接引用 ActorStage，而是通过 emit 'apply-params' 事件，
  * 由父组件 ActorEditApp 统一路由到舞台的 applyParameters()。
  */
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { pathCombine, pathDirname } from '../../path_utils'
 import {
@@ -28,6 +28,7 @@ import EditRangeCard from '../ModelEditApp/EditRangeCard.vue'
 import SearchInput from '../common/SearchInput.vue'
 import { filterBySearch } from '../../utils/searchUtils'
 import type { ParamCalc } from '../../stores/wmdlTypes'
+import { listPhysicsOutputIds } from '../../live2d/coreAdapter'
 
 const emit = defineEmits<{
   (e: 'apply-params', params: Array<{ id: string; val: number; calc: ParamCalc }>): void
@@ -44,14 +45,35 @@ const currentSnapshot = ref<ParamSnapshot[]>([])
 const activeExpressionKey = ref<string | null>(null)
 const paramSearch = ref('')
 
+/** 是否显示被物理驱动的参数（显示时禁用交互 + 遮罩提示）。 */
+const showPhysics = ref(false)
+/** 物理驱动参数 id 集合。物理 rig 异步编译挂载，需轮询补取（同 MotionTrackPanel 模式）。 */
+const physicsIdSet = ref<Set<string>>(new Set())
+
+function refreshPhysicsIds() {
+  const next = new Set(listPhysicsOutputIds(store.selectedModelId))
+  // 仅在集合规模变化时赋值，避免无谓的响应式更新
+  if (next.size !== physicsIdSet.value.size) {
+    physicsIdSet.value = next
+  }
+}
+
+const physicsPollTimer = window.setInterval(refreshPhysicsIds, 500)
+onBeforeUnmount(() => window.clearInterval(physicsPollTimer))
+
+function isPhysicsParam(id: string): boolean {
+  return physicsIdSet.value.has(id)
+}
+
 /** 导出用的快照：所有有 override 的参数，按 store.initParams 顺序。
- *  calc 缺省按 'set' 处理（界面初始化/手动拖动的语义）；表情加载的条目已在 toRangeCalc 显式写入 calc。 */
+ *  calc 缺省按 'set' 处理（界面初始化/手动拖动的语义）；表情加载的条目已在 toRangeCalc 显式写入 calc。
+ *  物理驱动参数一律不导出（被物理系统每帧覆盖，写入无意义）。 */
 const exportableSnapshot = computed<ParamSnapshot[]>(() => {
   const m = selectedModel.value
   if (!m) return []
   const out: ParamSnapshot[] = []
   for (const entry of m.initParams) {
-    if (entry.override === undefined) continue
+    if (entry.override === undefined || isPhysicsParam(entry.id)) continue
     out.push({
       id: entry.id,
       val: entry.override,
@@ -88,12 +110,14 @@ const paramsView = computed(() => {
     effective: p.override !== undefined ? p.override : p.value,
     hasOverride: p.override !== undefined,
     calc: p.calc ?? 'set',
+    isPhysics: isPhysicsParam(p.id),
   }))
 })
 
-const filteredParams = computed(() =>
-  filterBySearch(paramsView.value, paramSearch.value, (p) => p.id),
-)
+const filteredParams = computed(() => {
+  const base = showPhysics.value ? paramsView.value : paramsView.value.filter((p) => !p.isPhysics)
+  return filterBySearch(base, paramSearch.value, (p) => p.id)
+})
 
 const exprSearch = ref('')
 
@@ -144,10 +168,11 @@ async function onExpressionClick(item: { name: string; path: string }) {
     m.initParams.map((p) => buildApplyEntry(p)),
   )
 
-  // Step 2: 应用表情，把 calc 同步到 range；缺省/none 不写入舞台但 range 标 add
+  // Step 2: 应用表情，把 calc 同步到 range；缺省/none 不写入舞台但 range 标 add。
+  // 物理驱动参数被物理系统每帧覆盖，跳过应用。
   for (const s of result.snapshot) {
     const entry = m.initParams.find((it) => it.id === s.id)
-    if (!entry) continue
+    if (!entry || isPhysicsParam(entry.id)) continue
     entry.calc = toRangeCalc(s.calc)
     entry.override = s.val
     if (s.calc !== 'none') {
@@ -163,6 +188,7 @@ async function onExpressionClick(item: { name: string; path: string }) {
 function onParamChange(id: string, value: number) {
   const m = selectedModel.value
   if (!m) return
+  if (isPhysicsParam(id)) return
   const entry = m.initParams.find((p) => p.id === id)
   if (!entry) return
   entry.override = value
@@ -176,6 +202,7 @@ function onParamChange(id: string, value: number) {
 function onParamReset(id: string) {
   const m = selectedModel.value
   if (!m) return
+  if (isPhysicsParam(id)) return
   const entry = m.initParams.find((p) => p.id === id)
   if (!entry) return
   delete entry.override
@@ -187,16 +214,18 @@ function onResetAllParams() {
   const m = selectedModel.value
   if (!m) return
   for (const entry of m.initParams) {
+    if (isPhysicsParam(entry.id)) continue
     delete entry.override
     entry.calc = 'set'
   }
-  emit('apply-params', m.initParams.map((p) => buildApplyEntry(p)))
+  emit('apply-params', m.initParams.filter((p) => !isPhysicsParam(p.id)).map((p) => buildApplyEntry(p)))
   msg.success('已重置所有参数')
 }
 
 function onCalcTypeChange(id: string, calc: ParamCalc) {
   const m = selectedModel.value
   if (!m) return
+  if (isPhysicsParam(id)) return
   const entry = m.initParams.find((p) => p.id === id)
   if (!entry) return
   entry.calc = calc
@@ -355,6 +384,10 @@ async function onOpenOutputDir() {
             />
           </div>
           <div class="params-tab__actions">
+            <label class="physics-toggle" title="显示被 Live2D 物理系统驱动的参数（只读）">
+              <input v-model="showPhysics" type="checkbox" />
+              <span>显示物理参数</span>
+            </label>
             <button
               class="toolbar-btn"
               :disabled="!paramsView.length"
@@ -371,13 +404,17 @@ async function onOpenOutputDir() {
                   :max="p.max"
                   :model-value="p.effective"
                   :highlight="p.hasOverride"
-                  :show-reset="p.hasOverride"
-                  :show-calc-switch="true"
+                  :show-reset="p.hasOverride && !p.isPhysics"
+                  :show-calc-switch="!p.isPhysics"
                   :calc-type="p.calc"
+                  :disabled="p.isPhysics"
                   @update:model-value="onParamChange(p.id, $event)"
                   @reset="onParamReset(p.id)"
                   @update:calc-type="onCalcTypeChange(p.id, $event)"
                 />
+                <div v-if="p.isPhysics" class="physics-mask">
+                  <span>该参数由物理驱动</span>
+                </div>
               </li>
             </ul>
           </div>
@@ -619,6 +656,41 @@ async function onOpenOutputDir() {
   max-width: 300px;
   min-width: 0;
   display: block;
+  position: relative;
+}
+
+.physics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #c8ceda;
+  cursor: pointer;
+  user-select: none;
+}
+
+.physics-toggle input {
+  width: 13px;
+  height: 13px;
+  accent-color: #2f80ed;
+  cursor: pointer;
+}
+
+.physics-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 15, 0.55);
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.physics-mask span {
+  font-size: 11px;
+  color: #ff6b6b;
 }
 
 .empty-hint {

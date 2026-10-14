@@ -196,6 +196,12 @@ const handler = {
       })
     }
 
+    // bounds：全 0 时不输出参数
+    const b = entry.wmdlConfig?.bounds
+    if (b && b.some((v) => v !== 0)) {
+      inst.setParamValue('bounds', b.join(','))
+    }
+
     // 输出结果
     console.log('[Shortcut] modelFigure:', { entry, name, motion, expression, figurePath, inst })
     console.log('[Shortcut] modelFigure:', inst.toInstString())

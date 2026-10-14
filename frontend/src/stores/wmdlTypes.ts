@@ -83,6 +83,11 @@ export interface WmdlConfig {
   figureTemplate: string
   transformTemplate: string
   live2dBounds: [number, number, number, number]
+  /**
+   * 预览编辑器运行时的 bounds 覆写（-bounds 指令参数 + overWriteBounds 加载参数）。
+   * 首次加载用 live2dBounds 初始化；重载配置时不覆盖。
+   */
+  bounds?: [number, number, number, number]
   models: WmdlModelItem[] // 主模型，...副模型
   wmdlFilePath?: string
 }

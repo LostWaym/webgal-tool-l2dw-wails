@@ -357,6 +357,7 @@ export const useModelStore = defineStore('models', {
           figureTemplate: config.figureTemplate,
           transformTemplate: config.transformTemplate,
           live2dBounds: config.live2dBounds,
+          bounds: [...(config.live2dBounds ?? [0, 0, 0, 0])],
           models: config.models,
           wmdlFilePath: config.wmdlFilePath,
         },
@@ -378,6 +379,8 @@ export const useModelStore = defineStore('models', {
       // 重载不覆盖内存中的指令模板
       config.figureTemplate = entry.wmdlConfig?.figureTemplate ?? config.figureTemplate
       config.transformTemplate = entry.wmdlConfig?.transformTemplate ?? config.transformTemplate
+      // 重载不覆盖内存中的 bounds
+      const keepBounds = entry.wmdlConfig?.bounds
 
       // 更新配置
       Object.assign(entry, {
@@ -389,6 +392,7 @@ export const useModelStore = defineStore('models', {
           figureTemplate: config.figureTemplate,
           transformTemplate: config.transformTemplate,
           live2dBounds: config.live2dBounds,
+          bounds: keepBounds ?? [...(config.live2dBounds ?? [0, 0, 0, 0])],
           models: config.models,
           wmdlFilePath: config.wmdlFilePath,
         },
@@ -453,6 +457,12 @@ export const useModelStore = defineStore('models', {
       if (!entry?.wmdlConfig) return
       if (patch.figureTemplate !== undefined) entry.wmdlConfig.figureTemplate = patch.figureTemplate
       if (patch.transformTemplate !== undefined) entry.wmdlConfig.transformTemplate = patch.transformTemplate
+    },
+    /** 设置当前 wmdl entry 的运行时 bounds（不影响 .wmdl 文件） */
+    setModelBounds(entryId: string, bounds: [number, number, number, number]): void {
+      const entry = this.models.find((m) => m.id === entryId)
+      if (!entry?.wmdlConfig) return
+      entry.wmdlConfig.bounds = [...bounds]
     },
     async playMotion(modelId: string, group: string, index: number, name: string) {
       const entry = this.models.find((m) => m.id === modelId)

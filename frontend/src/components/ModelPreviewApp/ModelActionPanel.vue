@@ -623,6 +623,14 @@ function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures' 
   store.updateFigureGroup(cur.id, { [key]: checked })
 }
 
+function onFigureBoundsChange(index: number, value: number) {
+  const cur = store.selectedModel
+  if (!cur?.wmdlConfig) return
+  const next: [number, number, number, number] = [...(cur.wmdlConfig.bounds ?? [0, 0, 0, 0])]
+  next[index] = value
+  store.setModelBounds(cur.id, next)
+}
+
 function onFigureGroupCleanup() {
   const cur = store.selectedFigureGroup
   if (!cur) return
@@ -1424,6 +1432,41 @@ function onLabelDragEnd() {
             @change="store.setModelIgnoreFigureGroupSelect(store.selectedModel.id, ($event.target as HTMLInputElement).checked)"
           />
         </div>
+        <div v-if="store.selectedModel.kind !== 'image'" class="info-row--stack">
+          <label class="info-label">bounds</label>
+          <div class="bounds-row">
+            <span class="bounds-row__name">x0</span>
+            <NumberInput
+              :model-value="store.selectedModel.wmdlConfig?.bounds?.[0] ?? 0"
+              :step="1"
+              :precision="2"
+              @update:model-value="(v: number) => onFigureBoundsChange(0, v)"
+            />
+            <span class="bounds-row__name">y0</span>
+            <NumberInput
+              :model-value="store.selectedModel.wmdlConfig?.bounds?.[1] ?? 0"
+              :step="1"
+              :precision="2"
+              @update:model-value="(v: number) => onFigureBoundsChange(1, v)"
+            />
+          </div>
+          <div class="bounds-row">
+            <span class="bounds-row__name">x1</span>
+            <NumberInput
+              :model-value="store.selectedModel.wmdlConfig?.bounds?.[2] ?? 0"
+              :step="1"
+              :precision="2"
+              @update:model-value="(v: number) => onFigureBoundsChange(2, v)"
+            />
+            <span class="bounds-row__name">y1</span>
+            <NumberInput
+              :model-value="store.selectedModel.wmdlConfig?.bounds?.[3] ?? 0"
+              :step="1"
+              :precision="2"
+              @update:model-value="(v: number) => onFigureBoundsChange(3, v)"
+            />
+          </div>
+        </div>
         <div class="info-row">
           <label class="info-label">立绘模板</label>
           <button class="reset-btn reset-btn--small" @click="generateFigureTemplate">生成立绘模板</button>
@@ -1985,6 +2028,20 @@ function onLabelDragEnd() {
 .info-row--stack {
   flex-direction: column;
   align-items: stretch;
+}
+
+.bounds-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bounds-row__name {
+  color: #9ca3af;
+  font-size: 12px;
+  width: 18px;
+  flex-shrink: 0;
+  text-align: right;
 }
 
 .info-empty {

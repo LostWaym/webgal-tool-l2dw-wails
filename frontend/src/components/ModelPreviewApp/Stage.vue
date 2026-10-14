@@ -1171,9 +1171,15 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
   const subModelIds: string[] = []
 
   // 每个子模型用独立的 wrapper，最后装入主 wrapper
+  const bounds = entry.wmdlConfig?.bounds
+  const overrideBounds = bounds && bounds.some((v) => v !== 0) ? bounds : null
   for (const wmdlModel of wmdlModels) {
     const url = toFileUrl(wmdlModel.jsonAbsPath)
-    const model = await Live2DModel.from(url, { idleMotionGroup: '', autoInteract: false })
+    const model = await Live2DModel.from(url, {
+      idleMotionGroup: '',
+      autoInteract: false,
+      ...(overrideBounds ? { overWriteBounds: { x0: overrideBounds[0], y0: overrideBounds[1], x1: overrideBounds[2], y1: overrideBounds[3] } } : {}),
+    })
 
     const scaleX = STAGE_WIDTH / model.width
     const scaleY = STAGE_HEIGHT / model.height
@@ -1183,6 +1189,10 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
     model.scale.x = targetScale
     model.scale.y = targetScale
     model.anchor.set(0.5)
+    if (overrideBounds) {
+      model.pivot.x += (overrideBounds[0] + overrideBounds[2]) * 0.5
+      model.pivot.y += (overrideBounds[1] + overrideBounds[3]) * 0.5
+    }
     model.position.x = 0 + wmdlModel.offsetX;
     model.position.y = STAGE_HEIGHT / 1.8 + wmdlModel.offsetY;
 

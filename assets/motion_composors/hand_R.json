@@ -1,0 +1,18 @@
+{
+  "type": "switch",
+  "name": "右手切换",
+  "ignoreNameCase": true,
+  "range": { "active": 0, "inactive": -1 },
+  "members": [
+    "hand_R_1",
+    "hand_R_2",
+    "hand_R_3",
+    "hand_R_4",
+    "hand_R_5",
+    "hand_R_6",
+    "hand_R_7",
+    "hand_R_8",
+    "hand_R_9",
+    "hand_R_10"
+  ]
+}

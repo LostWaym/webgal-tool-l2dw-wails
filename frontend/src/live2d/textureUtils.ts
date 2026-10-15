@@ -20,9 +20,8 @@ function recordKey(modelId: string, absPath: string): string {
 }
 
 async function loadFreshTexture(absPath: string): Promise<PIXI.Texture> {
-  // 时间戳 query 破坏浏览器/HTTP 缓存
-  const cacheBustUrl = `${toFileUrl(absPath)}?t=${Date.now()}`
-  return PIXI.Texture.fromURL(cacheBustUrl)
+  // 缓存破坏由 textureCacheBust 的 Texture.fromURL patch 统一处理
+  return PIXI.Texture.fromURL(toFileUrl(absPath))
 }
 
 /** 从 internalModel.settings.textures 推导出每张纹理的绝对路径。 */

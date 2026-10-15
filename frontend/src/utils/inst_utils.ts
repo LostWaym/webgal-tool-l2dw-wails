@@ -123,8 +123,8 @@ function formatArg(a: InstArg): string {
 function quoteIfNeeded(value: string): string {
   // JSON 对象/数组：原文输出，不加引号不转义
   if (value.startsWith('{') || value.startsWith('[')) return value;
-  // 必须加引号：包含空格 / 等号 / 分号 / 开头为 `-` / 包含引号本身
-  if (/[\s=;"]/.test(value) || value.startsWith('-')) {
+  // 必须加引号：包含空格 / 等号 / 分号 / 包含引号本身
+  if (/[\s=;"]/.test(value)) {
     return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   }
   return value;

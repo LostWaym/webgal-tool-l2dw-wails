@@ -236,10 +236,12 @@ async function loadOne(id: string) {
     const scaleX = STAGE_WIDTH / model.width
     const scaleY = STAGE_HEIGHT / model.height
     const targetScale = Math.min(scaleX, scaleY)
+    const subScaleX = entry.scaleX ?? 1
+    const subScaleY = entry.scaleY ?? 1
     const targetWidth = model.width * targetScale
-    const targetHeight = model.height * targetScale
-    model.scale.x = targetScale
-    model.scale.y = targetScale
+    const targetHeight = model.height * targetScale * subScaleY
+    model.scale.x = targetScale * subScaleX
+    model.scale.y = targetScale * subScaleY
     model.anchor.set(0.5)
     model.position.x = 0
     model.position.y = STAGE_HEIGHT / 2

@@ -1186,8 +1186,8 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
     const targetScale = Math.min(scaleX, scaleY) * 1.25
     const targetHeight = model.height * targetScale
 
-    model.scale.x = targetScale
-    model.scale.y = targetScale
+    model.scale.x = targetScale * (wmdlModel.scaleX ?? 1)
+    model.scale.y = targetScale * (wmdlModel.scaleY ?? 1)
     model.anchor.set(0.5)
     if (overrideBounds) {
       model.pivot.x += (overrideBounds[0] + overrideBounds[2]) * 0.5

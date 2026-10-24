@@ -277,7 +277,7 @@ async function loadWmdlModels(config: WmdlConfig | null | undefined) {
       const scaleX = STAGE_WIDTH / model.width
       const scaleY = STAGE_HEIGHT / model.height
       const targetScale = Math.min(scaleX, scaleY) * 1.25
-      model.scale.set(targetScale, targetScale)
+      model.scale.set(targetScale * (wmdlModel.scaleX ?? 1), targetScale * (wmdlModel.scaleY ?? 1))
       model.anchor.set(0.5)
       model.position.x = 0 + wmdlModel.offsetX
       model.position.y = STAGE_HEIGHT / 1.8 + wmdlModel.offsetY

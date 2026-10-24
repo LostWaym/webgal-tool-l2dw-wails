@@ -125,6 +125,8 @@ export async function buildModelItem(
     jsonAbsPath,
     offsetX: 0,
     offsetY: 0,
+    scaleX: 1,
+    scaleY: 1,
     motions: [],
     expressions: [],
     initParams: [],
@@ -158,6 +160,8 @@ export function configToJson(cfg: WmdlConfig): string {
       modelRelativePath: m.modelRelativePath,
       offsetX: m.offsetX,
       offsetY: m.offsetY,
+      scaleX: m.scaleX,
+      scaleY: m.scaleY,
     })),
   }
   return JSON.stringify(external, null, 2)
@@ -190,6 +194,8 @@ export async function parseWmdlJson(
         if (item) {
           item.offsetX = sub.offsetX ?? 0
           item.offsetY = sub.offsetY ?? 0
+          item.scaleX = sub.scaleX ?? 1
+          item.scaleY = sub.scaleY ?? 1
           items.push(item)
         }
       }

@@ -70,6 +70,8 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
         jsonAbsPath: jsonPath,
         offsetX: 0,
         offsetY: 0,
+        scaleX: 1,
+        scaleY: 1,
         motions: [],
         expressions: [],
         initParams: [],

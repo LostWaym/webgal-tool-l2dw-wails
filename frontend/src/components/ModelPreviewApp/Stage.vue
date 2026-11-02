@@ -8,7 +8,7 @@ import type { FigureGroupEntry, FocusState } from '../../stores/previewStore'
 import { toFileUrl } from '../../path_utils'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { SpecialId } from '../../live2d/specialIds'
-import { OpenEditor, OpenActorEditor, OpenMotionEditor } from '../../../wailsjs/go/main/App'
+import { OpenEditor, OpenActorEditor, OpenMotionEditor, GetNextArgMode, SetNextArgMode } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
 import { STAGE_WIDTH, STAGE_HEIGHT, FOCUS_BOX_SIZE } from '../../utils/consts'
 import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
@@ -43,12 +43,30 @@ function onShortcutClick(e: MouseEvent, entry: ShortcutEntry) {
   runShortcutEntry(entry)
 }
 
-// 右上角 next 后处理模式：会话内有效，刷新即重置
 const nextMode = ref<NextArgMode>(getNextMode())
+let nextModeChanged = false
+let nextModeSave = Promise.resolve()
+GetNextArgMode().then((savedMode) => {
+  if (nextModeChanged) return
+  const option = NEXT_ARG_MODE_OPTIONS.find((item) => item.value === savedMode)
+  if (option) {
+    setNextMode(option.value)
+    nextMode.value = option.value
+  }
+}).catch((err) => {
+  console.error('读取 next 后处理设置失败', err)
+  useMessage().warning('读取 next 后处理设置失败，使用当前选项')
+})
+
 function onNextModeChange(e: Event) {
   const v = (e.target as HTMLSelectElement).value as NextArgMode
+  nextModeChanged = true
   setNextMode(v)
   nextMode.value = v
+  nextModeSave = nextModeSave.then(() => SetNextArgMode(v)).catch((err) => {
+    console.error('保存 next 后处理设置失败', err)
+    useMessage().warning('保存 next 后处理设置失败，当前选项仅在本次会话有效')
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

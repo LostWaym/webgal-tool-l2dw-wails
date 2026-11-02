@@ -29,7 +29,8 @@ const (
 
 // AppConfig stores persistent user preferences.
 type AppConfig struct {
-	LastDirs map[string]string `json:"lastDirs"`
+	LastDirs    map[string]string `json:"lastDirs"`
+	NextArgMode string            `json:"nextArgMode,omitempty"`
 }
 
 // App is the Wails application struct exposed to the frontend.
@@ -76,13 +77,6 @@ func (a *App) saveConfig(cfg AppConfig) error {
 	return os.WriteFile(a.configPath, data, 0644)
 }
 
-// snapshotConfig assembles the full AppConfig from the current state.
-// Callers MUST hold a.mu for writing before invoking this; the returned value
-// captures the current state of lastDirs for persistence.
-func (a *App) snapshotConfig() AppConfig {
-	return AppConfig{LastDirs: a.lastDirs}
-}
-
 // startup is called when the app starts. The context is saved so we can
 // call runtime methods later.
 func (a *App) startup(ctx context.Context) {
@@ -94,6 +88,25 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	a.lastDirs = cfg.LastDirs
 	a.mu.Unlock()
+}
+
+// GetNextArgMode returns the saved preview instruction post-processing mode.
+func (a *App) GetNextArgMode() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().NextArgMode
+}
+
+// SetNextArgMode saves the preview instruction post-processing mode.
+func (a *App) SetNextArgMode(mode string) error {
+	if mode != "none" && mode != "all" && mode != "allButLast" {
+		return fmt.Errorf("invalid next argument mode: %s", mode)
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.NextArgMode = mode
+	return a.saveConfig(cfg)
 }
 
 // AppMode 暴露当前进程的窗口模式给前端，main.ts 据此决定挂载 App 还是 ModelEditApp。
@@ -253,9 +266,13 @@ func (a *App) runPicker(opts runtime.OpenDialogOptions, slot string, kind picker
 	dir := filepath.Dir(path)
 	a.mu.Lock()
 	a.lastDirs[slot] = dir
-	cfg := a.snapshotConfig()
-	a.mu.Unlock()
+	cfg := a.loadConfig()
+	if cfg.LastDirs == nil {
+		cfg.LastDirs = map[string]string{}
+	}
+	cfg.LastDirs[slot] = dir
 	a.saveConfig(cfg)
+	a.mu.Unlock()
 	return path, nil
 }
 

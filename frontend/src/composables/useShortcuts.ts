@@ -16,7 +16,7 @@ export const NEXT_ARG_MODE_OPTIONS: ReadonlyArray<{ value: NextArgMode; label: s
   { value: 'allButLast', label: '除了最后一个' },
 ]
 
-/** 会话内 next 后处理模式：默认除了最后一个 */
+/** next 后处理模式：默认除了最后一个 */
 const nextArgMode = ref<NextArgMode>('allButLast')
 
 export function getNextMode(): NextArgMode {

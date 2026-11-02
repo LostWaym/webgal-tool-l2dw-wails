@@ -506,6 +506,7 @@ function resultToLines(result: unknown): string[] {
  *    （即 modelFigure / modelTransform / modelSplit / modelMerge / modelHide）
  *  - 立绘类循环每个立绘组目标，临时切 selectedId 复用 handler
  *  - includeBackground=true 时，在所有立绘指令之后无条件附加一条背景变换指令（bgTransform）
+ *  - includeStageMainCmdCopy=true 时，在最后附加一条主场景变换指令（stageTransform）
  *  - 其他 entry（如 stageTransform，targets 只有 stage）自然不会命中，跳过
  *  - 所有结果按 SHORTCUTS 声明顺序 + 目标顺序，行拼接后写入剪贴板
  */
@@ -556,6 +557,17 @@ function runShortcutForFigureGroup(key: string): void {
       ? bgEntry.run()
       : handler.bgTransform(false)
     if (bgInst) lines.push(...resultToLines(bgInst))
+  }
+
+  // 3) 包含主场景指令内容时：按触发键分发主场景对应指令，与按键无关的兜底为 stageTransform
+  if (group.includeStageMainCmdCopy) {
+    const stageEntry = SHORTCUTS.find(
+      (s) => s.key === key && s.targets.includes('stage'),
+    )
+    const stageInst = stageEntry
+      ? stageEntry.run()
+      : handler.stageTransform(false)
+    if (stageInst) lines.push(...resultToLines(stageInst))
   }
 
   if (lines.length === 0) {

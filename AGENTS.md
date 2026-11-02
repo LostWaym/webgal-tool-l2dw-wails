@@ -7,6 +7,18 @@ Wails v2 + Vue 3 + PixiJS 桌面应用，用于加载并展示本地 Live2D 模�
 - 在搜寻代码细节的时候，常用 grep 搜寻相关关键字来找到相关文件，而不是读取粗暴的读取所有文件，减少上下文消耗。
 - 本文档只记录相关模块的大概位置，不会记录具体的落地细节，具体地方需要自寻进行探索。
 - 在会话的第一次回答必须强制添加上 **我已阅读本项目规范，现在让我来处理你的需求** ，只需要一次即可。
+- 禁止修改本文档，除非用户明确要求；术语表和坑点文档可按其维护规范主动更新。
+
+## 文档索引与维护
+
+- `docs/glossary.md`：项目术语、模块入口与职责归属；按任务关键词检索定位，代码为实现依据。
+- `docs/development_pitfalls.md`：Wails、Vue、PixiJS、Live2D 等工具链的已确认坑点；涉及相关技术或排查异常时按主题检索。
+- `docs/MOTION_DOC.md`：动作编辑器入口与开发索引；开发动作编辑器时优先阅读。
+- `docs/MOTION_FORMAT.md`：Live2D 动作文件格式及 lanim 映射；涉及动作格式、导入导出时按需阅读。
+- `test-guide.md`：用户明确要求测试时，参考其中的临时测试与调试规范。
+- 新增或变更概念、入口、职责时，按需同步术语表；确认可复用的工具链坑点时，按需同步坑点文档。普通功能变化不强制新增条目。
+- 同一信息只在所属文档维护一处，其他文档使用索引；过时条目及时修订或移除，不把未经证实的推测写成结论。
+- 已注入或本会话已读取的文档优先复用上下文，不为刷新记忆重复通读；用户告知外部修改、上下文缺少具体内容或补丁冲突时，只重读必要部分。
 
 ## 技术栈
 
@@ -99,92 +111,8 @@ l2dw-wails/
   - 用来过滤列表项的则是它显示在界面上显示的标题文本。
   - 不考虑大小写
 
-## 知识快速检索库
+## 知识快速检索
 
-旨在帮助快速索引到项目里相关的知识，仅提供业务逻辑的大概位置，具体内容需自己进行推断。
-可通过 grep 相关关键字来快速索引定位到具体业务逻辑选择性进行了解。
-内容需尽量简短，信息密度密集。
-当知识库没有命中相关知识时，需简单输出没有命中哪部分知识。例如："【检索知识库未命中: 文件浏览器 | 将自行进行相关探索】"
-以协助用户尽可能地补充检索知识库。
-搜索关键词指引：当用户说"文件浏览器"的时候，你可拆分成三个关键字"文件""文件浏览器""浏览器"，然后根据情况决定是否需要读取相关部分。
-
-### 文件浏览器
-
-- 命中关键字：文件浏览器，文件对话框
-- 相关代码关键字：runPicker， FileDialog
-
-### live2d相关
-
-- 统一live2d访问工具类，用于统一cubism2和cubism4的模型数据增删查改: coreAdapter.ts
-- wmdl 相关数据结构定义: wmdlTypes.ts
-- 关键字
-  - 部件: part
-  - 动作: motion
-  - 表情: expr, expression
-
-### 主App （ 预览编辑器 ）
-
-- 入口vue = App.vue
-- 舞台vue = Stage.vue
-- 主要组件路径 = "frontend/src/components/ModelPreviewApp"
-- 相关PiniaStore = "frontend/src/stores/previewStore.ts"（注册名 `models`，通过 `useModelStore()` 获取）
-- 相关术语：
-  - grs（Stage.vue对立绘的快捷键操作）
-  - 立绘列表（一般指"frontend\src\components\ModelPreviewApp\ModelList.vue"）
-  - 操作区（一般指"frontend\src\components\ModelPreviewApp\ModelActionPanel.vue"）
-  - 页签（一般指操作区上方的页签），页签内容（一般指选择页签后，操作区里展示的panel内容。
-- 立绘组快捷键复制 = useShortcuts.ts 的 runShortcutForFigureGroup（handler.bgTransform / bgSetImage / modelFigure...）
-- 背景相关 = ModelList.vue 特殊行按钮（加载背景 / 历史背景）、Modal/BackgroundHistoryModal.vue、composables/useBackgroundHistoryModal.ts
-- 背景历史数据 = previewStore.bgHistory（setBackground / removeBgHistory）
-
-### 改模编辑器相关
-
-- 入口vue = ModelEditApp.vue（启动时通过 `--editor` 参数进入；也可附带 `--wmdl <路径>` 自动加载）
-- 操作区vue = EditActionPanel.vue（页签： wmdl / 初始参数 / 部件参数 / 动作 / 表情 ...）
-- 舞台vue = EditStage.vue
-- 主要组件路径 = "frontend/src/components/ModelEditApp"
-- 相关PiniaStore = "frontend/src/stores/wmdlModelEditor.ts"（注册名 `wmdlModelEditor`，通过 `useWmdlModelEditorStore()` 获取）
-- 数据结构 = "frontend/src/stores/wmdlTypes.ts"
-
-### 演出编辑器相关
-
-- 入口vue = ActorEditApp.vue（启动时通过 `--actor` 参数进入；可附带 `--actor-wmdl <路径>` 自动加载）
-- 左侧 PIXI 舞台 = ActorStage.vue（简化版 EditStage）
-- 右侧面板 = EditPanel.vue（含 [表情 / 参数] 两个 Tab，迁移自 ExpressionEditorModal）
-- 主要组件路径 = "frontend/src/components/ActorEditorApp"
-- 相关PiniaStore = "frontend/src/stores/wmdlModelEditor.ts"（与模型编辑器共用 store id，但 Pinia 按 app 实例隔离）
-- 导出状态 = "frontend/src/composables/useActorEditorState.ts"（reactive 单例，导出覆盖层状态）
-- 数据结构 = "frontend/src/stores/wmdlTypes.ts"
-
-### 动作编辑器相关
-
-非必要不读取这部分的内容，但如果用户需要开发动作编辑器相关的内容，请优先读取开发文档，然后再做后续决策。
-
-- 入口vue = MotionEditApp.vue
-- 开发文档 'MOTION_DOC.md' 文件
-
-### 通用气泡信息功能
-
-- 入口 = "frontend/src/composables/useMessage.ts"
-- 用法: 引入useMessage后，调用 useMessage() 然后缓存起来对象，然后按需调用对象的success，info，warning，error方法即可，填入字符串参数。比如说msg.info("测试信息")
-- 触发关键词：弹消息|气泡|提示
-
-### 通用组件
-
-- 搜索栏 = SearchInput.vue
-- 轻量数值输入 = `frontend/src/components/common/NumberInput.vue`（展示态为文本，点击进入编辑；支持 min/max/precision/clamp，常用于变换/滤镜等参数）
-- 拖拽调参输入 = `frontend/src/components/ModelEditApp/EditRangeCard.vue`（带重置按钮 + label 拖拽改值，常用于编辑器初始参数/部件参数）
-- 模态通用模式 = composables/useXxxModal.ts（reactive 单例）+ Modal 组件 Teleport 挂 App.vue 顶层（参考 FilterPresetModal / BackgroundHistoryModal）
-
-### 折叠块设计参考
-
-- 预览编辑器的 动作/表情 页签里的 动作 和 表情 这两个块，可进行视口滚动，也可以使用鼠标进行视口竖向拖动，也可以折叠块。
-
-### 工具类
-
-- 事件分发 = "frontend/src/stores/emitter.ts"（mitt 封装）。避免从 window 注入方法，避免使用匿名函数，需考虑 on off 生命周期，尽量避免在列表项组件里使用。事件名统一在 `StageEvents` 常量中维护（避免散落字符串）。
-- 运行时共享 = "frontend/src/utils/runtimeRegistry.ts"。跨组件共享 Pixi app、模型 / 特殊容器、清理回调等运行时引用。
-
-### 通用术语
-
-- rts = 如果没有特殊说明，则一般指代 rotation（旋转） translate（位置） scale（缩放）
+- 在 `docs/glossary.md` 按用户术语、别名和拆分后的关键词检索，再按入口定点查代码。
+- 知识库未命中时，简要提示未命中的主题，例如：【检索知识库未命中: 文件浏览器 | 将自行进行相关探索】。
+- 事件分发统一使用 `frontend/src/stores/emitter.ts` 与 `StageEvents`；避免从 window 注入方法、避免匿名函数，注意 on/off 生命周期，尽量不在列表项组件里使用。

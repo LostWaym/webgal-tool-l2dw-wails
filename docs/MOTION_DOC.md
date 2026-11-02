@@ -1,10 +1,13 @@
 # MOTION_DOC — 动作编辑器快速索引
 
-> 用途：快速定位动作编辑器的控件与术语，减少探索成本。不记录实现细节。
+> 用途：定位动作编辑器的控件、术语和核心实现；动作格式参考见 [MOTION_FORMAT.md](MOTION_FORMAT.md)。
 
-**如果用户没有要求，不要修改本文档**
+## 维护规范
 
-**本文档加载一次之后，就不需要再重新进行加载，整个会话过程中不会产生任何改变**
+- 动作编辑器开发时按需阅读；具体行为以当前代码为准。
+- 模块入口或职责变化时同步更新；删除失效内容，避免将调试过程和开发历史作为长期规范。
+- 格式规格与导出映射维护在 `docs/MOTION_FORMAT.md`，通用坑点维护在 `docs/development_pitfalls.md`；此处仅保留动作编辑器专属定位与必要注意事项。
+- 文档上下文复用规则见 `AGENTS.md`；已读取内容不因刷新记忆重复通读，外部修改或上下文缺失时按需重读。
 
 ## 启动与入口
 
@@ -115,7 +118,7 @@
 
 - 底层一切以**整数帧号**运算，秒只是显示换算（`frame / fps`）
 - 保存/加载：打开用 `PickLanimJsonFile`（Filter `*.lanim.json`，slotMotion 目录记忆），保存用 `SaveLanimFileDialog`（Filter `*.lanim.json`，currentPath 提供默认目录/文件名）+ `SaveModelJsonFile` / `ReadTextFile`，自动补 `.lanim.json` 后缀
-- 插值方式是**全局代码常量**（不存进文件）：`motionEditor.ts` 顶部 `DEFAULT_INTERP`（当前 `easeIn`，可改 linear/easeIn/easeOut/easeInOut）
+- 插值方式是**全局代码常量**（不存进文件）：`motionEditor.ts` 顶部 `DEFAULT_INTERP`；当前值以代码为准。
 
 ## 导出（.mtn / .motion3.json）
 

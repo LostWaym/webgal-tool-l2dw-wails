@@ -852,7 +852,19 @@ async function init() {
     }
   }
 
-  void loadDefaultBackground()
+  const applyTransform = (container: PIXI.Container, state: typeof store.stageState) => {
+    container.x = state.x
+    container.y = state.y
+    container.scale.set(state.scale.x, state.scale.y)
+    container.rotation = state.rotation * Math.PI / 180
+  }
+  applyTransform(stageMain, store.stageState)
+  applyTransform(backgroundContainer, store.bgState)
+  store.setFilterState(SpecialId.StageMain, store.stageFilterState)
+  store.setFilterState(SpecialId.BgContainer, store.bgFilterState)
+  if (store.backgroundUrl) void loadBackground(store.backgroundUrl)
+  else void loadDefaultBackground()
+  for (const entry of store.models) await loadOne(entry.id)
 }
 
 /**
@@ -1094,10 +1106,24 @@ async function loadOne(id: string) {
       await loadWmdlModels(entry)
     }
 
+    const wrapper = containersById.get(id)
+    if (wrapper) {
+      wrapper.visible = entry.visible
+      wrapper.zIndex = store.models.findIndex(m => m.id === id)
+      figureContainer?.sortChildren()
+    }
+    if (entry.kind === 'live2d') {
+      try {
+        store.setFocusState(id, store.figureFocusStates[id] ?? {})
+        store.setBlinkState(id, store.figureBlinkStates[id] ?? {})
+        if (entry.playing.motion) await store.playMotion(id, entry.playing.motion.group, entry.playing.motion.index, entry.playing.motion.name)
+        if (entry.playing.expression) await store.playExpression(id, entry.playing.expression.index, entry.playing.expression.name)
+      } catch (err) { console.warn('Failed to restore figure playback:', err) }
+    }
     store.selectedId = id
   } catch (err) {
     console.error('Failed to load figure:', err)
-    await store.remove(id)
+    removeOne(id)
   }
 }
 
@@ -1169,6 +1195,7 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
   }
 
   const subModelIds: string[] = []
+  previewRuntime.wmdlSubModels.set(entry.id, { subModelIds, mainWrapper })
 
   // 每个子模型用独立的 wrapper，最后装入主 wrapper
   const bounds = entry.wmdlConfig?.bounds
@@ -1803,11 +1830,7 @@ watch(
     if (!backgroundContainer) return
     if (url) {
       await loadBackground(url)
-    } else if (backgroundSprite) {
-      backgroundContainer.removeChild(backgroundSprite)
-      backgroundSprite.destroy({ texture: true, baseTexture: true })
-      backgroundSprite = null
-    }
+    } else await loadDefaultBackground()
   },
   { immediate: true }
 )
@@ -1817,6 +1840,7 @@ function dispose() {
   resizeObserver = null
 
   if (backgroundSprite) {
+    backgroundSprite.parent?.removeChild(backgroundSprite)
     backgroundSprite.destroy({ texture: true, baseTexture: true })
     backgroundSprite = null
   }
@@ -1830,6 +1854,15 @@ function dispose() {
     entry.dummy.destroy()
   }
   groupDummyEntries = []
+
+  for (const c of groupContainers.values()) {
+    c.destroy({ children: true })
+  }
+  groupContainers.clear()
+  if (frameContainer) {
+    frameContainer.destroy({ children: true })
+    frameContainer = null
+  }
 
   if (app) {
     if (typeof previewRuntime.cleanup === 'function') previewRuntime.cleanup()
@@ -1845,14 +1878,6 @@ function dispose() {
   stageMain = null
   backgroundContainer = null
   figureContainer = null
-  if (frameContainer) {
-    frameContainer.destroy({ children: true })
-    frameContainer = null
-  }
-  for (const c of groupContainers.values()) {
-    c.destroy({ children: true })
-  }
-  groupContainers.clear()
   isMiddleDown = false
 
   previewRuntime.specialContainers.clear()

@@ -617,7 +617,7 @@ function onFigureGroupCenterChange(axis: 'x' | 'y', value: number) {
   store.applyFigureGroupAnchor(cur.id, axis, value)
 }
 
-function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures' | 'editAnchorOnly', checked: boolean) {
+function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures' | 'includeStageMainCmdCopy' | 'editAnchorOnly', checked: boolean) {
   const cur = store.selectedFigureGroup
   if (!cur) return
   store.updateFigureGroup(cur.id, { [key]: checked })
@@ -1546,6 +1546,16 @@ function onLabelDragEnd() {
             :checked="store.selectedFigureGroup.includeAllFigures"
             @mousedown.prevent
             @change="onFigureGroupFlagChange('includeAllFigures', ($event.target as HTMLInputElement).checked)"
+          />
+        </div>
+        <div class="info-row">
+          <label class="info-label">指令复制包含主场景</label>
+          <input
+            tabindex="-1"
+            type="checkbox"
+            :checked="store.selectedFigureGroup.includeStageMainCmdCopy"
+            @mousedown.prevent
+            @change="onFigureGroupFlagChange('includeStageMainCmdCopy', ($event.target as HTMLInputElement).checked)"
           />
         </div>
         <div class="info-row">

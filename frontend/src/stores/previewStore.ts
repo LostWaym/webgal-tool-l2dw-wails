@@ -189,6 +189,8 @@ export interface FigureGroupEntry {
   includeBackground: boolean
   /** 是否在复制指令时包含当前所有立绘 */
   includeAllFigures: boolean
+  /** 是否在复制指令时附加主场景的指令内容 */
+  includeStageMainCmdCopy: boolean
   /** 是否仅编辑锚点（X/Y 与 G 拖拽只改锚点本身，不动目标与背景） */
   editAnchorOnly: boolean
 }
@@ -800,6 +802,7 @@ export const useModelStore = defineStore('models', {
         targetGroupIds: [],
         includeBackground: false,
         includeAllFigures: false,
+        includeStageMainCmdCopy: false,
         editAnchorOnly: false,
       }
       this.figureGroups.push(group)

@@ -8,6 +8,7 @@ import eyeIcon from '../../assets/icons/eye.png'
 import eyeOffIcon from '../../assets/icons/eye-off.png'
 
 const store = useModelStore()
+const emit = defineEmits<{ (e: 'project'): void }>()
 const bgHistoryModal = useBackgroundHistoryModal()
 const dragFromIndex = ref<number | null>(null)
 
@@ -94,6 +95,7 @@ function onDragEnd() {
     </header>
     <header class="model-list__header model-list__header--secondary">
       <button class="add-btn add-btn--group" @click="onAddFigureGroup">新建立绘组</button>
+      <button class="project-pill" @click="emit('project')">项目</button>
     </header>
 
     <ul class="model-list__items model-list__items--special">
@@ -178,6 +180,8 @@ function onDragEnd() {
 </template>
 
 <style scoped>
+.project-pill { padding: 6px 15px; border: 1px solid #5a6b85; border-radius: 999px; background: #303a4a; color: #e6e6e6; cursor: pointer; }
+.project-pill:hover { background: #40516a; }
 .model-list {
   display: flex;
   flex-direction: column;

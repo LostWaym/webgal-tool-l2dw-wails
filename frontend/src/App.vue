@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
 import ModelList from './components/ModelPreviewApp/ModelList.vue'
 import Stage from './components/ModelPreviewApp/Stage.vue'
 import ModelActionPanel from './components/ModelPreviewApp/ModelActionPanel.vue'
 import TransformSnapshotModal from './components/ModelPreviewApp/Modal/TransformSnapshotModal.vue'
 import FilterPresetModal from './components/ModelPreviewApp/Modal/FilterPresetModal.vue'
 import BackgroundHistoryModal from './components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue'
+import PreviewProjectModal from './components/ModelPreviewApp/Modal/PreviewProjectModal.vue'
+import { applyPreviewProject } from './utils/previewProject'
+import type { PreviewProject } from './utils/previewProject'
+import { useMessage } from './composables/useMessage'
 import ColorPickerModal from './components/common/ColorPickerModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
 import { useModelStore } from './stores/previewStore'
@@ -17,6 +21,22 @@ const { handleShortcut } = useShortcuts()
 
 // Blender 风格变换操作状态：让侧边栏呈现变暗且不可点击
 const isTransforming = ref(false)
+const projectVisible = ref(false)
+const stageVisible = ref(true)
+
+async function loadProject(project: PreviewProject, path: string) {
+  projectVisible.value = false
+  stageVisible.value = false
+  await nextTick()
+  try {
+    await applyPreviewProject(store, project, path)
+    useMessage().success('项目已加载')
+  } catch (err) {
+    useMessage().error(`加载项目失败：${String(err)}`)
+  } finally {
+    stageVisible.value = true
+  }
+}
 
 function onTransformStart(active: boolean) {
   isTransforming.value = active
@@ -35,12 +55,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app" :class="{ 'is-transforming': isTransforming }">
-    <ModelList class="app__left" />
-    <Stage class="app__right" />
+    <ModelList class="app__left" @project="projectVisible = true" />
+    <Stage v-if="stageVisible" class="app__right" />
     <ModelActionPanel v-if="store.selectedId" />
     <TransformSnapshotModal />
     <FilterPresetModal />
     <BackgroundHistoryModal />
+    <PreviewProjectModal :visible="projectVisible" @close="projectVisible = false" @load="loadProject" />
     <ColorPickerModal />
     <MessageHost />
   </div>

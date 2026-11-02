@@ -24,6 +24,7 @@ const (
 	slotMotion     = "motion"
 	slotExpression = "expression"
 	slotWmdl       = "wmdl"
+	slotProject    = "project"
 )
 
 // AppConfig stores persistent user preferences.
@@ -524,6 +525,32 @@ func (a *App) PickWmdlFile() (string, error) {
 		},
 		slotWmdl, pickerFile,
 	)
+}
+
+func (a *App) PickPreviewProjectFile() (string, error) {
+	return a.runPicker(runtime.OpenDialogOptions{
+		Title:   "选择预览项目",
+		Filters: []runtime.FileFilter{{DisplayName: "预览项目", Pattern: "*.w2proj"}},
+	}, slotProject, pickerFile)
+}
+
+func (a *App) SavePreviewProjectFileDialog() (string, error) {
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "项目另存为",
+		DefaultFilename: "project.w2proj",
+		Filters:         []runtime.FileFilter{{DisplayName: "预览项目", Pattern: "*.w2proj"}},
+	})
+}
+
+func (a *App) MissingPreviewProjectFiles(paths []string) []string {
+	missing := make([]string, 0)
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil || info.IsDir() {
+			missing = append(missing, path)
+		}
+	}
+	return missing
 }
 
 // SaveWmdlFileDialog opens a native save dialog for selecting the destination

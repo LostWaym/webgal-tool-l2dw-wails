@@ -1,6 +1,12 @@
 # Live2D 动作文件格式参考（.mtn / motion3.json）
 
-本文档记录 Cubism 2 `.mtn` 与 Cubism 3+ `.motion3.json` 两种动作文件的结构规格，以及本项目 lanim 数据与这两种格式的互相映射关系。用于动作编辑器的导入 / 导出开发参考。
+本文档记录 Cubism 2 `.mtn` 与 Cubism 3+ `.motion3.json` 的结构参考，以及本项目 lanim 的导出映射和未来导入设想。用于动作格式、导入 / 导出开发参考。
+
+## 维护规范
+
+- 涉及动作格式、导入导出或 lanim 映射时按需阅读；编辑器入口与交互见 [MOTION_DOC.md](MOTION_DOC.md)。
+- 格式参考、已实现行为和未来设想应明确区分；项目当前行为以代码为准。
+- 修改序列化或导出行为时同步检查映射说明；有依据地修订或移除失效描述，不把推测当作格式保证。
 
 参考样例文件：
 
@@ -128,11 +134,11 @@ PARAM_EYE_R_SMILE=0               ← 常量参数：只有一个值（整条动
 
 ## 三、lanim 与两种格式的映射（本项目导出规则）
 
-lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 track = `paramId` + 按 frame 升序的 keys）。插值全局常量 `easeInOut`，采样函数 `sampleTrack`（stores/motionEditor.ts）。
+lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 track = `paramId` + 按 frame 升序的 keys）。插值方式和采样函数 `sampleTrack` 以 `frontend/src/stores/motionEditor.ts` 为准。
 
 ### lanim → .mtn
 
-1. 首行魔数 `$fps=<lanim.fps>`，随后 `$fadein` / `$fadeout`（模态内可编辑，空行分隔与样例一致）。
+1. 首行标识 `# Live2D Animator Motion Data`，随后 `$fps=<lanim.fps>` 和 `$fadein` / `$fadeout`（模态内可编辑）。
 2. 每条轨道用 `sampleTrack` 逐帧采样（帧 0..末关键帧帧号，**尾部裁剪**：末关键帧之后的值运行时钳制在末帧值，烘焙无意义），逗号拼接为 `PARAM_ID=...`。
 3. 全帧同值的轨道只输出单值（常量参数）。
 
@@ -148,7 +154,7 @@ lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 tr
 2. 每个 `PARAM_X=v0,v1,...` 生成一个 Curve：`Target="Parameter"`（若该 ID 映射到部件透明度则用 `PartOpacity`），`Id` 按参数映射表转换。
 3. 值序列转 Segments：首点 `(0, v0)`，每帧追加 `0, i/fps, v[i]`（type 0）。若需压缩体积，共线连续点可合并成一段线性（同时更新 TotalSegmentCount/TotalPointCount）。
 4. 常量参数仍导出一条 Curve：`Segments=[0, v, 0, Duration, v]`（补 1 段延伸到 Duration，避免 runtime parse 越界），建议保留以维持参数表完整性。
-5. `Loop` 与 `AreBeziersRestricted` 置 `true` 安全（mtn 逐帧格式天然无缝循环）；`UserDataCount/TotalUserDataSize` 置 0，可省略顶层 `UserData` 数组。
+5. `Loop` 应根据动作内容或用户选择决定；逐帧采样本身不能保证首尾无缝。`AreBeziersRestricted` 可按输出的曲线类型确定；无 UserData 时相关计数置 0。
 
 ### ID 体系注意事项
 

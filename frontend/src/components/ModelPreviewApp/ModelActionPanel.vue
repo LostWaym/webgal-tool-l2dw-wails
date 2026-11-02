@@ -146,6 +146,32 @@ function onFilterInput(key: keyof FilterState, value: number) {
   store.setFilterState(store.selectedId, { [key]: value } as Partial<FilterState>)
 }
 
+let filterDrag: { item: FilterItemSpec; startX: number; startValue: number; selectedId: string; pointerId: number } | null = null
+
+function onFilterLabelPointerDown(item: FilterItemSpec, e: PointerEvent) {
+  if (e.button !== 0 || !item.key || !store.selectedId) return
+  const value = filterState.value[item.key as keyof FilterState]
+  if (typeof value !== 'number') return
+  e.preventDefault()
+  e.stopPropagation()
+  filterDrag = { item, startX: e.clientX, startValue: value, selectedId: store.selectedId, pointerId: e.pointerId }
+  const target = e.currentTarget as HTMLElement
+  target.setPointerCapture(e.pointerId)
+}
+
+function onFilterLabelPointerMove(e: PointerEvent) {
+  if (!filterDrag || filterDrag.pointerId !== e.pointerId || filterDrag.selectedId !== store.selectedId) return
+  const { item, startX, startValue } = filterDrag
+  const step = item.step ?? 1
+  const precision = step < 1 ? 3 : 2
+  const value = clamp(startValue + (e.clientX - startX) * step / 3, item.min ?? -Infinity, item.max ?? Infinity)
+  onFilterInput(item.key as keyof FilterState, Number(value.toFixed(precision)))
+}
+
+function onFilterLabelPointerEnd(e: PointerEvent) {
+  if (filterDrag?.pointerId === e.pointerId) filterDrag = null
+}
+
 /** 切换布尔型滤镜（0/1） */
 function onFilterToggle(key: keyof FilterState, checked: boolean) {
   store.setFilterState(store.selectedId, { [key]: checked ? 1 : 0 } as Partial<FilterState>)
@@ -1178,7 +1204,15 @@ function onLabelDragEnd() {
                     />
                   </template>
                   <template v-else>
-                    <label>{{ item.label }}</label>
+                    <label
+                      class="filter-drag-label"
+                      title="左右拖动调整数值"
+                      @pointerdown="(e) => onFilterLabelPointerDown(item, e)"
+                      @pointermove="onFilterLabelPointerMove"
+                      @pointerup="onFilterLabelPointerEnd"
+                      @pointercancel="onFilterLabelPointerEnd"
+                      @lostpointercapture="onFilterLabelPointerEnd"
+                    >{{ item.label }}</label>
                     <NumberInput
                       :model-value="filterState[item.key as keyof FilterState] as number"
                       :step="item.step ?? 1"
@@ -1938,6 +1972,15 @@ function onLabelDragEnd() {
 
 .form-row label:hover {
   background: #2a3140;
+}
+
+.filter-drag-label {
+  touch-action: none;
+  user-select: none;
+}
+
+.filter-group .form-row__color-label {
+  cursor: default;
 }
 
 .form-input {

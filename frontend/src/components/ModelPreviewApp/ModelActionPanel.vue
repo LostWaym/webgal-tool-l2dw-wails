@@ -136,7 +136,7 @@ let _updatingTransform = false
 const filterState = computed<FilterState>(
   () => store.getFilterState(store.selectedId),
 )
-const filterCollapsed = ref(false)
+const transformSection = ref<'basic' | 'filter' | 'focus' | 'blink'>('basic')
 
 /** 每个 group: { title, items: { key, label, min?, max?, step?, boolean?, colorPicker? }[] } */
 // FILTER_GROUPS / FilterItemSpec / FilterGroupSpec 现已从 utils/consts 导入
@@ -238,10 +238,7 @@ const focusState = computed<FocusState>(
 const blinkState = computed<BlinkState>(
   () => store.getBlinkState(store.selectedId),
 )
-const focusCollapsed = ref(true)
-const blinkCollapsed = ref(true)
-
-/** 仅 live2d 立绘显示注视/眨眼折叠块 */
+/** 仅 live2d 立绘显示注视/眨眼 */
 const showLive2dParams = computed(
   () => !isSpecial.value && store.selectedModel?.kind === 'live2d',
 )
@@ -687,6 +684,11 @@ const currentState = computed(() => store.selectedModel?.playing ?? { motion: nu
 
 // 是否选中占位项（StageMain / BGContainer）
 const isSpecial = computed(() => isSpecialId(store.selectedId))
+watch(showLive2dParams, (visible) => {
+  if (!visible && (transformSection.value === 'focus' || transformSection.value === 'blink')) {
+    transformSection.value = 'basic'
+  }
+})
 
 // 统一对外的"当前选中项"：占位项返回 { name }，真实模型返回 ModelEntry
 const selectedEntry = computed(() => {
@@ -1028,8 +1030,15 @@ function onLabelDragEnd() {
 
     <!-- 变换表单 -->
     <div v-else-if="activeTab === 'transform'" class="panel__motion-expression">
-      <!-- 上：基础字段（始终展开，作为唯一滚动容器） -->
-      <div class="panel__list-region">
+      <div class="transform-toolbar" role="group" aria-label="变换模块">
+        <button type="button" :class="{ 'is-active': transformSection === 'basic' }" :aria-pressed="transformSection === 'basic'" @click="transformSection = 'basic'">基础</button>
+        <button type="button" :class="{ 'is-active': transformSection === 'filter' }" :aria-pressed="transformSection === 'filter'" @click="transformSection = 'filter'">滤镜</button>
+        <template v-if="showLive2dParams">
+          <button type="button" :class="{ 'is-active': transformSection === 'focus' }" :aria-pressed="transformSection === 'focus'" @click="transformSection = 'focus'">注视</button>
+          <button type="button" :class="{ 'is-active': transformSection === 'blink' }" :aria-pressed="transformSection === 'blink'" @click="transformSection = 'blink'">眨眼</button>
+        </template>
+      </div>
+      <div v-if="transformSection === 'basic'" class="panel__list-region">
         <div class="list-region-body">
           <ul class="panel__list" v-bind="motionScroll.scrollHandlers">
             <li class="list-item list-item--row">
@@ -1063,7 +1072,7 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--pair">
-                <label @mousedown="(e) => onLabelDragStart('scaleX', e)">X 缩放</label>
+                <label title="X 缩放" @mousedown="(e) => onLabelDragStart('scaleX', e)">缩X</label>
                 <NumberInput
                   :model-value="transformState.scale.x"
                   :step="0.01"
@@ -1072,7 +1081,7 @@ function onLabelDragEnd() {
                   :precision="3"
                   @update:model-value="(v: number) => { transformState.scale.x = v; onTransformInput() }"
                 />
-                <label @mousedown="(e) => onLabelDragStart('scaleY', e)">Y 缩放</label>
+                <label title="Y 缩放" @mousedown="(e) => onLabelDragStart('scaleY', e)">缩Y</label>
                 <NumberInput
                   :model-value="transformState.scale.y"
                   :step="0.01"
@@ -1109,8 +1118,7 @@ function onLabelDragEnd() {
         </div>
       </div>
 
-      <!-- 下：滤镜（可折叠） -->
-      <div class="panel__list-region" :class="{ 'is-collapsed': filterCollapsed }">
+      <div v-else-if="transformSection === 'filter'" class="panel__list-region">
         <div class="list-region-header">
           <span class="list-region-title">滤镜</span>
           <button
@@ -1134,17 +1142,8 @@ function onLabelDragEnd() {
           >
             选择
           </button>
-          <button
-            type="button"
-            class="list-region-toggle"
-            :aria-expanded="!filterCollapsed"
-            :aria-label="filterCollapsed ? '展开滤镜' : '折叠滤镜'"
-            @click="filterCollapsed = !filterCollapsed"
-          >
-            <span aria-hidden="true">{{ filterCollapsed ? '▸' : '▾' }}</span>
-          </button>
         </div>
-        <div v-show="!filterCollapsed" class="list-region-body">
+        <div class="list-region-body">
           <ul class="panel__list" v-bind="filterScroll.scrollHandlers">
             <li
               v-for="group in FILTER_GROUPS"
@@ -1196,11 +1195,10 @@ function onLabelDragEnd() {
         </div>
       </div>
 
-      <!-- 下：注视（可折叠，仅 live2d 立绘） -->
+      <!-- 注视（仅 live2d 立绘） -->
       <div
-        v-if="showLive2dParams"
+        v-else-if="transformSection === 'focus' && showLive2dParams"
         class="panel__list-region"
-        :class="{ 'is-collapsed': focusCollapsed }"
       >
         <div class="list-region-header">
           <span class="list-region-title">注视</span>
@@ -1213,17 +1211,8 @@ function onLabelDragEnd() {
             />
             <span>启用</span>
           </label>
-          <button
-            type="button"
-            class="list-region-toggle"
-            :aria-expanded="!focusCollapsed"
-            :aria-label="focusCollapsed ? '展开注视' : '折叠注视'"
-            @click="focusCollapsed = !focusCollapsed"
-          >
-            <span aria-hidden="true">{{ focusCollapsed ? '▸' : '▾' }}</span>
-          </button>
         </div>
-        <div v-show="!focusCollapsed" class="list-region-body">
+        <div class="list-region-body">
           <ul class="panel__list" v-bind="focusScroll.scrollHandlers">
             <li class="list-item list-item--row focus-picker-row">
               <FocusPicker
@@ -1282,11 +1271,10 @@ function onLabelDragEnd() {
         </div>
       </div>
 
-      <!-- 下：眨眼（可折叠，仅 live2d 立绘） -->
+      <!-- 眨眼（仅 live2d 立绘） -->
       <div
-        v-if="showLive2dParams"
+        v-else-if="transformSection === 'blink' && showLive2dParams"
         class="panel__list-region"
-        :class="{ 'is-collapsed': blinkCollapsed }"
       >
         <div class="list-region-header">
           <span class="list-region-title">眨眼</span>
@@ -1299,17 +1287,8 @@ function onLabelDragEnd() {
             />
             <span>启用</span>
           </label>
-          <button
-            type="button"
-            class="list-region-toggle"
-            :aria-expanded="!blinkCollapsed"
-            :aria-label="blinkCollapsed ? '展开眨眼' : '折叠眨眼'"
-            @click="blinkCollapsed = !blinkCollapsed"
-          >
-            <span aria-hidden="true">{{ blinkCollapsed ? '▸' : '▾' }}</span>
-          </button>
         </div>
-        <div v-show="!blinkCollapsed" class="list-region-body">
+        <div class="list-region-body">
           <ul class="panel__list" v-bind="blinkScroll.scrollHandlers">
             <li class="list-item list-item--row">
               <div class="form-row">
@@ -1742,6 +1721,36 @@ function onLabelDragEnd() {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.transform-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  gap: 4px;
+  border-bottom: 1px solid #2c313a;
+}
+
+.transform-toolbar button {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #8a93a3;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.transform-toolbar button:hover {
+  background: #2a3140;
+  color: #e6e6e6;
+}
+
+.transform-toolbar button.is-active {
+  background: #2f80ed;
+  color: #fff;
 }
 
 .panel__list-region {

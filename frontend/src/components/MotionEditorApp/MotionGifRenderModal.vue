@@ -108,7 +108,7 @@ async function onRender() {
     }
 
     const defaultName = `${store.lanim.name || 'animation'}.gif`
-    const picked = await choosePath(() => SaveGifFileDialog(defaultName))
+    const picked = await choosePath(() => SaveGifFileDialog(defaultName), 'file', { silentOnCancel: true })
     if (!picked) {
       msg.info('已取消保存（渲染结果已丢弃）')
       return

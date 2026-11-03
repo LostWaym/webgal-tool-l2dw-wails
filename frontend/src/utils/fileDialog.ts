@@ -1,6 +1,10 @@
 import { useMessage } from '../composables/useMessage'
 
-export async function choosePath(dialog: () => Promise<string>, kind: 'file' | 'directory' = 'file'): Promise<string> {
+export async function choosePath(
+  dialog: () => Promise<string>,
+  kind: 'file' | 'directory' = 'file',
+  options: { silentOnCancel?: boolean } = {},
+): Promise<string> {
   let path: string
   try {
     path = await dialog()
@@ -8,7 +12,7 @@ export async function choosePath(dialog: () => Promise<string>, kind: 'file' | '
     if ((err instanceof Error ? err.message : String(err)).toLowerCase() !== 'shellitem is nil') throw err
     path = ''
   }
-  if (!path) useMessage().info(kind === 'file' ? '未选择文件' : '未选择文件夹')
+  if (!path && !options.silentOnCancel) useMessage().info(kind === 'file' ? '未选择文件' : '未选择文件夹')
   return path
 }
 

@@ -231,12 +231,21 @@ type pickerKind int
 const (
 	pickerFile pickerKind = iota
 	pickerDir
+	pickerFiles
 )
 
 // runPicker opens a native file or directory dialog with the given options.
 // On a successful non-empty selection it caches the chosen directory in
 // a.lastDirs[slot] and persists the updated config.
 func (a *App) runPicker(opts runtime.OpenDialogOptions, slot string, kind pickerKind) (string, error) {
+	paths, err := a.runPickers(opts, slot, kind)
+	if len(paths) == 0 {
+		return "", err
+	}
+	return paths[0], err
+}
+
+func (a *App) runPickers(opts runtime.OpenDialogOptions, slot string, kind pickerKind) ([]string, error) {
 	a.mu.RLock()
 	defaultDir := a.lastDirs[slot]
 	a.mu.RUnlock()
@@ -252,18 +261,28 @@ func (a *App) runPicker(opts runtime.OpenDialogOptions, slot string, kind picker
 	}
 	opts.DefaultDirectory = defaultDir
 
-	var path string
+	var paths []string
 	var err error
 	if kind == pickerDir {
+		var path string
 		path, err = runtime.OpenDirectoryDialog(a.ctx, opts)
+		if path != "" {
+			paths = []string{path}
+		}
+	} else if kind == pickerFiles {
+		paths, err = runtime.OpenMultipleFilesDialog(a.ctx, opts)
 	} else {
+		var path string
 		path, err = runtime.OpenFileDialog(a.ctx, opts)
+		if path != "" {
+			paths = []string{path}
+		}
 	}
-	if err != nil || path == "" {
-		return path, err
+	if err != nil || len(paths) == 0 {
+		return paths, err
 	}
 
-	dir := filepath.Dir(path)
+	dir := filepath.Dir(paths[0])
 	a.mu.Lock()
 	a.lastDirs[slot] = dir
 	cfg := a.loadConfig()
@@ -273,7 +292,7 @@ func (a *App) runPicker(opts runtime.OpenDialogOptions, slot string, kind picker
 	cfg.LastDirs[slot] = dir
 	a.saveConfig(cfg)
 	a.mu.Unlock()
-	return path, nil
+	return paths, nil
 }
 
 // PickLive2DModel opens a native file dialog for choosing a Live2D model
@@ -294,28 +313,42 @@ func (a *App) PickLive2DModel() (string, error) {
 // descriptor json and .wmdl files. Returns the absolute path, or "" if cancelled.
 func (a *App) PickLive2DModelOrWmdl() (string, error) {
 	return a.runPicker(
-		runtime.OpenDialogOptions{
-			Title: "Select Live2D Model / WMDL File",
-			Filters: []runtime.FileFilter{
-				{DisplayName: "Live2D Model / WMDL", Pattern: "*.json;*.wmdl"},
-			},
-		},
-		slotModel, pickerFile,
+		modelOrWmdlPickerOptions(), slotModel, pickerFile,
 	)
+}
+
+func modelOrWmdlPickerOptions() runtime.OpenDialogOptions {
+	return runtime.OpenDialogOptions{
+		Title: "Select Live2D Model / WMDL File",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Live2D Model / WMDL", Pattern: "*.json;*.wmdl"},
+		},
+	}
+}
+
+func (a *App) PickLive2DModelsOrWmdl() ([]string, error) {
+	return a.runPickers(modelOrWmdlPickerOptions(), slotModel, pickerFiles)
 }
 
 // PickImageFile opens a native file dialog for choosing an image file.
 // Returns the absolute path the user picked, or "" if cancelled.
 func (a *App) PickImageFile() (string, error) {
 	return a.runPicker(
-		runtime.OpenDialogOptions{
-			Title: "Select Background Image",
-			Filters: []runtime.FileFilter{
-				{DisplayName: "Image Files", Pattern: "*.png;*.jpg;*.jpeg;*.webp"},
-			},
-		},
-		slotImage, pickerFile,
+		imagePickerOptions(), slotImage, pickerFile,
 	)
+}
+
+func imagePickerOptions() runtime.OpenDialogOptions {
+	return runtime.OpenDialogOptions{
+		Title: "Select Background Image",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Image Files", Pattern: "*.png;*.jpg;*.jpeg;*.webp"},
+		},
+	}
+}
+
+func (a *App) PickImageFiles() ([]string, error) {
+	return a.runPickers(imagePickerOptions(), slotImage, pickerFiles)
 }
 
 // PickMotionFile opens a native file dialog for choosing a single Live2D

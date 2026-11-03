@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { Live2DModel, MotionPriority, baseBlinkParam } from 'pixi-live2d-display-webgal'
-import { PickLive2DModelOrWmdl, ReadWmdlFile, SaveWmdlFile, PickImageFile, ReadTextFile, WriteTextFile, PickTransformSnapshotFile, SaveTransformSnapshotFileDialog } from '../../wailsjs/go/main/App'
-import { choosePath } from '../utils/fileDialog'
+import { PickLive2DModelsOrWmdl, ReadWmdlFile, SaveWmdlFile, PickImageFiles, ReadTextFile, WriteTextFile, PickTransformSnapshotFile, SaveTransformSnapshotFileDialog } from '../../wailsjs/go/main/App'
+import { choosePath, choosePaths } from '../utils/fileDialog'
+import { useMessage } from '../composables/useMessage'
 import { pathDirname, pathRelative } from '../path_utils'
 import { parseWmdlJson, buildInMemoryWmdlConfig } from '../utils/wmdlUtils'
 import { deriveNameFromPath } from '../utils/wmdlUtils'
@@ -286,18 +287,22 @@ export const useModelStore = defineStore('models', {
       this.expressionSearchMap[this.selectedId] = v
     },
     /** 统一加载入口：按扩展名路由到 json / wmdl 加载逻辑 */
-    async addFromPicker(): Promise<ModelEntry | null> {
-      const path = await choosePath(() => PickLive2DModelOrWmdl())
-      if (!path) return null
-
-      const entry = /\.wmdl$/i.test(path)
-        ? await this._addWmdl(path)
-        : await this._addJson(path)
-      if (entry) {
-        entry.kind = 'live2d'
-        this.models.push(entry)
+    async addFromPicker(): Promise<void> {
+      const paths = await choosePaths(() => PickLive2DModelsOrWmdl())
+      for (const path of paths) {
+        try {
+          const entry = /\.wmdl$/i.test(path)
+            ? await this._addWmdl(path)
+            : await this._addJson(path)
+          if (entry) {
+            entry.kind = 'live2d'
+            this.models.push(entry)
+          }
+        } catch (err) {
+          console.error(`加载模型失败: ${path}`, err)
+          useMessage().error(`加载模型失败：${path}`)
+        }
       }
-      return entry
     },
     async _addJson(jsonPath: string): Promise<ModelEntry | null> {
       const config = await buildInMemoryWmdlConfig(jsonPath)
@@ -319,27 +324,24 @@ export const useModelStore = defineStore('models', {
       return await this._loadWmdlFromFile(filePath)
     },
     /** 新增"加载图片"类型：以图片作为立绘（FitInside） */
-    async addImageFigure(): Promise<ModelEntry | null> {
-      const imagePath = await choosePath(() => PickImageFile())
-      if (!imagePath) return null
-
-      // 去掉扩展名（.png / .jpg / .jpeg / .webp）
-      const name = deriveNameFromPath(imagePath).replace(/\.[^.]+$/, '')
-
-      const entry: ModelEntry = {
-        id: crypto.randomUUID(),
-        kind: 'image',
-        name,
-        jsonPath: '',
-        imageUrl: imagePath,
-        visible: true,
-        playing: { motion: null, expression: null },
-        state: { ...DEFAULT_TRANSFORM_STATE },
-        wmdlModels: [],
-        isMoc3: false,
+    async addImageFigure(): Promise<void> {
+      const paths = await choosePaths(() => PickImageFiles())
+      for (const imagePath of paths) {
+        const name = deriveNameFromPath(imagePath).replace(/\.[^.]+$/, '')
+        const entry: ModelEntry = {
+          id: crypto.randomUUID(),
+          kind: 'image',
+          name,
+          jsonPath: '',
+          imageUrl: imagePath,
+          visible: true,
+          playing: { motion: null, expression: null },
+          state: { ...DEFAULT_TRANSFORM_STATE },
+          wmdlModels: [],
+          isMoc3: false,
+        }
+        this.models.push(entry)
       }
-      this.models.push(entry)
-      return entry
     },
     async _loadWmdlFromFile(filePath: string): Promise<ModelEntry | null> {
       const content = await ReadWmdlFile(filePath)

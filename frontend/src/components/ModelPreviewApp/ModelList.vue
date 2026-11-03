@@ -11,7 +11,7 @@ import eyeIcon from '../../assets/icons/eye.png'
 import eyeOffIcon from '../../assets/icons/eye-off.png'
 
 const store = useModelStore()
-const emit = defineEmits<{ (e: 'project'): void }>()
+const emit = defineEmits<{ (e: 'project'): void; (e: 'settings'): void }>()
 const bgHistoryModal = useBackgroundHistoryModal()
 const filterPresetModal = useFilterPresetModal()
 const snapshotModal = useTransformSnapshotModal()
@@ -113,6 +113,7 @@ function onDragEnd() {
     <header class="model-list__header model-list__header--secondary">
       <button class="add-btn add-btn--secondary" @click="onAddFigureGroup">新建立绘组</button>
       <button class="add-btn add-btn--secondary" @click="emit('project')">项目</button>
+      <button class="add-btn add-btn--secondary" @click="emit('settings')">设置</button>
     </header>
 
     <ul class="model-list__items model-list__items--special">

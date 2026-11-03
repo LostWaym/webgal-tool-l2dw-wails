@@ -29,8 +29,9 @@ const (
 
 // AppConfig stores persistent user preferences.
 type AppConfig struct {
-	LastDirs    map[string]string `json:"lastDirs"`
-	NextArgMode string            `json:"nextArgMode,omitempty"`
+	LastDirs                  map[string]string `json:"lastDirs"`
+	NextArgMode               string            `json:"nextArgMode,omitempty"`
+	LegacyExpressionBlendMode bool              `json:"legacyExpressionBlendMode"`
 }
 
 // App is the Wails application struct exposed to the frontend.
@@ -106,6 +107,22 @@ func (a *App) SetNextArgMode(mode string) error {
 	defer a.mu.Unlock()
 	cfg := a.loadConfig()
 	cfg.NextArgMode = mode
+	return a.saveConfig(cfg)
+}
+
+// GetLegacyExpressionBlendMode returns the saved Cubism 2 expression mode.
+func (a *App) GetLegacyExpressionBlendMode() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().LegacyExpressionBlendMode
+}
+
+// SetLegacyExpressionBlendMode saves the Cubism 2 expression mode.
+func (a *App) SetLegacyExpressionBlendMode(enabled bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.LegacyExpressionBlendMode = enabled
 	return a.saveConfig(cfg)
 }
 

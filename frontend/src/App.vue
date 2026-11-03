@@ -7,6 +7,7 @@ import TransformSnapshotModal from './components/ModelPreviewApp/Modal/Transform
 import FilterPresetModal from './components/ModelPreviewApp/Modal/FilterPresetModal.vue'
 import BackgroundHistoryModal from './components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue'
 import PreviewProjectModal from './components/ModelPreviewApp/Modal/PreviewProjectModal.vue'
+import PreviewSettingsModal from './components/ModelPreviewApp/Modal/PreviewSettingsModal.vue'
 import { applyPreviewProject } from './utils/previewProject'
 import type { PreviewProject } from './utils/previewProject'
 import { useMessage } from './composables/useMessage'
@@ -22,6 +23,7 @@ const { handleShortcut } = useShortcuts()
 // Blender 风格变换操作状态：让侧边栏呈现变暗且不可点击
 const isTransforming = ref(false)
 const projectVisible = ref(false)
+const settingsVisible = ref(false)
 const stageVisible = ref(true)
 
 async function loadProject(project: PreviewProject, path: string) {
@@ -55,13 +57,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app" :class="{ 'is-transforming': isTransforming }">
-    <ModelList class="app__left" @project="projectVisible = true" />
+    <ModelList class="app__left" @project="projectVisible = true" @settings="settingsVisible = true" />
     <Stage v-if="stageVisible" class="app__right" />
     <ModelActionPanel v-if="store.selectedId" />
     <TransformSnapshotModal />
     <FilterPresetModal />
     <BackgroundHistoryModal />
     <PreviewProjectModal :visible="projectVisible" @close="projectVisible = false" @load="loadProject" />
+    <PreviewSettingsModal :visible="settingsVisible" @close="settingsVisible = false" />
     <ColorPickerModal />
     <MessageHost />
   </div>

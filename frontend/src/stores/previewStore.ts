@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { Live2DModel, MotionPriority, baseBlinkParam } from 'pixi-live2d-display-webgal'
 import { PickLive2DModelOrWmdl, ReadWmdlFile, SaveWmdlFile, PickImageFile, ReadTextFile, WriteTextFile, PickTransformSnapshotFile, SaveTransformSnapshotFileDialog } from '../../wailsjs/go/main/App'
+import { choosePath } from '../utils/fileDialog'
 import { pathDirname, pathRelative } from '../path_utils'
 import { parseWmdlJson, buildInMemoryWmdlConfig } from '../utils/wmdlUtils'
 import { deriveNameFromPath } from '../utils/wmdlUtils'
@@ -286,7 +287,7 @@ export const useModelStore = defineStore('models', {
     },
     /** 统一加载入口：按扩展名路由到 json / wmdl 加载逻辑 */
     async addFromPicker(): Promise<ModelEntry | null> {
-      const path = await PickLive2DModelOrWmdl()
+      const path = await choosePath(() => PickLive2DModelOrWmdl())
       if (!path) return null
 
       const entry = /\.wmdl$/i.test(path)
@@ -319,7 +320,7 @@ export const useModelStore = defineStore('models', {
     },
     /** 新增"加载图片"类型：以图片作为立绘（FitInside） */
     async addImageFigure(): Promise<ModelEntry | null> {
-      const imagePath = await PickImageFile()
+      const imagePath = await choosePath(() => PickImageFile())
       if (!imagePath) return null
 
       // 去掉扩展名（.png / .jpg / .jpeg / .webp）
@@ -620,7 +621,7 @@ export const useModelStore = defineStore('models', {
     /** 导出全部快照到 json 文件；用户取消返回 false */
     async exportTransformSnapshots(): Promise<boolean> {
       if (this.transformSnapshots.length === 0) return false
-      const path = await SaveTransformSnapshotFileDialog()
+      const path = await choosePath(() => SaveTransformSnapshotFileDialog())
       if (!path) return false
       const content = JSON.stringify({ version: 1, snapshots: this.transformSnapshots }, null, 2)
       await WriteTextFile(path, content)
@@ -629,7 +630,7 @@ export const useModelStore = defineStore('models', {
 
     /** 从 json 文件追加导入快照；返回导入数量（0 = 取消或内容无效） */
     async importTransformSnapshots(): Promise<number> {
-      const path = await PickTransformSnapshotFile()
+      const path = await choosePath(() => PickTransformSnapshotFile())
       if (!path) return 0
       const content = await ReadTextFile(path)
       const parsed = JSON.parse(content)

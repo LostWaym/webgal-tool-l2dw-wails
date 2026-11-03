@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { choosePath } from '../../../utils/fileDialog'
 import {
   PickMotionFile,
   PickExpressionFile,
@@ -147,7 +148,7 @@ async function pickSingleFile() {
   errorMsg.value = ''
   try {
     const picked =
-      modal.state.kind === 'motion' ? await PickMotionFile() : await PickExpressionFile()
+      await choosePath(() => modal.state.kind === 'motion' ? PickMotionFile() : PickExpressionFile())
     if (!picked) return
     filePath.value = picked
   } catch (e: any) {
@@ -163,8 +164,8 @@ async function pickFolder() {
   busy.value = true
   errorMsg.value = ''
   try {
-    const dir = await PickDirectory(modal.state.kind)
-    if (!dir) return
+    const dir = await choosePath(() => PickDirectory(modal.state.kind), 'directory')
+    if (!dir) { busy.value = false; return }
     folder.value = dir
   } catch (e: any) {
     console.error('pick folder failed', e)

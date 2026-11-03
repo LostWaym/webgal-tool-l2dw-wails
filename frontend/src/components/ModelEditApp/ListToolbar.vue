@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { PickMotionFile, PickExpressionFile } from '../../../wailsjs/go/main/App'
+import { choosePath } from '../../utils/fileDialog'
 import { useWmdlModelEditorStore, deriveNameFromFile } from '../../stores/wmdlModelEditor'
 import { pathDirname } from '../../path_utils'
 
@@ -64,8 +65,8 @@ async function onAddSingle() {
   const m = store.selectedModel
   if (!m) return
   const abs = props.kind === 'motion'
-    ? await PickMotionFile()
-    : await PickExpressionFile()
+    ? await choosePath(() => PickMotionFile())
+    : await choosePath(() => PickExpressionFile())
   if (!abs) return
 
   // store.addMotion / addExpression 使用绝对路径；运行时通过 /abs_files/ 路由加载。

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { choosePath } from '../utils/fileDialog'
 import {
   PickLive2DModel,
   ListMotionAndExpressionFiles,
@@ -51,7 +52,7 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
   actions: {
     /** Add a new model by prompting the user to pick a file. */
     async addModel(): Promise<WmdlModelItem | null> {
-      const jsonPath = await PickLive2DModel()
+      const jsonPath = await choosePath(() => PickLive2DModel())
       if (!jsonPath) return null
 
       const id = crypto.randomUUID()
@@ -147,7 +148,7 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
 
     /** Update a single model's path by picking a new file. */
     async changeModelPath(id: string): Promise<void> {
-      const jsonPath = await PickLive2DModel()
+      const jsonPath = await choosePath(() => PickLive2DModel())
       if (!jsonPath) return
 
       const model = this.currentWmdl.models.find((m) => m.id === id)
@@ -507,7 +508,7 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
     async saveModelJsonAs(modelId: string): Promise<{ path: string } | null> {
       const item = this.currentWmdl.models.find((m) => m.id === modelId)
       if (!item) return null
-      const newPath = await SaveModelJsonFileDialog(item.jsonAbsPath)
+      const newPath = await choosePath(() => SaveModelJsonFileDialog(item.jsonAbsPath))
       if (!newPath) return null
       const obj = this.serializeModelToJson(item)
       const content = JSON.stringify(obj, null, 2)

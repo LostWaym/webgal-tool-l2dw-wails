@@ -4,6 +4,7 @@
  * 确认后弹出保存对话框选择路径，调用 WriteTextFile 写出。
  */
 import { computed, ref, watch } from 'vue'
+import { choosePath } from '../../utils/fileDialog'
 import { useMotionExportModal, type MotionExportFormat } from '../../composables/useMotionExportModal'
 import { useMotionEditorStore } from '../../stores/motionEditor'
 import { useMessage } from '../../composables/useMessage'
@@ -87,7 +88,7 @@ async function onConfirm() {
 
   exporting.value = true
   try {
-    const picked = await SaveMotionExportFileDialog(targetFileName.value)
+    const picked = await choosePath(() => SaveMotionExportFileDialog(targetFileName.value))
     if (!picked) return
     await WriteTextFile(picked, content)
     close()

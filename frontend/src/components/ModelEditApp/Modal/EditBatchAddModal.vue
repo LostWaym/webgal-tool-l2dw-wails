@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { choosePath } from '../../../utils/fileDialog'
 import { PickDirectory } from '../../../../wailsjs/go/main/App'
 import { useWmdlModelEditorStore, type ScannedEntry } from '../../../stores/wmdlModelEditor'
 import { pathDirname } from '../../../path_utils'
@@ -153,8 +154,8 @@ async function onPickFolder() {
   busy.value = true
   errorMsg.value = ''
   try {
-    const dir = await PickDirectory(modal.state.kind)
-    if (!dir) return
+    const dir = await choosePath(() => PickDirectory(modal.state.kind), 'directory')
+    if (!dir) { busy.value = false; return }
     folder.value = dir
     nodes.value = deriveNodesFromFolder(dir)
   } catch (e: any) {

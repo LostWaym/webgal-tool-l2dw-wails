@@ -8,6 +8,7 @@
  * 保存/加载：.lanim.json，SaveModelJsonFileDialog 选路径 + WriteTextFile / ReadTextFile。
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { choosePath } from '../../utils/fileDialog'
 import MotionStage from './MotionStage.vue'
 import MotionTrackPanel from './MotionTrackPanel.vue'
 import FrameSettingsModal from './FrameSettingsModal.vue'
@@ -268,7 +269,7 @@ async function onSave() {
   try {
     let path = store.lanimFilePath
     if (!path) {
-      const picked = await SaveLanimFileDialog('')
+      const picked = await choosePath(() => SaveLanimFileDialog(''))
       if (!picked) return
       path = withLanimExt(picked)
     }
@@ -284,7 +285,7 @@ async function onSave() {
 
 async function onSaveAs() {
   try {
-    const picked = await SaveLanimFileDialog(store.lanimFilePath ?? '')
+    const picked = await choosePath(() => SaveLanimFileDialog(store.lanimFilePath ?? ''))
     if (!picked) return
     const path = withLanimExt(picked)
     await SaveModelJsonFile(path, serialize())
@@ -297,7 +298,7 @@ async function onSaveAs() {
 
 async function onLoad() {
   try {
-    const picked = await PickLanimJsonFile()
+    const picked = await choosePath(() => PickLanimJsonFile())
     if (!picked) return
     const text = await ReadTextFile(picked)
     const lanim = parseLanimJson(text)

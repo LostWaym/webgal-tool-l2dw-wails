@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { choosePath } from '../../utils/fileDialog'
 import { useWmdlModelEditorStore, type WmdlModelItem } from '../../stores/wmdlModelEditor'
 import { PickWmdlFile, ReadWmdlFile, SaveWmdlFile, SaveWmdlFileDialog } from '../../../wailsjs/go/main/App'
 import { useMessage } from '../../composables/useMessage'
@@ -28,7 +29,7 @@ async function onLoad() {
   if (busy.value) return
   busy.value = true
   try {
-    const path = await PickWmdlFile()
+    const path = await choosePath(() => PickWmdlFile())
     if (!path) return
     // json 路径：内存构造只含主模型的 wmdl（不写盘）
     if (path.toLowerCase().endsWith('.json')) {
@@ -49,7 +50,7 @@ async function onSave() {
   if (busy.value) return
   busy.value = true
   try {
-    const path = await SaveWmdlFileDialog()
+    const path = await choosePath(() => SaveWmdlFileDialog())
     if (!path) return
     // Update the wmdlFilePath anchor BEFORE toJson so the relative paths
     // it computes are anchored at the new file location (handles "Save As"

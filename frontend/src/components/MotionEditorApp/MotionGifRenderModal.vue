@@ -4,6 +4,7 @@
  * 点击渲染后逐帧抓取预览视口 → gif.js 编码 → 保存对话框选路径落盘。
  */
 import { computed, ref, watch } from 'vue'
+import { choosePath } from '../../utils/fileDialog'
 import { useMotionGifRenderModal, type GifSizeMode } from '../../composables/useMotionGifRenderModal'
 import { useMotionEditorStore } from '../../stores/motionEditor'
 import { useMessage } from '../../composables/useMessage'
@@ -107,7 +108,7 @@ async function onRender() {
     }
 
     const defaultName = `${store.lanim.name || 'animation'}.gif`
-    const picked = await SaveGifFileDialog(defaultName)
+    const picked = await choosePath(() => SaveGifFileDialog(defaultName))
     if (!picked) {
       msg.info('已取消保存（渲染结果已丢弃）')
       return

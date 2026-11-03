@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { choosePath } from '../../utils/fileDialog'
 import { useModelStore } from '../../stores/previewStore'
 import { SPECIAL_IDS, SpecialId, getSpecialName } from '../../live2d/specialIds'
 import { PickImageFile } from '../../../wailsjs/go/main/App'
@@ -54,7 +55,7 @@ function onToggleVisible(id: string, event: MouseEvent) {
 
 async function onLoadBackground(event: MouseEvent) {
   event.stopPropagation()
-  const imagePath = await PickImageFile()
+  const imagePath = await choosePath(() => PickImageFile())
   if (imagePath) store.setBackground(imagePath)
 }
 

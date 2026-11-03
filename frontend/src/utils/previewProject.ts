@@ -1,4 +1,5 @@
 import { ReadTextFile, WriteTextFile, PickPreviewProjectFile, SavePreviewProjectFileDialog, MissingPreviewProjectFiles } from '../../wailsjs/go/main/App'
+import { choosePath } from './fileDialog'
 import { pathCombine, pathDirname, pathRelative } from '../path_utils'
 import { buildInMemoryWmdlConfig, buildModelItem, parseWmdlJson } from './wmdlUtils'
 import { useModelStore } from '../stores/previewStore'
@@ -30,7 +31,7 @@ const relative = (base: string, path: string) => path ? pathRelative(base, path)
 const absolute = (base: string, path: string) => path ? pathCombine(base, path) : ''
 
 export async function savePreviewProject(store: Store): Promise<boolean> {
-  let path = await SavePreviewProjectFileDialog()
+  let path = await choosePath(() => SavePreviewProjectFileDialog())
   if (!path) return false
   if (!/\.w2proj$/i.test(path)) {
     path += '.w2proj'
@@ -77,7 +78,7 @@ function validate(raw: any): asserts raw is PreviewProject {
 }
 
 export async function choosePreviewProject(): Promise<{ path: string; project: PreviewProject; missing: string[] } | null> {
-  const path = await PickPreviewProjectFile()
+  const path = await choosePath(() => PickPreviewProjectFile())
   if (!path) return null
   const project: unknown = JSON.parse(await ReadTextFile(path))
   validate(project)

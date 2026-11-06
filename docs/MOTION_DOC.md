@@ -41,9 +41,11 @@
 
 - 拖行头滑条 / 输数值 = 实时预览 + **自动建轨** + 当前帧打帧；播放中改值 → 立即打断播放
 - 播放中拖播放头/时间轴线 → 暂停播放并到达拖到的帧位
+- 播放预览按显示刷新节奏线性插值相邻整数帧的采样值，组合器仍离散切换；播放头和编辑仍使用整数帧，暂停时回到显示的整数帧，不改变导出帧率。
 - `+`/`−`（行头右上）= 增删轨道；`+` 会在当前帧插一帧
 - `✕`（行头，条件显示）= 删除当前播放头帧的关键帧；**按钮出现 = 播放头正对准一帧**
 - 拖标尺 = 移动播放头（整数帧吸附）；双击车道 = 插帧；双击帧点 = 播放头跳到该帧；Delete = 删除选中帧
+- 非输入状态按左右方向键移动播放头，轻按一帧、长按使用系统按键重复；播放时按下会先暂停。
 - 采样线/帧点 y = 值相对参数 [min,max] 的百分比映射（上下 10% 保护带）；拖帧/改值/缩放自动重算，播放头移动不触发
 - **Ctrl + 滚轮**（车道上）= 缩放刻度密度（0.5~40 px/帧，鼠标锚点）
 - 刻度密度固定（每格 ≥80px，1/2/5×10ⁿ 自动换档），不随面板宽度变化
@@ -56,6 +58,7 @@
 - 车道空白处拖动框选帧点，Ctrl + 单击切换选中、Ctrl + 框选增选；选区可跨普通轨道和组合器，筛选隐藏的帧仍保留选中。
 - 拖动已选帧可整体平移，采样曲线和播放头处的模型参数同步预览，限制在动画时长内；目标与未选帧冲突时停留在最近一次有效位置。Esc 或窗口失焦取消拖动。
 - Ctrl+C / Ctrl+X 复制或剪切选中帧，Ctrl+V 将最早帧对齐播放头并粘回原轨道；目标冲突、越界或轨道不存在时整批拒绝。剪贴板仅限当前编辑器会话，加载新动画会清空。
+- 主 header「立绘动作」读取第一个模型的动作列表（每组第一项），仅支持 Cubism 2 的 MTN；按文件采样逐帧导入，失败不替换时间轴。「工具 → 反烘焙」按普通轨道的增减方向保留端点、转折点及平台两端，是有损简化；组合器轨道不变。
 - 组合器成员参数从普通参数列表中排除；组合器行受搜索栏过滤（匹配 def 显示名）
 - 组合器行头 dropdown 弹层 Teleport 到 body（fixed 定位）：底部行向上翻转 + 视口内夹紧；菜单内滚轮/拖滚动条不关闭，外部滚动/resize 关闭
 - 删组合器帧 / 拖帧点（非播放态）→ 预览即时重采样（关键帧变动 watch 同时覆盖 tracks 与 composers）
@@ -90,12 +93,13 @@
 | 文件 | 职责 |
 | --- | --- |
 | `frontend/src/stores/motionEditor.ts` | 帧制数据结构 + 插值采样 + 关键帧/轨道 action + applier 桥接 |
-| `frontend/src/components/MotionEditorApp/MotionEditApp.vue` | 主入口：header + 左右布局 + 播放循环（rAF 帧步进）+ 保存/加载 |
+| `frontend/src/components/MotionEditorApp/MotionEditApp.vue` | 主入口：header + 左右布局 + 播放循环（rAF 小数帧采样）+ 保存/加载 |
 | `frontend/src/components/MotionEditorApp/MotionTrackPanel.vue` | 轨道面板全部交互与几何（帧↔像素换算、缩放、拖拽） |
 | `frontend/src/components/MotionEditorApp/MotionStage.vue` | 预览区封装（注册 editRuntime） |
 | `frontend/src/components/MotionEditorApp/FrameSettingsModal.vue` | 帧率/时长模态 |
 | `frontend/src/components/MotionEditorApp/MotionExportModal.vue` | 导出模态（格式卡片 + fade 输入 + 保存对话框 + WriteTextFile） |
 | `frontend/src/utils/motionExport.ts` | 导出格式构建：`buildMtn` / `buildMotion3Json`（纯函数，规格见 `MOTION_FORMAT.md`） |
+| `frontend/src/utils/motionImport.ts` | MTN 逐帧导入与参数轨道反烘焙 |
 | `frontend/src/composables/useMotionExportModal.ts` | 导出模态 reactive 单例状态（visible / format） |
 | `frontend/src/components/ModelEditApp/ResizeHandle.vue` | 通用拖拽分隔条（本编辑器两处复用） |
 | `frontend/src/components/ModelEditApp/EditRangeCard.vue` | 通用参数滑条卡片（行头复用） |
@@ -128,7 +132,7 @@
 - 入口：主 header「导出」按钮 → 导出模态；格式卡片二选一（`.motion3.json` Cubism 3+ / `.mtn` Cubism 2）
 - fade 时长（ms）模态内可编辑（默认 0/1000）；「压缩输出（单行）」仅 motion3 生效
 - 确认后 `SaveMotionExportFileDialog(defaultName)`（Filter `*.mtn;*.motion3.json`）选路径 + `WriteTextFile` 写入
-- 生成规则：逐帧采样（`sampleTrack`）——mtn 输出值序列（全帧同值仅单值常量）；motion3 每轨道一条 `Parameter` 曲线、线性段（type 0），Meta 计数实算
+- 生成规则：逐帧采样（`sampleTrack`）——mtn 裁剪各轨道末尾重复值（可能缩短动作时长）；motion3 每轨道一条 `Parameter` 曲线、线性段（type 0），Meta 计数实算
 - **格式规格与 lanim 映射详见 `MOTION_FORMAT.md`**；paramId 原样输出，跨 Cubism 版本喂模型时注意 ID 体系（`PARAM_X` vs `ParamX`）
 
 ## GIF 渲染

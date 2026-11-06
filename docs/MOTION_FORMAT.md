@@ -14,6 +14,7 @@
 - `.motion3.json`：`extres/game2/figure/on/mutsumi/adv_live2d_mutsumi_007_casual_spring_01/.mtn_exp/motions/mutsumi/mtn_idle01_C.motion3.json`
 
 导出实现：`frontend/src/utils/motionExport.ts`
+MTN 导入实现：`frontend/src/utils/motionImport.ts`，按采样逐帧建立 lanim 参数轨道；反烘焙由用户单独执行，不保留 fade 元数据。
 
 ---
 
@@ -139,8 +140,8 @@ lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 tr
 ### lanim → .mtn
 
 1. 首行标识 `# Live2D Animator Motion Data`，随后 `$fps=<lanim.fps>` 和 `$fadein` / `$fadeout`（模态内可编辑）。
-2. 每条轨道用 `sampleTrack` 逐帧采样（帧 0..末关键帧帧号，**尾部裁剪**：末关键帧之后的值运行时钳制在末帧值，烘焙无意义），逗号拼接为 `PARAM_ID=...`。
-3. 全帧同值的轨道只输出单值（常量参数）。
+2. 每条轨道用 `sampleTrack` 逐帧采样至末关键帧，格式化后裁剪尾部连续重复值，仅保留第一个，再逗号拼接为 `PARAM_ID=...`。
+3. 全帧同值的轨道只输出单值（常量参数）。裁剪可能缩短最长值序列，进而缩短 MTN 的播放时长和尾部静止时间。
 
 ### lanim → motion3.json
 

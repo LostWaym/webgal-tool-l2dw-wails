@@ -3,11 +3,11 @@
  * 动作编辑器主入口（--motion 模式）。
  *
  * 布局：左 Live2D 预览 / 右 轨道面板（参数卡片 + 时间轴合并）。
- * 帧制：底层以整数帧号运算；播放循环 rAF 累积时间 → frame = floor(elapsed × fps) 循环步进。
+ * 帧制：编辑使用整数帧号；播放时通过 rAF 按实际时间采样小数帧。
  * 帧率/时长通过 FrameSettingsModal 编辑（缩短时长截断关键帧需二次确认）。
  * 保存/加载：.lanim.json，SaveModelJsonFileDialog 选路径 + WriteTextFile / ReadTextFile。
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { choosePath } from '../../utils/fileDialog'
 import MotionStage from './MotionStage.vue'
 import MotionTrackPanel from './MotionTrackPanel.vue'
@@ -15,18 +15,22 @@ import FrameSettingsModal from './FrameSettingsModal.vue'
 import MotionExportModal from './MotionExportModal.vue'
 import MotionGifRenderModal from './MotionGifRenderModal.vue'
 import MessageHost from '../common/MessageHost.vue'
+import SearchInput from '../common/SearchInput.vue'
 import ResizeHandle from '../ModelEditApp/ResizeHandle.vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import {
   useMotionEditorStore,
   sampleLanim,
+  sampleLanimForPlayback,
   parseLanimJson,
   normalizeLanim,
   restoreParamDefaults,
 } from '../../stores/motionEditor'
 import { resolveComposerMembers, loadComposerDefsByIds } from '../../utils/motionComposors'
 import { previewLanim } from '../../utils/motionKeyframes'
-import { listParameters } from '../../live2d/coreAdapter'
+import { listParameters, parseMotions } from '../../live2d/coreAdapter'
+import { parseMtn, unbakeKeys } from '../../utils/motionImport'
+import { filterBySearch } from '../../utils/searchUtils'
 import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
 import { useMotionExportModal } from '../../composables/useMotionExportModal'
@@ -38,7 +42,9 @@ import {
   ReadTextFile,
   EnsureDirAndOpenInExplorer,
 } from '../../../wailsjs/go/main/App'
-import { pathBasename, pathDirname } from '../../path_utils'
+import { pathBasename, pathDirname, pathCombine } from '../../path_utils'
+import type { MotionEntry } from '../../live2d/coreAdapter'
+import type { LanimFile } from '../../stores/motionEditor'
 import type { ParamCalc } from '../../stores/wmdlTypes'
 
 const wmdlStore = useWmdlModelEditorStore()
@@ -179,21 +185,19 @@ store.onLiveValueChange = () => {
 
 // 播放中用户抓取播放头 → 暂停（拖动后由 playhead watch 实时采样）
 store.onPlayheadGrab = () => {
-  if (store.playing) {
-    store.playing = false
-    cancelAnimationFrame(rafId)
-  }
+  pause()
 }
 
-// ── 播放（帧步进） ──────────────────────────────────────────────────────────
+// ── 播放 ────────────────────────────────────────────────────────────────────
 
 let rafId = 0
 let playStart = 0
 
 const sampledLanim = computed(() => previewLanim(store.lanim, store.keyframePreview))
 
-function applySampled(frame: number) {
-  const sampled = sampleLanim(sampledLanim.value, frame, store.composerDefOf)
+function applySampled(frame: number, playback = false) {
+  const sample = playback ? sampleLanimForPlayback : sampleLanim
+  const sampled = sample(sampledLanim.value, frame, store.composerDefOf)
   if (!sampled.size) return
   const params: Array<{ id: string; val: number; calc: ParamCalc }> = []
   sampled.forEach((val, id) => params.push({ id, val, calc: 'set' }))
@@ -204,9 +208,9 @@ function tick(now: number) {
   if (!store.playing) return
   const elapsed = (now - playStart) / 1000
   const fps = store.lanim.fps || 60
-  const frame = Math.floor(elapsed * fps) % Math.max(1, store.lanim.durationFrames)
-  store.playhead = frame
-  applySampled(frame)
+  const frame = (elapsed * fps) % Math.max(1, store.lanim.durationFrames)
+  store.playhead = Math.floor(frame)
+  applySampled(frame, true)
   rafId = requestAnimationFrame(tick)
 }
 
@@ -221,6 +225,7 @@ function pause() {
   if (!store.playing) return
   store.playing = false
   cancelAnimationFrame(rafId)
+  applySampled(store.playhead)
 }
 
 function stop() {
@@ -251,7 +256,15 @@ watch(() => store.keyframePreview, () => {
   if (!store.playing) applySampled(store.playhead)
 })
 
+function closeMenusOnOutsideClick(event: MouseEvent) {
+  for (const menu of [motionMenu.value, toolsMenu.value]) {
+    if (menu && !menu.contains(event.target as Node)) menu.open = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', closeMenusOnOutsideClick))
 onBeforeUnmount(() => {
+  document.removeEventListener('click', closeMenusOnOutsideClick)
   cancelAnimationFrame(rafId)
   store.applier = null
   store.onLiveValueChange = null
@@ -261,6 +274,92 @@ onBeforeUnmount(() => {
 // ── 保存 / 加载 ─────────────────────────────────────────────────────────────
 
 const saving = ref(false)
+const motionMenu = ref<HTMLDetailsElement | null>(null)
+const toolsMenu = ref<HTMLDetailsElement | null>(null)
+const importing = ref(false)
+const motionModel = computed(() => wmdlStore.currentWmdl.models[0] ?? null)
+const modelMotions = computed(() => parseMotions(motionModel.value?.rawJsonObject, true))
+const motionSearch = ref('')
+const toolsSearch = ref('')
+const filteredMotions = computed(() => filterBySearch(modelMotions.value, motionSearch.value, (entry) => entry.name))
+const tools = [{ name: '反烘焙', run: onUnbake }]
+const filteredTools = computed(() => filterBySearch(tools, toolsSearch.value, (tool) => tool.name))
+
+function replaceAnimation(lanim: LanimFile, path: string | null) {
+  pause()
+  restoreParamDefaults(store.lanim.tracks.map((tr) => tr.paramId))
+  const memberIds: string[] = []
+  for (const track of store.lanim.composers ?? []) {
+    const def = store.composerDefs[track.id]
+    if (def) for (const id of def.resolvedMembers) if (id != null) memberIds.push(id)
+  }
+  restoreParamDefaults(memberIds)
+  store.keyframePreview = null
+  store.selectedTrackId = null
+  store.lanim = lanim
+  store.lanimFilePath = path
+  store.playhead = 0
+  store.resetComposerLog()
+}
+
+function onMotionMenuToggle(event: Event) {
+  const menu = event.target as HTMLDetailsElement
+  if (!menu.open) return
+  if (!motionModel.value) {
+    menu.open = false
+    msg.warning('当前没有可加载的模型')
+  } else if (motionModel.value.isMoc3) {
+    menu.open = false
+    msg.warning('当前不支持加载 moc3 模型的动作')
+  }
+}
+
+async function onImportMotion(entry: MotionEntry) {
+  if (motionMenu.value) motionMenu.value.open = false
+  const model = motionModel.value
+  if (!model || importing.value) return
+  if (!entry.path || !model.jsonAbsPath) {
+    msg.error(`动作「${entry.name}」没有可用的文件路径`)
+    return
+  }
+  const path = pathCombine(pathDirname(model.jsonAbsPath), entry.path)
+  if (!path.toLowerCase().endsWith('.mtn')) {
+    msg.error(`动作「${entry.name}」不是 MTN 文件，无法加载`)
+    return
+  }
+  importing.value = true
+  try {
+    const text = await ReadTextFile(path)
+    const lanim = parseMtn(text, entry.name)
+    if (motionModel.value?.id !== model.id || motionModel.value?.jsonAbsPath !== model.jsonAbsPath) {
+      msg.warning('模型已更换，取消加载动作')
+      return
+    }
+    replaceAnimation(lanim, null)
+    msg.success(`已加载动作「${entry.name}」`)
+  } catch (err) {
+    msg.error(`无法加载动作「${entry.name}」：${err}`)
+  } finally {
+    importing.value = false
+  }
+}
+
+function onUnbake() {
+  if (toolsMenu.value) toolsMenu.value.open = false
+  if (!store.lanim.tracks.length) {
+    msg.info('当前没有可反烘焙的参数轨道')
+    return
+  }
+  pause()
+  store.keyframePreview = null
+  let removed = 0
+  store.lanim.tracks = store.lanim.tracks.map((track) => {
+    const keys = unbakeKeys(track.keys)
+    removed += track.keys.length - keys.length
+    return { ...track, keys }
+  })
+  msg.success(`反烘焙完成，删除 ${removed} 帧`)
+}
 
 function serialize(): string {
   return JSON.stringify(normalizeLanim(store.lanim), null, 2)
@@ -313,22 +412,7 @@ async function onLoad() {
       msg.error('文件不是有效的 lanim 动画文件')
       return
     }
-    // 换文件前把旧轨道（含组合器成员参数）的动画残留值恢复为参数默认值
-    restoreParamDefaults(store.lanim.tracks.map((tr) => tr.paramId))
-    const oldComposerMemberIds: string[] = []
-    for (const track of store.lanim.composers ?? []) {
-      const def = store.composerDefs[track.id]
-      if (!def) continue
-      for (const pid of def.resolvedMembers) {
-        if (pid != null) oldComposerMemberIds.push(pid)
-      }
-    }
-    restoreParamDefaults(oldComposerMemberIds)
-
-    store.lanim = lanim
-    store.lanimFilePath = picked
-    store.playhead = 0
-    store.resetComposerLog()
+    replaceAnimation(lanim, picked)
 
     // 补载 lanim 引用的组合器 def（会话内尚未加载的）；缺失的逐条弹提示
     const ids = (lanim.composers ?? []).map((c) => c.id)
@@ -400,6 +484,27 @@ async function onLoad() {
       <button type="button" class="he-btn" @click="onSave" :disabled="saving">保存</button>
       <button type="button" class="he-btn" @click="onSaveAs">另存为</button>
       <button type="button" class="he-btn" @click="onLoad">加载</button>
+      <details ref="motionMenu" class="motion-menu" @toggle="onMotionMenuToggle">
+        <summary class="he-btn">立绘动作 ▾</summary>
+        <div class="motion-menu__panel">
+          <SearchInput v-model="motionSearch" variant="edit" placeholder="搜索动作..." />
+          <div class="motion-menu__items">
+            <button v-for="entry in filteredMotions" :key="entry.name" type="button" :title="entry.path || '文件路径缺失'" @click="onImportMotion(entry)">{{ entry.name }}</button>
+            <span v-if="!modelMotions.length">当前模型没有动作</span>
+            <span v-else-if="!filteredMotions.length">没有匹配的动作</span>
+          </div>
+        </div>
+      </details>
+      <details ref="toolsMenu" class="motion-menu">
+        <summary class="he-btn">工具 ▾</summary>
+        <div class="motion-menu__panel">
+          <SearchInput v-model="toolsSearch" variant="edit" placeholder="搜索工具..." />
+          <div class="motion-menu__items">
+            <button v-for="tool in filteredTools" :key="tool.name" type="button" @click="tool.run">{{ tool.name }}</button>
+            <span v-if="!filteredTools.length">没有匹配的工具</span>
+          </div>
+        </div>
+      </details>
     </div>
     <div class="motion-editor__body">
       <div class="motion-editor__stage" :style="{ width: stageWidth + 'px' }">
@@ -512,6 +617,22 @@ async function onLoad() {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.motion-menu { position: relative; flex-shrink: 0; }
+.motion-menu summary { list-style: none; }
+.motion-menu summary::-webkit-details-marker { display: none; }
+.motion-menu__panel {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+  width: 220px;
+  padding: 4px; background: #2c313a; border: 1px solid #3a4150; border-radius: 4px;
+}
+.motion-menu__items { max-height: 55vh; overflow-y: auto; }
+.motion-menu__items button, .motion-menu__items span {
+  display: block; width: 100%; padding: 6px 8px; text-align: left;
+  white-space: nowrap; color: #e6e6e6; font-size: 12px;
+}
+.motion-menu__items button { border: 0; background: transparent; cursor: pointer; }
+.motion-menu__items button:hover { background: #343b49; }
 
 .motion-editor__body {
   display: flex;

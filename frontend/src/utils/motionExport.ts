@@ -86,9 +86,9 @@ export function buildMtn(
   lines.push('', `$fadeout=${Math.max(0, Math.round(opts.fadeOutMs))}`)
   for (const track of collectExportTracks(lanim, defOf)) {
     if (!track.keys.length) continue
-    const values = sampleFrames(lanim, track.keys)
-    const allSame = values.every((v) => v === values[0])
-    lines.push('', allSame ? `${track.paramId}=${fmtNum(values[0])}` : `${track.paramId}=${values.map(fmtNum).join(',')}`)
+    const values = sampleFrames(lanim, track.keys).map(fmtNum)
+    while (values.length > 1 && values[values.length - 1] === values[values.length - 2]) values.pop()
+    lines.push('', `${track.paramId}=${values.join(',')}`)
   }
   return lines.join('\n') + '\n'
 }

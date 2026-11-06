@@ -118,7 +118,7 @@ function readPath(obj: any, path: string): any {
   return cur
 }
 
-function parseMotions(data: any): MotionEntry[] {
+export function parseMotions(data: any, includeMissingPaths = false): MotionEntry[] {
   const motionsObj = pickField<Record<string, any[]>>(
     data,
     'FileReferences.Motions',
@@ -132,8 +132,8 @@ function parseMotions(data: any): MotionEntry[] {
     const first = list[0]
     if (!first || typeof first !== 'object') continue
     const file = pickField<string>(first, 'File', 'file')
-    if (typeof file !== 'string' || !file) continue
-    out.push({ name, path: file })
+    if ((typeof file !== 'string' || !file.trim()) && !includeMissingPaths) continue
+    out.push({ name, path: typeof file === 'string' ? file.trim() : '' })
   }
   return out
 }

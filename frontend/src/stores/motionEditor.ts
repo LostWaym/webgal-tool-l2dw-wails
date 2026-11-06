@@ -187,6 +187,27 @@ export function sampleLanim(
   return out
 }
 
+/** 播放预览在相邻整数帧的采样值之间线性插值，组合器保持离散切换。 */
+export function sampleLanimForPlayback(
+  lanim: LanimFile,
+  frame: number,
+  defOf: (id: string) => ComposerDef | null = () => null,
+): Map<string, number> {
+  const f = Math.max(0, Math.min(lanim.durationFrames, frame))
+  const before = Math.floor(f)
+  const after = Math.ceil(f)
+  const ratio = f - before
+  const out = new Map<string, number>()
+  for (const track of lanim.tracks) {
+    if (!track.keys.length) continue
+    const a = sampleTrack(track.keys, before)
+    const b = before === after ? a : sampleTrack(track.keys, after)
+    out.set(track.paramId, a + (b - a) * ratio)
+  }
+  applyComposers(lanim, f, out, defOf)
+  return out
+}
+
 /** 把任意 json 解析为 LanimFile；结构不合法返回 null。 */
 export function parseLanimJson(text: string): LanimFile | null {
   let raw: unknown

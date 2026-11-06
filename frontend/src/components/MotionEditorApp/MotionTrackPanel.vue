@@ -591,6 +591,13 @@ function onShortcut(e: KeyboardEvent) {
   const target = e.target
   if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return
   if (frameModal.state.visible || exportModal.state.visible || gifModal.state.visible) return
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !drag) {
+    e.preventDefault()
+    store.onPlayheadGrab?.()
+    const delta = e.key === 'ArrowLeft' ? -1 : 1
+    store.playhead = Math.max(0, Math.min(store.lanim.durationFrames, store.playhead + delta))
+    return
+  }
   if (e.key === 'Escape') {
     if (drag) cancelDrag()
     else selectedKeys.value = []
@@ -1110,10 +1117,6 @@ function onHeadDrag(dx: number) {
   padding: 4px 8px;
 }
 
-.head-row.is-selected {
-  background: #262d3a;
-}
-
 .head-row--ruler {
   padding: 0 8px;
   font-size: 11px;
@@ -1206,10 +1209,6 @@ function onHeadDrag(dx: number) {
   position: relative;
   border-bottom: 1px solid #2c313a;
   box-sizing: border-box;
-}
-
-.lane-row.is-selected {
-  background: #262d3a;
 }
 
 .lane-row--ruler {

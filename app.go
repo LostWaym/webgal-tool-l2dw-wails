@@ -29,9 +29,15 @@ const (
 
 // AppConfig stores persistent user preferences.
 type AppConfig struct {
-	LastDirs                  map[string]string `json:"lastDirs"`
-	NextArgMode               string            `json:"nextArgMode,omitempty"`
-	LegacyExpressionBlendMode bool              `json:"legacyExpressionBlendMode"`
+	LastDirs                  map[string]string               `json:"lastDirs"`
+	NextArgMode               string                          `json:"nextArgMode,omitempty"`
+	LegacyExpressionBlendMode bool                            `json:"legacyExpressionBlendMode"`
+	MotionExpressionFolders   *MotionExpressionFolderSettings `json:"motionExpressionFolders,omitempty"`
+}
+
+type MotionExpressionFolderSettings struct {
+	Enabled   bool   `json:"enabled"`
+	Separator string `json:"separator"`
 }
 
 // App is the Wails application struct exposed to the frontend.
@@ -123,6 +129,20 @@ func (a *App) SetLegacyExpressionBlendMode(enabled bool) error {
 	defer a.mu.Unlock()
 	cfg := a.loadConfig()
 	cfg.LegacyExpressionBlendMode = enabled
+	return a.saveConfig(cfg)
+}
+
+func (a *App) GetMotionExpressionFolderSettings() *MotionExpressionFolderSettings {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().MotionExpressionFolders
+}
+
+func (a *App) SetMotionExpressionFolderSettings(enabled bool, separator string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.MotionExpressionFolders = &MotionExpressionFolderSettings{Enabled: enabled, Separator: separator}
 	return a.saveConfig(cfg)
 }
 

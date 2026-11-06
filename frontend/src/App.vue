@@ -24,6 +24,7 @@ const { handleShortcut } = useShortcuts()
 const isTransforming = ref(false)
 const projectVisible = ref(false)
 const settingsVisible = ref(false)
+const settingsTab = ref<'motionExpression' | undefined>()
 const stageVisible = ref(true)
 
 async function loadProject(project: PreviewProject, path: string) {
@@ -44,6 +45,16 @@ function onTransformStart(active: boolean) {
   isTransforming.value = active
 }
 
+function openMotionExpressionSettings() {
+  settingsTab.value = 'motionExpression'
+  settingsVisible.value = true
+}
+
+function closeSettings() {
+  settingsVisible.value = false
+  settingsTab.value = undefined
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleShortcut)
   emitter.on(StageEvents.TransformStart, onTransformStart)
@@ -59,12 +70,12 @@ onBeforeUnmount(() => {
   <div class="app" :class="{ 'is-transforming': isTransforming }">
     <ModelList class="app__left" @project="projectVisible = true" @settings="settingsVisible = true" />
     <Stage v-if="stageVisible" class="app__right" />
-    <ModelActionPanel v-if="store.selectedId" />
+    <ModelActionPanel v-if="store.selectedId" @open-motion-expression-settings="openMotionExpressionSettings" />
     <TransformSnapshotModal />
     <FilterPresetModal />
     <BackgroundHistoryModal />
     <PreviewProjectModal :visible="projectVisible" @close="projectVisible = false" @load="loadProject" />
-    <PreviewSettingsModal :visible="settingsVisible" @close="settingsVisible = false" />
+    <PreviewSettingsModal :visible="settingsVisible" :initial-tab="settingsTab" @close="closeSettings" />
     <ColorPickerModal />
     <MessageHost />
   </div>

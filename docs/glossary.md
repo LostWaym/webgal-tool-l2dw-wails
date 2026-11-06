@@ -26,6 +26,7 @@
 - **主 App / 预览编辑器**：`frontend/src/App.vue` 为入口，`frontend/src/components/ModelPreviewApp/Stage.vue` 为舞台；状态由 `frontend/src/stores/previewStore.ts` 管理。
 - **立绘列表**：`frontend/src/components/ModelPreviewApp/ModelList.vue`，包含模型、图片立绘、立绘组和特殊场景项。
 - **操作区 / 页签 / 页签内容**：`frontend/src/components/ModelPreviewApp/ModelActionPanel.vue`；页签位于操作区上方，选中后显示对应内容。
+- **预览设置 / 动作表情文件夹**：设置界面在 `frontend/src/components/ModelPreviewApp/Modal/PreviewSettingsModal.vue`，文件夹设置由 `frontend/src/composables/useMotionExpressionFolders.ts` 共享并通过 `app.go` 持久化。
 - **GRS**：预览舞台对立绘等对象的快捷键变换操作，入口为 `frontend/src/components/ModelPreviewApp/Stage.vue`。
 - **立绘组 / 立绘组快捷键复制**：数据归预览 store 管理；复制分发入口为 `frontend/src/composables/useShortcuts.ts` 的 `runShortcutForFigureGroup`。
 - **背景 / 历史背景**：背景入口在立绘列表；历史界面与状态控制分别为 `frontend/src/components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue`、`frontend/src/composables/useBackgroundHistoryModal.ts`，历史数据归预览 store。

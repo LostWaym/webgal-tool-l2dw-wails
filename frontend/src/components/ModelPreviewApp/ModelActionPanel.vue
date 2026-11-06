@@ -22,6 +22,7 @@ import emitter, { StageEvents } from '../../stores/emitter'
 import { reloadAllModelTextures } from '../../live2d/textureUtils'
 import { useMessage } from '../../composables/useMessage'
 import { useDraggableScroll } from '../../composables/useDraggableScroll'
+import { useMotionExpressionFolders } from '../../composables/useMotionExpressionFolders'
 import SearchInput from '../common/SearchInput.vue'
 import NumberInput from '../common/NumberInput.vue'
 import FocusPicker from '../common/FocusPicker.vue'
@@ -35,10 +36,12 @@ import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 import { ListFilterPresetFiles, SaveFilterPresetFile } from '../../../wailsjs/go/main/App'
 
 const store = useModelStore()
+const emit = defineEmits<{ (e: 'open-motion-expression-settings'): void }>()
 const snapshotModal = useTransformSnapshotModal()
 const filterPresetModal = useFilterPresetModal()
 const motionScroll = useDraggableScroll()
 const expressionScroll = useDraggableScroll()
+const folders = useMotionExpressionFolders()
 const filterScroll = useDraggableScroll()
 const focusScroll = useDraggableScroll()
 const blinkScroll = useDraggableScroll()
@@ -119,6 +122,12 @@ interface ExpressionInfo {
 
 const motions = ref<MotionInfo[]>([])
 const expressions = ref<ExpressionInfo[]>([])
+const motionPath = ref<string[]>([])
+const expressionPath = ref<string[]>([])
+watch([() => folders.settings.enabled, () => folders.settings.separator], () => {
+  motionPath.value = []
+  expressionPath.value = []
+}, { flush: 'sync' })
 
 // 变换状态（统一通过 store.getTransformState 获取，内部已处理特殊容器 / 普通模型）
 const transformState = computed<TransformState>(
@@ -434,6 +443,8 @@ const figureTransformTemplateInput = computed({
 
 // 监听模型选择变化
 watch(() => store.selectedId, async (newId, oldId) => {
+  motionPath.value = []
+  expressionPath.value = []
   console.log('selectedId changed:', newId, oldId)
 
   // 立绘组：清理无效目标，并切到 figureGroupInfo
@@ -695,15 +706,37 @@ function generateStageTransformTemplate() {
   store.setStageTransformTemplate(DEFAULT_STAGE_TRANSFORM_TEMPLATE)
 }
 
-// 过滤后的动作列表
-const filteredMotions = computed(() =>
-  filterBySearch(motions.value, motionSearch.value, (m) => m.name),
-)
+function nameSegments(name: string): string[] {
+  if (!folders.active.value) return [name]
+  const segments = name.split(folders.settings.separator).filter(Boolean)
+  return segments.length ? segments : [name]
+}
 
-// 过滤后的表情列表
-const filteredExpressions = computed(() =>
-  filterBySearch(expressions.value, expressionSearch.value, (e) => e.name),
-)
+function itemName(item: { name: string }): string {
+  return nameSegments(item.name).slice(-1)[0]
+}
+
+function directoryContents<T extends { name: string }>(items: T[], path: string[], query: string) {
+  if (query.trim()) {
+    const matching = filterBySearch(items, query, item => item.name)
+    return { matching, folders: [] as string[], entries: matching }
+  }
+  const matching = items.filter(item => {
+      const segments = nameSegments(item.name)
+      return path.every((part, index) => segments[index] === part) && segments.length > path.length
+    })
+  const folders = new Set<string>()
+  const entries: T[] = []
+  for (const item of matching) {
+    const segments = nameSegments(item.name)
+    if (segments.length > path.length + 1) folders.add(segments[path.length])
+    else entries.push(item)
+  }
+  return { matching, folders: Array.from(folders).sort((a, b) => a.localeCompare(b)), entries }
+}
+
+const motionDirectory = computed(() => directoryContents(motions.value, motionPath.value, motionSearch.value))
+const expressionDirectory = computed(() => directoryContents(expressions.value, expressionPath.value, expressionSearch.value))
 
 // 当前播放状态
 const currentState = computed(() => store.selectedModel?.playing ?? { motion: null, expression: null })
@@ -748,23 +781,27 @@ async function playExpression(item: ExpressionInfo) {
 
 // 随机播放一个动作
 async function playRandomMotion() {
-  const list = filteredMotions.value
+  const list = filterBySearch(motions.value, motionSearch.value, item => item.name)
   if (list.length === 0) return
   const item = list[Math.floor(Math.random() * list.length)]
   await playMotion(item)
+  if (!motionSearch.value.trim()) motionPath.value = nameSegments(item.name).slice(0, -1)
   if (motionCollapsed.value) return
   if (motionScroll.isDragging.value) return
+  await nextTick()
   motionScroll.scrollToItem(`${item.group}_${item.index}`)
 }
 
 // 随机播放一个表情
 async function playRandomExpression() {
-  const list = filteredExpressions.value
+  const list = filterBySearch(expressions.value, expressionSearch.value, item => item.name)
   if (list.length === 0) return
   const item = list[Math.floor(Math.random() * list.length)]
   await playExpression(item)
+  if (!expressionSearch.value.trim()) expressionPath.value = nameSegments(item.name).slice(0, -1)
   if (expressionCollapsed.value) return
   if (expressionScroll.isDragging.value) return
+  await nextTick()
   expressionScroll.scrollToItem(item.index)
 }
 
@@ -776,6 +813,10 @@ async function scrollToCurrent(type: 'motion' | 'expression') {
       msg.info('当前没有播放中的动作')
       return
     }
+    const item = motions.value.find(item => item.group === playing.group && item.index === playing.index)
+    if (!item) return
+    if (!filterBySearch([item], motionSearch.value, entry => entry.name).length) motionSearch.value = ''
+    if (!motionSearch.value.trim()) motionPath.value = nameSegments(item.name).slice(0, -1)
     if (motionCollapsed.value) motionCollapsed.value = false
     await nextTick()
     motionScroll.scrollToItem(`${playing.group}_${playing.index}`, { immediate: true })
@@ -785,11 +826,27 @@ async function scrollToCurrent(type: 'motion' | 'expression') {
       msg.info('当前没有播放中的表情')
       return
     }
+    const item = expressions.value.find(item => item.index === playing.index)
+    if (!item) return
+    if (!filterBySearch([item], expressionSearch.value, entry => entry.name).length) expressionSearch.value = ''
+    if (!expressionSearch.value.trim()) expressionPath.value = nameSegments(item.name).slice(0, -1)
     if (expressionCollapsed.value) expressionCollapsed.value = false
     await nextTick()
     expressionScroll.scrollToItem(playing.index, { immediate: true })
   }
 }
+
+watch([motionSearch, () => store.selectedId], ([query, id], [previousQuery, previousId]) => {
+  if (id === previousId && previousQuery.trim() && !query.trim() && currentState.value.motion) {
+    void scrollToCurrent('motion')
+  }
+})
+
+watch([expressionSearch, () => store.selectedId], ([query, id], [previousQuery, previousId]) => {
+  if (id === previousId && previousQuery.trim() && !query.trim() && currentState.value.expression) {
+    void scrollToCurrent('expression')
+  }
+})
 
 // 瞬时滚动到当前播放项（列表已渲染才有 data-key，故需 nextTick）
 function scrollToPlayingIfNeeded() {
@@ -830,7 +887,7 @@ const hasTabConfig = computed(() => availableTabs.includes(activeTab.value))
 
 // 页签配置按钮点击回调
 function onTabConfigClick() {
-  msg.info('这里是配置界面(施工中)')
+  emit('open-motion-expression-settings')
 }
 
 function onDragMove(e: MouseEvent) {
@@ -941,6 +998,8 @@ function onLabelDragEnd() {
           v-if="activeTab === tab.key && hasTabConfig"
           :src="settingsIcon"
           class="tab-settings-btn"
+          alt="打开动作/表情设置"
+          title="打开动作/表情设置"
           :class="{ 'is-visible': hoveredTab === tab.key }"
           @click.stop="onTabConfigClick"
         />
@@ -983,18 +1042,26 @@ function onLabelDragEnd() {
           <div class="panel__search">
             <SearchInput v-model="motionSearch" variant="action" placeholder="搜索动作..." />
           </div>
+          <nav v-if="folders.active.value && !motionSearch.trim()" class="list-breadcrumb" aria-label="动作目录">
+            <button type="button" :disabled="motionPath.length === 0" @click="motionPath = []">root</button>
+            <template v-for="(part, index) in motionPath" :key="index">
+              <span aria-hidden="true">&gt;</span>
+              <button type="button" :disabled="index === motionPath.length - 1" @click="motionPath = motionPath.slice(0, index + 1)">{{ part }}</button>
+            </template>
+          </nav>
           <ul class="panel__list is-dragging-scroll" v-bind="motionScroll.scrollHandlers" :ref="el => { motionScroll.containerRef.value = el as HTMLElement | null }">
+            <li v-for="folder in motionDirectory.folders" :key="`folder:${folder}`" class="list-item list-item--folder" @click="motionPath = [...motionPath, folder]">📁 {{ folder }}</li>
             <li
-              v-for="item in filteredMotions"
+              v-for="item in motionDirectory.entries"
               :key="`${item.group}_${item.index}`"
               :data-key="`${item.group}_${item.index}`"
               class="list-item"
               :class="{ 'is-playing': isMotionPlaying(item) }"
               @click="playMotion(item)"
             >
-              {{ item.name }}
+              {{ motionSearch.trim() ? item.name : itemName(item) }}
             </li>
-            <li v-if="filteredMotions.length === 0" class="list-item list-item--empty">
+            <li v-if="motionDirectory.matching.length === 0" class="list-item list-item--empty">
               暂无动作
             </li>
           </ul>
@@ -1035,18 +1102,26 @@ function onLabelDragEnd() {
           <div class="panel__search">
             <SearchInput v-model="expressionSearch" variant="action" placeholder="搜索表情..." />
           </div>
+          <nav v-if="folders.active.value && !expressionSearch.trim()" class="list-breadcrumb" aria-label="表情目录">
+            <button type="button" :disabled="expressionPath.length === 0" @click="expressionPath = []">root</button>
+            <template v-for="(part, index) in expressionPath" :key="index">
+              <span aria-hidden="true">&gt;</span>
+              <button type="button" :disabled="index === expressionPath.length - 1" @click="expressionPath = expressionPath.slice(0, index + 1)">{{ part }}</button>
+            </template>
+          </nav>
           <ul class="panel__list is-dragging-scroll" v-bind="expressionScroll.scrollHandlers" :ref="el => { expressionScroll.containerRef.value = el as HTMLElement | null }">
+            <li v-for="folder in expressionDirectory.folders" :key="`folder:${folder}`" class="list-item list-item--folder" @click="expressionPath = [...expressionPath, folder]">📁 {{ folder }}</li>
             <li
-              v-for="item in filteredExpressions"
+              v-for="item in expressionDirectory.entries"
               :key="item.index"
               :data-key="item.index"
               class="list-item"
               :class="{ 'is-playing': isExpressionPlaying(item) }"
               @click="playExpression(item)"
             >
-              {{ item.name }}
+              {{ expressionSearch.trim() ? item.name : itemName(item) }}
             </li>
-            <li v-if="filteredExpressions.length === 0" class="list-item list-item--empty">
+            <li v-if="expressionDirectory.matching.length === 0" class="list-item list-item--empty">
               暂无表情
             </li>
           </ul>
@@ -1972,6 +2047,35 @@ function onLabelDragEnd() {
 
 .form-row label:hover {
   background: #2a3140;
+}
+
+.list-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+  border-bottom: 1px solid #2c313a;
+  color: #8d99aa;
+  font-size: 12px;
+}
+
+.list-breadcrumb button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8fb9ef;
+  cursor: pointer;
+}
+
+.list-breadcrumb button:disabled {
+  color: #d1d5db;
+  cursor: default;
+}
+
+.list-item--folder {
+  color: #a9c8ed;
 }
 
 .filter-drag-label {

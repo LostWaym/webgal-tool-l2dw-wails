@@ -11,7 +11,7 @@
  * 帧制：底层一切以整数帧号运算（fps/durationFrames 存于 store.lanim）。
  *  - 拖拽车道/标尺 → 播放头帧吸附
  *  - 双击车道 → 当前帧插关键帧（值 = 当前采样值）
- *  - 拖拽关键帧 → 帧吸附；右键删除
+ *  - 拖拽关键帧 → 帧吸附；Delete 删除选中帧
  *  - 拖动参数卡片 → 实时写模型预览 + 当前帧打帧（已有轨道时）
  *  - 行头显示值：有轨道时 = 当前帧采样值，随播放头刷新
  */
@@ -24,6 +24,11 @@ import { listParameters, listPhysicsOutputIds, type ParamEntry } from '../../liv
 import { filterBySearch } from '../../utils/searchUtils'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { useMotionEditorStore, sampleTrack, sampleComposerIndex } from '../../stores/motionEditor'
+import { keyId, snapshotKeys, validateKeyPlacement, type KeyRef, type KeySnapshot } from '../../utils/motionKeyframes'
+import { useMessage } from '../../composables/useMessage'
+import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
+import { useMotionExportModal } from '../../composables/useMotionExportModal'
+import { useMotionGifRenderModal } from '../../composables/useMotionGifRenderModal'
 import {
   resolveComposerMembers,
   isMemberValid,
@@ -38,6 +43,19 @@ import {
 
 const wmdlStore = useWmdlModelEditorStore()
 const store = useMotionEditorStore()
+const msg = useMessage()
+const selectedKeys = ref<KeyRef[]>([])
+let clipboard: KeySnapshot[] = []
+const selectedIds = computed(() => new Set(selectedKeys.value.map(keyId)))
+const frameModal = useFrameSettingsModal()
+const exportModal = useMotionExportModal()
+const gifModal = useMotionGifRenderModal()
+
+watch(() => store.lanim, () => { selectedKeys.value = []; clipboard = []; cancelDrag() })
+watch(() => [store.lanim.tracks, store.lanim.composers], () => {
+  const existing = new Set(snapshotKeys(store.lanim, selectedKeys.value).map(keyId))
+  selectedKeys.value = selectedKeys.value.filter((key) => existing.has(keyId(key)))
+}, { deep: true })
 
 const search = ref('')
 const params = ref<ParamEntry[]>([])
@@ -350,8 +368,14 @@ const curves = computed(() => {
   const out: Array<{ paramId: string; points: string }> = []
   for (const track of store.lanim.tracks) {
     if (!track.keys.length) continue
+    const keys = dragDelta.value
+      ? track.keys.map((key) => ({
+        ...key,
+        frame: key.frame + keyOffset({ kind: 'param', id: track.paramId, frame: key.frame }),
+      })).sort((a, b) => a.frame - b.frame)
+      : track.keys
     const pts = frames.map((f) => {
-      const y = t2topPct(v2t(track.paramId, sampleTrack(track.keys, f)))
+      const y = t2topPct(v2t(track.paramId, sampleTrack(keys, f)))
       return `${f2x(f).toFixed(2)},${y.toFixed(2)}`
     })
     out.push({ paramId: track.paramId, points: pts.join(' ') })
@@ -412,6 +436,8 @@ onMounted(() => {
   refreshWidth()
   loadPresetFiles()
   document.addEventListener('mousedown', onDocClick)
+  window.addEventListener('keydown', onShortcut)
+  window.addEventListener('blur', cancelDrag)
   if (typeof ResizeObserver !== 'undefined' && lanesEl.value) {
     resizeObserver = new ResizeObserver(refreshWidth)
     resizeObserver.observe(lanesEl.value)
@@ -421,9 +447,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   resizeObserver = null
-  window.removeEventListener('mousemove', onWindowMove)
-  window.removeEventListener('mouseup', onWindowUp)
+  cancelDrag()
   document.removeEventListener('mousedown', onDocClick)
+  window.removeEventListener('keydown', onShortcut)
+  window.removeEventListener('blur', cancelDrag)
 })
 
 function onLanesScroll() {
@@ -432,6 +459,7 @@ function onLanesScroll() {
   scrollLeft.value = el.scrollLeft
   // 同步左列垂直滚动
   if (headEl.value) headEl.value.style.transform = `translateY(${-el.scrollTop}px)`
+  if (drag?.kind === 'box') updateBox(drag.clientX, drag.clientY)
 }
 
 // 时长变化时，非手动缩放状态下重新适配面板宽度
@@ -517,31 +545,115 @@ function fmtTime(frame: number): string {
 
 // ── 拖拽（播放头 / 关键帧） ─────────────────────────────────────────────────
 
-interface DragState {
-  kind: 'key' | 'playhead' | 'composerKey'
-  paramId?: string
-  composerId?: string
-  fromFrame?: number
-}
+type DragState =
+  | { kind: 'playhead' }
+  | { kind: 'keys'; startX: number; keys: KeySnapshot[] }
+  | { kind: 'box'; startX: number; startY: number; clientX: number; clientY: number; base: KeyRef[]; moved: boolean }
 
 let drag: DragState | null = null
+const dragDelta = ref(0)
+const box = ref<{ left: number; top: number; width: number; height: number } | null>(null)
+
+function contentPoint(clientX: number, clientY: number) {
+  const el = lanesEl.value!
+  const rect = el.getBoundingClientRect()
+  return { x: clientX - rect.left + el.scrollLeft, y: clientY - rect.top + el.scrollTop }
+}
+
+function updateBox(clientX: number, clientY: number) {
+  if (!drag || drag.kind !== 'box' || !lanesEl.value) return
+  drag.clientX = clientX
+  drag.clientY = clientY
+  const p = contentPoint(clientX, clientY)
+  const left = Math.min(drag.startX, p.x), top = Math.min(drag.startY, p.y)
+  const width = Math.abs(p.x - drag.startX), height = Math.abs(p.y - drag.startY)
+  if (width > 3 || height > 3) drag.moved = true
+  if (!drag.moved) return
+  box.value = { left, top, width, height }
+  const found: KeyRef[] = []
+  lanesEl.value.querySelectorAll<HTMLElement>('.lane-row__key').forEach((node) => {
+    const rect = node.getBoundingClientRect()
+    const center = contentPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    if (center.x < left || center.x > left + width || center.y < top || center.y > top + height) return
+    const kind = node.dataset.kind as KeyRef['kind']
+    const id = node.dataset.id
+    if (id !== undefined) found.push({ kind, id, frame: Number(node.dataset.frame) })
+  })
+  const combined = new Map(drag.base.map((key) => [keyId(key), key]))
+  for (const key of found) combined.set(keyId(key), key)
+  selectedKeys.value = [...combined.values()]
+}
+
+function selected(key: KeyRef): boolean { return selectedIds.value.has(keyId(key)) }
+function keyOffset(key: KeyRef): number { return drag?.kind === 'keys' && selected(key) ? dragDelta.value : 0 }
+
+function onShortcut(e: KeyboardEvent) {
+  const target = e.target
+  if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return
+  if (frameModal.state.visible || exportModal.state.visible || gifModal.state.visible) return
+  if (e.key === 'Escape') {
+    if (drag) cancelDrag()
+    else selectedKeys.value = []
+    return
+  }
+  if (e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !drag && selectedKeys.value.length) {
+    e.preventDefault()
+    if (store.deleteKeys(selectedKeys.value)) selectedKeys.value = []
+    return
+  }
+  if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.repeat || drag) return
+  const key = e.key.toLowerCase()
+  if (key === 'c' || key === 'x') {
+    const keys = snapshotKeys(store.lanim, selectedKeys.value)
+    if (!keys.length || keys.length !== selectedKeys.value.length) return
+    e.preventDefault()
+    clipboard = keys.map((item) => ({ ...item }))
+    if (key === 'x' && store.deleteKeys(selectedKeys.value)) selectedKeys.value = []
+  } else if (key === 'v' && clipboard.length) {
+    e.preventDefault()
+    const earliest = Math.min(...clipboard.map((item) => item.frame))
+    const pasted = clipboard.map((item) => ({ ...item, frame: item.frame - earliest + store.playhead }))
+    const error = store.placeKeys(pasted)
+    if (error) msg.warning(`无法粘贴：${error}`)
+    else selectedKeys.value = pasted.map(({ kind, id, frame }) => ({ kind, id, frame }))
+  }
+}
 
 function onWindowMove(e: MouseEvent) {
   if (!drag) return
-  const f = x2f(e.clientX)
   if (drag.kind === 'playhead') {
-    store.playhead = f
-  } else if (drag.kind === 'key' && drag.paramId !== undefined && drag.fromFrame !== undefined) {
-    store.moveKeyframe(drag.paramId, drag.fromFrame, f)
-    drag.fromFrame = f
-  } else if (drag.kind === 'composerKey' && drag.composerId !== undefined && drag.fromFrame !== undefined) {
-    store.moveComposerKey(drag.composerId, drag.fromFrame, f)
-    drag.fromFrame = f
+    store.playhead = x2f(e.clientX)
+  } else if (drag.kind === 'keys') {
+    const frames = drag.keys.map((key) => key.frame)
+    const delta = Math.round((e.clientX - drag.startX) / effectivePpf())
+    const next = Math.max(-Math.min(...frames), Math.min(durationFrames.value - Math.max(...frames), delta))
+    const targets = drag.keys.map((key) => ({ ...key, frame: key.frame + next }))
+    if (next !== dragDelta.value && !validateKeyPlacement(store.lanim, targets, drag.keys)) {
+      dragDelta.value = next
+      store.keyframePreview = next ? { sources: drag.keys, keys: targets } : null
+    }
+  } else {
+    updateBox(e.clientX, e.clientY)
   }
 }
 
 function onWindowUp() {
+  if (drag?.kind === 'keys' && dragDelta.value) {
+    const targets = drag.keys.map((key) => ({ ...key, frame: key.frame + dragDelta.value }))
+    const error = validateKeyPlacement(store.lanim, targets, drag.keys) || store.placeKeys(targets, drag.keys)
+    if (error) msg.warning(`无法移动：${error}`)
+    else selectedKeys.value = targets.map(({ kind, id, frame }) => ({ kind, id, frame }))
+  } else if (drag?.kind === 'box' && !drag.moved && !drag.base.length) {
+    selectedKeys.value = []
+  }
+  cancelDrag()
+}
+
+function cancelDrag() {
   drag = null
+  dragDelta.value = 0
+  store.keyframePreview = null
+  box.value = null
   window.removeEventListener('mousemove', onWindowMove)
   window.removeEventListener('mouseup', onWindowUp)
 }
@@ -560,7 +672,14 @@ function beginDrag(state: DragState, e: MouseEvent) {
 }
 
 function onRulerDown(e: MouseEvent) {
+  if (e.button !== 0) return
   beginDrag({ kind: 'playhead' }, e)
+}
+
+function onLaneDown(e: MouseEvent) {
+  if (e.button !== 0 || !lanesEl.value) return
+  const point = contentPoint(e.clientX, e.clientY)
+  beginDrag({ kind: 'box', startX: point.x, startY: point.y, clientX: e.clientX, clientY: e.clientY, base: e.ctrlKey ? [...selectedKeys.value] : [], moved: false }, e)
 }
 
 function onLaneDblClick(paramId: string, e: MouseEvent) {
@@ -575,26 +694,30 @@ function onLaneDblClick(paramId: string, e: MouseEvent) {
 
 function onKeyframeDown(paramId: string, frame: number, e: MouseEvent) {
   store.selectedTrackId = paramId
-  beginDrag({ kind: 'key', paramId, fromFrame: frame }, e)
+  onAnyKeyDown({ kind: 'param', id: paramId, frame }, e)
 }
 
-function onKeyframeContext(paramId: string, frame: number, e: MouseEvent) {
-  e.preventDefault()
-  store.removeKeyframeNear(paramId, frame)
+function onAnyKeyDown(key: KeyRef, e: MouseEvent) {
+  if (e.button !== 0) return
+  if (e.ctrlKey) {
+    selectedKeys.value = selected(key) ? selectedKeys.value.filter((item) => keyId(item) !== keyId(key)) : [...selectedKeys.value, key]
+    e.stopPropagation()
+    e.preventDefault()
+    return
+  }
+  if (!selected(key)) selectedKeys.value = [key]
+  const keys = snapshotKeys(store.lanim, selectedKeys.value)
+  if (keys.length) beginDrag({ kind: 'keys', startX: e.clientX, keys }, e)
 }
 
 function onComposerKeyDown(id: string, frame: number, e: MouseEvent) {
-  beginDrag({ kind: 'composerKey', composerId: id, fromFrame: frame }, e)
+  store.selectedTrackId = 'composer:' + id
+  onAnyKeyDown({ kind: 'composer', id, frame }, e)
 }
 
 function onComposerKeyDblClick(frame: number, e: MouseEvent) {
   e.stopPropagation()
   store.playhead = frame
-}
-
-function onComposerKeyContext(id: string, frame: number, e: MouseEvent) {
-  e.preventDefault()
-  store.removeComposerKeyNear(id, frame)
 }
 
 // 左列垂直同步目标
@@ -609,6 +732,7 @@ function onHeadDrag(dx: number) {
   <div class="track-panel">
     <div class="track-panel__search">
       <SearchInput v-model="search" variant="edit" placeholder="搜索参数..." />
+      <span v-if="selectedKeys.length" class="track-panel__selection">已选 {{ selectedKeys.length }} 帧</span>
       <div id="motion-preset-root" class="preset-root">
         <button
           class="preset-toggle"
@@ -771,6 +895,7 @@ function onHeadDrag(dx: number) {
             class="lane-row"
             :class="{ 'is-selected': store.selectedTrackId === p.id }"
             :style="{ height: ROW_H + 'px' }"
+            @mousedown="onLaneDown"
             @dblclick="onLaneDblClick(p.id, $event)"
           >
             <template v-if="isTracked(p.id)">
@@ -787,11 +912,13 @@ function onHeadDrag(dx: number) {
                 v-for="key in trackOf(p.id)?.keys ?? []"
                 :key="key.frame"
                 class="lane-row__key"
-                :style="{ left: f2x(key.frame) + 'px', top: keyTopPct(p.id, key.v) + '%' }"
-                title="拖动改帧 / 双击移动播放头 / 右键删除"
+                :class="{ 'is-key-selected': selected({ kind: 'param', id: p.id, frame: key.frame }) }"
+                :data-kind="'param'" :data-id="p.id" :data-frame="key.frame"
+                :style="{ left: f2x(key.frame + keyOffset({ kind: 'param', id: p.id, frame: key.frame })) + 'px', top: keyTopPct(p.id, key.v) + '%' }"
+                title="拖动改帧 / 双击移动播放头 / Delete 删除选中帧"
                 @mousedown="onKeyframeDown(p.id, key.frame, $event)"
                 @dblclick.stop="onKeyframeDblClick(key.frame, $event)"
-                @contextmenu="onKeyframeContext(p.id, key.frame, $event)"
+                @contextmenu.prevent
               />
             </template>
           </div>
@@ -802,19 +929,22 @@ function onHeadDrag(dx: number) {
             class="lane-row"
             :class="{ 'is-selected': store.selectedTrackId === 'composer:' + c.id }"
             :style="{ height: ROW_H + 'px' }"
+            @mousedown="onLaneDown"
           >
             <div
               v-for="key in c.keys"
               :key="key.frame"
               class="lane-row__key lane-row__key--composer"
-              :class="{ 'is-missing': isComposerMissing(c.id) }"
-              :style="{ left: f2x(key.frame) + 'px', top: '50%' }"
-              :title="isComposerMissing(c.id) ? '组合器定义缺失' : '拖动改帧 / 双击移动播放头 / 右键删除'"
+              :class="{ 'is-missing': isComposerMissing(c.id), 'is-key-selected': selected({ kind: 'composer', id: c.id, frame: key.frame }) }"
+              :data-kind="'composer'" :data-id="c.id" :data-frame="key.frame"
+              :style="{ left: f2x(key.frame + keyOffset({ kind: 'composer', id: c.id, frame: key.frame })) + 'px', top: '50%' }"
+              :title="isComposerMissing(c.id) ? '组合器定义缺失' : '拖动改帧 / 双击移动播放头 / Delete 删除选中帧'"
               @mousedown="onComposerKeyDown(c.id, key.frame, $event)"
               @dblclick.stop="onComposerKeyDblClick(key.frame, $event)"
-              @contextmenu="onComposerKeyContext(c.id, key.frame, $event)"
+              @contextmenu.prevent
             />
           </div>
+          <div v-if="box" class="track-panel__selection-box" :style="{ left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }" />
         </div>
       </div>
       <!-- 播放头覆盖层（不随滚动；left 随 lanesOffsetX/scrollLeft 修正） -->
@@ -1069,6 +1199,9 @@ function onHeadDrag(dx: number) {
   position: relative;
 }
 
+.track-panel__selection { color: #b7c9e8; font-size: 12px; white-space: nowrap; }
+.track-panel__selection-box { position: absolute; z-index: 3; border: 1px solid #75b7ff; background: rgba(70, 145, 240, 0.18); pointer-events: none; box-sizing: border-box; }
+
 .lane-row {
   position: relative;
   border-bottom: 1px solid #2c313a;
@@ -1134,6 +1267,8 @@ function onHeadDrag(dx: number) {
 .lane-row__key:hover {
   background: #56a0ff;
 }
+
+.lane-row__key.is-key-selected { outline: 2px solid #fff2a6; outline-offset: 2px; z-index: 1; }
 
 /* 组合器帧点：绿色系以示区分；定义缺失时灰显 */
 .lane-row__key--composer {

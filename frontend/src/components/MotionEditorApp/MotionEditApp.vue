@@ -25,6 +25,7 @@ import {
   restoreParamDefaults,
 } from '../../stores/motionEditor'
 import { resolveComposerMembers, loadComposerDefsByIds } from '../../utils/motionComposors'
+import { previewLanim } from '../../utils/motionKeyframes'
 import { listParameters } from '../../live2d/coreAdapter'
 import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
@@ -189,8 +190,10 @@ store.onPlayheadGrab = () => {
 let rafId = 0
 let playStart = 0
 
+const sampledLanim = computed(() => previewLanim(store.lanim, store.keyframePreview))
+
 function applySampled(frame: number) {
-  const sampled = sampleLanim(store.lanim, frame, store.composerDefOf)
+  const sampled = sampleLanim(sampledLanim.value, frame, store.composerDefOf)
   if (!sampled.size) return
   const params: Array<{ id: string; val: number; calc: ParamCalc }> = []
   sampled.forEach((val, id) => params.push({ id, val, calc: 'set' }))
@@ -243,6 +246,10 @@ watch(
   },
   { deep: true },
 )
+
+watch(() => store.keyframePreview, () => {
+  if (!store.playing) applySampled(store.playhead)
+})
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(rafId)

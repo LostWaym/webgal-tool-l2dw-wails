@@ -3,6 +3,7 @@ import { listParameters, writeParameter } from '../live2d/coreAdapter'
 import { useWmdlModelEditorStore } from './wmdlModelEditor'
 import type { ComposerDef } from '../utils/motionComposors'
 import { isMemberValid } from '../utils/motionComposors'
+import { keysFor, keyId, snapshotKeys, validateKeyPlacement, type KeyRef, type KeySnapshot, type KeyframePreview } from '../utils/motionKeyframes'
 
 /** 关键帧插值方式（全局，不存进 lanim 文件），可改为 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'。 */
 export type InterpKind = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'
@@ -260,6 +261,7 @@ export function restoreParamDefaults(paramIds: string[]) {
 }
 
 interface MotionEditorState {  lanim: LanimFile
+  keyframePreview: KeyframePreview | null
   /** 当前编辑的 wmdl 关联的动画文件路径；保存过则为绝对路径。 */
   lanimFilePath: string | null
   selectedTrackId: string | null
@@ -285,6 +287,7 @@ interface MotionEditorState {  lanim: LanimFile
 export const useMotionEditorStore = defineStore('motionEditor', {
   state: (): MotionEditorState => ({
     lanim: createDefaultLanim(),
+    keyframePreview: null,
     lanimFilePath: null,
     selectedTrackId: null,
     playhead: 0,
@@ -324,6 +327,46 @@ export const useMotionEditorStore = defineStore('motionEditor', {
   },
 
   actions: {
+    placeKeys(keys: KeySnapshot[], sources: KeyRef[] = []): string | null {
+      if (sources.length && snapshotKeys(this.lanim, sources).length !== sources.length) return '选中的关键帧已不存在'
+      const error = validateKeyPlacement(this.lanim, keys, sources)
+      if (error) return error
+      const sourceIds = new Set(sources.map(keyId))
+      const affected = new Set<MotionKeyframe[]>()
+      for (const source of sources) {
+        const track = keysFor(this.lanim, source)!
+        if (affected.has(track)) continue
+        affected.add(track)
+        for (let i = track.length - 1; i >= 0; i--) {
+          if (sourceIds.has(keyId({ ...source, frame: track[i].frame }))) track.splice(i, 1)
+        }
+      }
+      for (const key of keys) {
+        const track = keysFor(this.lanim, key)!
+        track.push({ frame: key.frame, v: key.v })
+        affected.add(track)
+      }
+      for (const track of affected) track.sort((a, b) => a.frame - b.frame)
+      return null
+    },
+    deleteKeys(refs: KeyRef[]): boolean {
+      if (snapshotKeys(this.lanim, refs).length !== refs.length) return false
+      const affectedParams = new Set(refs.filter((ref) => ref.kind === 'param').map((ref) => ref.id))
+      const affectedComposers = new Set(refs.filter((ref) => ref.kind === 'composer').map((ref) => ref.id))
+      this.placeKeys([], refs)
+      const empty = [...affectedParams].filter((id) => !this.lanim.tracks.find((track) => track.paramId === id)?.keys.length)
+      for (const id of affectedComposers) {
+        const track = this.lanim.composers?.find((item) => item.id === id)
+        const def = this.composerDefs[id]
+        if (track && !track.keys.length && def) {
+          for (const paramId of def.resolvedMembers) {
+            if (paramId != null) empty.push(paramId)
+          }
+        }
+      }
+      if (empty.length) restoreParamDefaults(empty)
+      return true
+    },
     addTrack(paramId: string) {
       if (this.lanim.tracks.some((tr) => tr.paramId === paramId)) return
       this.lanim.tracks.push({ paramId, keys: [] })
@@ -545,6 +588,7 @@ export const useMotionEditorStore = defineStore('motionEditor', {
       return removed
     },
     reset() {
+      this.keyframePreview = null
       restoreParamDefaults(this.lanim.tracks.map((tr) => tr.paramId))
       const composerMemberIds: string[] = []
       for (const track of this.lanim.composers ?? []) {

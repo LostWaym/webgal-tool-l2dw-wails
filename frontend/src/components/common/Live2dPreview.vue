@@ -20,6 +20,7 @@ const props = defineProps<{
   /** wmdl 模型组配置（含子模型列表）。为空时不渲染任何模型。 */
   wmdlConfig?: WmdlConfig | null
 }>()
+const emit = defineEmits<{ (e: 'loaded'): void; (e: 'load-error'): void }>()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 let app: PIXI.Application | null = null
@@ -68,6 +69,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  loadSeq++
   dispose()
 })
 
@@ -288,8 +290,10 @@ async function loadWmdlModels(config: WmdlConfig | null | undefined) {
 
     writeFilterStateToContainer(wrapper, currentFilterState, currentScale)
     fitModel()
+    emit('loaded')
   } catch (err) {
     console.error('Live2dPreview failed to load model group:', err)
+    if (token === loadSeq) emit('load-error')
   }
 }
 
@@ -515,9 +519,11 @@ defineExpose({
    *   - add:  在当前值基础上叠加增量（cubism 2 用 read-modify-write）
    *   - mult: 在当前值基础上乘以倍数（cubism 2 用 read-modify-write）
    */
-  applyParameters(params: Array<{ id: string; val: number; calc: ParamCalc }>) {
+  applyParameters(params: Array<{ id: string; val: number; calc: ParamCalc }>, modelId?: string) {
     if (!subModels.length) return
-    for (const m of subModels) {
+    for (let i = 0; i < subModels.length; i++) {
+      if (modelId && props.wmdlConfig?.models[i]?.id !== modelId) continue
+      const m = subModels[i]
       const core: any = (m as any).internalModel?.coreModel
       if (!core) continue
       for (const { id, val, calc } of params) {

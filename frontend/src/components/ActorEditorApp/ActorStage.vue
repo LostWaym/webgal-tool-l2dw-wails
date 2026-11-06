@@ -70,8 +70,8 @@ onBeforeUnmount(() => {
 })
 
 defineExpose({
-  applyParameters(params: Array<{ id: string; val: number; calc: ParamCalc }>) {
-    previewRef.value?.applyParameters(params)
+  applyParameters(params: Array<{ id: string; val: number; calc: ParamCalc }>, modelId?: string) {
+    previewRef.value?.applyParameters(params, modelId)
   },
 })
 </script>

@@ -34,8 +34,8 @@ function onRightDrag(dx: number) {
   panelWidth.value = Math.max(PANEL_MIN, Math.min(PANEL_MAX, next))
 }
 
-function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc }>) {
-  stageRef.value?.applyParameters(params)
+function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc }>, modelId?: string) {
+  stageRef.value?.applyParameters(params, modelId)
 }
 </script>
 

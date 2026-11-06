@@ -8,7 +8,7 @@
  * 不直接引用 ActorStage，而是通过 emit 'apply-params' 事件，
  * 由父组件 ActorEditApp 统一路由到舞台的 applyParameters()。
  */
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { pathCombine, pathDirname } from '../../path_utils'
 import {
@@ -26,12 +26,13 @@ import { useActorEditorState, type ExportFormat } from '../../composables/useAct
 import { useMessage } from '../../composables/useMessage'
 import EditRangeCard from '../ModelEditApp/EditRangeCard.vue'
 import SearchInput from '../common/SearchInput.vue'
+import MotionSampleModal from './MotionSampleModal.vue'
 import { filterBySearch } from '../../utils/searchUtils'
 import type { ParamCalc } from '../../stores/wmdlTypes'
 import { listPhysicsOutputIds } from '../../live2d/coreAdapter'
 
 const emit = defineEmits<{
-  (e: 'apply-params', params: Array<{ id: string; val: number; calc: ParamCalc }>): void
+  (e: 'apply-params', params: Array<{ id: string; val: number; calc: ParamCalc }>, modelId?: string): void
 }>()
 
 const store = useWmdlModelEditorStore()
@@ -89,6 +90,8 @@ const fadeOut = ref(500)
 const compress = ref(false)
 
 const selectedModel = computed(() => store.selectedModel)
+const samplingMotion = ref(false)
+watch(() => store.selectedModelId, () => { samplingMotion.value = false })
 const expressions = computed(() => store.selectedModel?.expressions ?? [])
 const hasSelection = computed(() => !!store.selectedModelId)
 const isMoc3 = computed(() => store.selectedModel?.isMoc3 === true)
@@ -222,6 +225,38 @@ function onResetAllParams() {
   msg.success('已重置所有参数')
 }
 
+function onOpenMotionSample() {
+  if (!selectedModel.value) {
+    msg.warning('请先选择模型')
+  } else if (selectedModel.value.isMoc3) {
+    msg.warning('当前不支持采样 moc3 模型的动作')
+  } else if (!selectedModel.value.initParams.length) {
+    msg.warning('模型参数尚未加载完成')
+  } else {
+    samplingMotion.value = true
+  }
+}
+
+function onApplyMotionSample(modelId: string, values: Array<{ id: string; val: number }>) {
+  const model = selectedModel.value
+  if (!model || model.id !== modelId) return
+  const sampled = new Map(values.map((item) => [item.id, item.val]))
+  const writes: Array<{ id: string; val: number; calc: ParamCalc }> = []
+  for (const entry of model.initParams) {
+    if (isPhysicsParam(entry.id)) continue
+    delete entry.override
+    entry.calc = 'set'
+    const value = sampled.get(entry.id)
+    if (value !== undefined) entry.override = value
+    writes.push({ id: entry.id, val: entry.override ?? entry.value, calc: 'set' })
+  }
+  emit('apply-params', writes, modelId)
+  currentSnapshot.value = []
+  activeExpressionKey.value = null
+  samplingMotion.value = false
+  msg.success(`已应用动作帧（${sampled.size} 个参数）`)
+}
+
 function onCalcTypeChange(id: string, calc: ParamCalc) {
   const m = selectedModel.value
   if (!m) return
@@ -324,6 +359,7 @@ async function onOpenOutputDir() {
         编辑面板
         <span class="actor-panel__subtitle" v-if="selectedModel">（{{ selectedModel.name }}）</span>
       </h2>
+      <button class="toolbar-btn" :disabled="!hasSelection" @click="onOpenMotionSample">动作采样</button>
       <button
         class="toolbar-btn toolbar-btn--primary"
         :disabled="!hasSelection || !exportableSnapshot.length"
@@ -422,6 +458,9 @@ async function onOpenOutputDir() {
       </template>
     </div>
 
+    <MotionSampleModal v-if="samplingMotion && selectedModel" :model="selectedModel" :config="store.currentWmdl"
+      :physics-ids="physicsIdSet" @close="samplingMotion = false" @apply="onApplyMotionSample" />
+
     <!-- 导出覆盖层 -->
     <Transition name="fade-fast">
       <div v-if="editorState.state.exportMode" class="actor-export-mask" @click.self="editorState.cancelExport()">
@@ -515,6 +554,7 @@ async function onOpenOutputDir() {
 .actor-panel__header {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 10px 16px;
   border-bottom: 1px solid rgba(60, 68, 80, 0.35);
   flex-shrink: 0;

@@ -140,8 +140,8 @@ lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 tr
 ### lanim → .mtn
 
 1. 首行标识 `# Live2D Animator Motion Data`，随后 `$fps=<lanim.fps>` 和 `$fadein` / `$fadeout`（模态内可编辑）。
-2. 每条轨道用 `sampleTrack` 逐帧采样至末关键帧，格式化后裁剪尾部连续重复值，仅保留第一个，再逗号拼接为 `PARAM_ID=...`。
-3. 全帧同值的轨道只输出单值（常量参数）。裁剪可能缩短最长值序列，进而缩短 MTN 的播放时长和尾部静止时间。
+2. 每条轨道用 `sampleTrack` 逐帧采样至末关键帧，格式化后裁剪尾部连续重复值，仅保留第一个。
+3. 将裁剪后最长的一条轨道延伸至 `durationFrames`，以保留动作时长；其他全帧同值轨道只输出单值。各轨道以逗号拼接为 `PARAM_ID=...`。
 
 ### lanim → motion3.json
 

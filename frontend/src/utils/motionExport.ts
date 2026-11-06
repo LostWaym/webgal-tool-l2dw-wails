@@ -84,11 +84,24 @@ export function buildMtn(
   const lines: string[] = ['# Live2D Animator Motion Data', `$fps=${lanim.fps}`]
   lines.push('', `$fadein=${Math.max(0, Math.round(opts.fadeInMs))}`)
   lines.push('', `$fadeout=${Math.max(0, Math.round(opts.fadeOutMs))}`)
+  const tracks: Array<{ paramId: string; values: string[] }> = []
   for (const track of collectExportTracks(lanim, defOf)) {
     if (!track.keys.length) continue
     const values = sampleFrames(lanim, track.keys).map(fmtNum)
     while (values.length > 1 && values[values.length - 1] === values[values.length - 2]) values.pop()
-    lines.push('', `${track.paramId}=${values.join(',')}`)
+    tracks.push({ paramId: track.paramId, values })
+  }
+  const longest = tracks.reduce<typeof tracks[number] | null>(
+    (current, track) => !current || track.values.length > current.values.length ? track : current,
+    null,
+  )
+  if (longest) {
+    while (longest.values.length <= lanim.durationFrames) {
+      longest.values.push(longest.values[longest.values.length - 1])
+    }
+  }
+  for (const { paramId, values } of tracks) {
+    lines.push('', `${paramId}=${values.join(',')}`)
   }
   return lines.join('\n') + '\n'
 }

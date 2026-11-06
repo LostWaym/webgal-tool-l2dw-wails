@@ -335,6 +335,7 @@ async function onImportMotion(entry: MotionEntry) {
       msg.warning('模型已更换，取消加载动作')
       return
     }
+    if (!window.confirm(`加载动作「${entry.name}」将替换当前动画，未保存的修改会丢失。请先保存，是否继续？`)) return
     replaceAnimation(lanim, null)
     msg.success(`已加载动作「${entry.name}」`)
   } catch (err) {
@@ -350,6 +351,7 @@ function onUnbake() {
     msg.info('当前没有可反烘焙的参数轨道')
     return
   }
+  if (!window.confirm('反烘焙会有损简化参数轨道并删除关键帧，无法撤销。请先保存当前动画，是否继续？')) return
   pause()
   store.keyframePreview = null
   let removed = 0

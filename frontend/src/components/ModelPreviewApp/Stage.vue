@@ -20,6 +20,7 @@ import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
 import { usePreviewFrameRateLimit } from '../../composables/usePreviewFrameRateLimit'
+import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 
 const store = useModelStore()
 const filterPresetModal = useFilterPresetModal()
@@ -721,7 +722,7 @@ function onReloadModelConfig() {
 let app: PIXI.Application | null = null
 const live2dById = new Map<string, Live2DModel>()
 const containersById = new Map<string, L2dwContainer>()
-let resizeObserver: ResizeObserver | null = null
+let stopObservingViewport: (() => void) | null = null
 let backgroundSprite: PIXI.Sprite | null = null
 
 // Root 容器交互常量
@@ -766,7 +767,7 @@ async function init() {
     backgroundAlpha: 0,
     antialias: true,
     autoDensity: true,
-    resolution: window.devicePixelRatio || 1,
+    resolution: getDevicePixelRatio(),
   })
   app.ticker.maxFPS = frameRateLimit.value
   previewRuntime.app = app
@@ -779,8 +780,8 @@ async function init() {
 
   // 创建 Root 容器（用户通过中键拖拽和滚轮缩放操作它）
   rootContainer = new PIXI.Container()
-  rootContainer.x = app.renderer.width / 2
-  rootContainer.y = app.renderer.height / 2
+  rootContainer.x = app.screen.width / 2
+  rootContainer.y = app.screen.height / 2
   rootContainer.scale.set(0.33)
   store.rootContainerScale = 0.33
 
@@ -835,22 +836,7 @@ async function init() {
   frameContainer.addChild(frame)
   rootContainer.addChild(frameContainer)
 
-  resizeObserver = new ResizeObserver(() => {
-    if (!app || !containerRef.value || !rootContainer) return
-    const w = containerRef.value.clientWidth
-    const h = containerRef.value.clientHeight
-
-    const oldW = app.renderer.width
-    const oldH = app.renderer.height
-    const relX = rootContainer.x / oldW
-    const relY = rootContainer.y / oldH
-
-    app.renderer.resize(w, h)
-    rootContainer.x = relX * w
-    rootContainer.y = relY * h
-    fitBackground()
-  })
-  resizeObserver.observe(container)
+  stopObservingViewport = observePixiViewport(app, container, rootContainer, fitBackground)
 
   attachDomHandlers()
 
@@ -1860,8 +1846,8 @@ watch(
 )
 
 function dispose() {
-  resizeObserver?.disconnect()
-  resizeObserver = null
+  stopObservingViewport?.()
+  stopObservingViewport = null
 
   if (backgroundSprite) {
     backgroundSprite.parent?.removeChild(backgroundSprite)

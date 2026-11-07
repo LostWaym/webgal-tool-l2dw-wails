@@ -10,6 +10,7 @@ import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
 import type { WmdlConfig, ParamCalc } from '../../stores/wmdlTypes'
 import { useMessage } from '../../composables/useMessage'
 import { SaveScreenshot } from '../../../wailsjs/go/main/App'
+import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 
 const msg = useMessage()
 
@@ -29,7 +30,7 @@ let stageMain: PIXI.Container | null = null
 let wrapper: L2dwContainer | null = null
 /** 子模型 Live2DModel 列表（按 wmdlConfig.models 顺序），用于销毁 */
 const subModels: Live2DModel[] = []
-let resizeObserver: ResizeObserver | null = null
+let stopObservingViewport: (() => void) | null = null
 let currentFilterState: FilterState = { ...DEFAULT_FILTER_STATE }
 let currentScale = 1
 
@@ -83,7 +84,7 @@ async function init() {
     backgroundAlpha: 0,
     antialias: true,
     autoDensity: true,
-    resolution: window.devicePixelRatio || 1,
+    resolution: getDevicePixelRatio(),
     preserveDrawingBuffer: true,
   })
   app.ticker.maxFPS = 60
@@ -94,8 +95,8 @@ async function init() {
   // 用 scale 把舞台适配进 host.clientHeight（保留 80% 留白）。
   rootContainer = new PIXI.Container()
   const initialScale = computeFitScale(host.clientHeight)
-  rootContainer.x = host.clientWidth / 2
-  rootContainer.y = host.clientHeight / 2
+  rootContainer.x = app.screen.width / 2
+  rootContainer.y = app.screen.height / 2
   rootContainer.scale.set(initialScale)
   currentScale = initialScale
 
@@ -109,23 +110,7 @@ async function init() {
   rootContainer.addChild(stageMain)
   app.stage.addChild(rootContainer)
 
-  resizeObserver = new ResizeObserver(() => {
-    if (!app || !host) return
-    const oldW = app.renderer.width
-    const oldH = app.renderer.height
-    app.renderer.resize(host.clientWidth, host.clientHeight)
-    if (rootContainer) {
-      // 按比例保留用户平移的视口位置，避免尺寸变化时被拉回中心
-      if (oldW > 0 && oldH > 0) {
-        rootContainer.x = (rootContainer.x / oldW) * host.clientWidth
-        rootContainer.y = (rootContainer.y / oldH) * host.clientHeight
-      } else {
-        rootContainer.x = host.clientWidth / 2
-        rootContainer.y = host.clientHeight / 2
-      }
-    }
-  })
-  resizeObserver.observe(host)
+  stopObservingViewport = observePixiViewport(app, host, rootContainer)
 
   attachDomHandlers()
   await loadWmdlModels(props.wmdlConfig)
@@ -481,8 +466,8 @@ function dispose() {
   detachDomHandlers?.()
   detachDomHandlers = null
 
-  resizeObserver?.disconnect()
-  resizeObserver = null
+  stopObservingViewport?.()
+  stopObservingViewport = null
 
   for (const m of subModels) {
     m.destroy()

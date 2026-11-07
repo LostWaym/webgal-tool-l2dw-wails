@@ -19,6 +19,7 @@
 - **RTS**：通常指 rotation（旋转）、translate（位置）、scale（缩放）。
 - **事件分发**：`frontend/src/stores/emitter.ts` 是 mitt 封装和 `StageEvents` 入口。
 - **运行时共享**：`frontend/src/utils/runtimeRegistry.ts` 保存跨组件的 Pixi、容器、模型及清理引用。
+- **DPI / 高分屏 / 画布视口**：`frontend/src/live2d/viewport.ts` 统一画布尺寸监听、DPR 同步与逻辑坐标下的视口位置保持，供各编辑器画布共用。
 - **指令解析**：`frontend/src/utils/inst_utils.ts` 是 webgal-parser 的项目封装入口。
 
 ## 预览编辑器

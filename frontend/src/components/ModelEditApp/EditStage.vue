@@ -9,6 +9,7 @@ import { createTextureWatcher, type TextureWatcher } from '../../live2d/textureU
 import EditStageToolbar from './EditStageToolbar.vue'
 import { editRuntime } from '../../utils/runtimeRegistry'
 import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
+import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 
 /**
  * 编辑器窗口的 Pixi 预览画布。
@@ -34,7 +35,7 @@ let app: PIXI.Application | null = null
 const live2dById = new Map<string, Live2DModel>()
 const jsonPathByModelId = new Map<string, string>()
 const containersById = new Map<string, L2dwContainer>()
-let resizeObserver: ResizeObserver | null = null
+let stopObservingViewport: (() => void) | null = null
 let textureWatcher: TextureWatcher | null = null
 
 // Root 容器交互常量（与主 Stage 完全一致）
@@ -70,7 +71,7 @@ async function init() {
     backgroundAlpha: 0,
     antialias: true,
     autoDensity: true,
-    resolution: window.devicePixelRatio || 1,
+    resolution: getDevicePixelRatio(),
   })
   app.ticker.maxFPS = 60
   editRuntime.app = app
@@ -82,8 +83,8 @@ async function init() {
 
   // 创建 Root 容器（中键拖拽和滚轮缩放操作它）
   rootContainer = new PIXI.Container()
-  rootContainer.x = app.renderer.width / 2
-  rootContainer.y = app.renderer.height / 2
+  rootContainer.x = app.screen.width / 2
+  rootContainer.y = app.screen.height / 2
   rootContainer.scale.set(0.5)
 
   // 创建主容器
@@ -111,21 +112,7 @@ async function init() {
   frameContainer.addChild(frame)
   rootContainer.addChild(frameContainer)
 
-  resizeObserver = new ResizeObserver(() => {
-    if (!app || !containerRef.value || !rootContainer) return
-    const w = containerRef.value.clientWidth
-    const h = containerRef.value.clientHeight
-
-    const oldW = app.renderer.width
-    const oldH = app.renderer.height
-    const relX = rootContainer.x / oldW
-    const relY = rootContainer.y / oldH
-
-    app.renderer.resize(w, h)
-    rootContainer.x = relX * w
-    rootContainer.y = relY * h
-  })
-  resizeObserver.observe(container)
+  stopObservingViewport = observePixiViewport(app, container, rootContainer)
 
   attachDomHandlers()
   textureWatcher = createTextureWatcher(
@@ -342,8 +329,8 @@ function dispose() {
   textureWatcher?.disable()
   textureWatcher = null
 
-  resizeObserver?.disconnect()
-  resizeObserver = null
+  stopObservingViewport?.()
+  stopObservingViewport = null
 
   for (const id of [...containersById.keys()]) {
     removeOne(id)

@@ -16,5 +16,6 @@
 
 ## Live2D 与资源
 
+- **Pixi 高 DPI 下 `renderer.width/height` 不是场景逻辑尺寸**：它们包含 `resolution` 倍率；居中与 resize 位置换算使用 `app.screen.width/height`，否则非 100% 缩放下会偏移。共用入口为 `frontend/src/live2d/viewport.ts`，变更 DPR 时也同步 Pixi 6 的 `InteractionManager.resolution`；截图导出读取实际像素时仍应保留 `renderer.width/height`。
 - **本地模型资源不是普通前端静态资源**：绝对路径资源通过 `frontend/src/path_utils.ts` 的 `toFileUrl` 和后端 `/abs_files/` 路由访问；不要把磁盘路径直接当作普通网页静态路径。
 - **Live2D 运行时由页面预先加载**：`frontend/index.html` 在应用入口之前加载运行时；仅安装 npm 依赖不等于运行时资源已就绪。

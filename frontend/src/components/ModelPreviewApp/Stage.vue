@@ -19,10 +19,12 @@ import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
+import { usePreviewFrameRateLimit } from '../../composables/usePreviewFrameRateLimit'
 
 const store = useModelStore()
 const filterPresetModal = useFilterPresetModal()
 const snapshotModal = useTransformSnapshotModal()
+const { frameRateLimit } = usePreviewFrameRateLimit()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 
@@ -740,6 +742,10 @@ let isMiddleDown = false
 let lastMouseX = 0
 let lastMouseY = 0
 
+watch(frameRateLimit, (limit) => {
+  if (app) app.ticker.maxFPS = limit
+})
+
 onMounted(() => {
   void init()
   emitter.on(StageEvents.ReloadModel, reloadOne)
@@ -762,7 +768,7 @@ async function init() {
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
   })
-  app.ticker.maxFPS = 60
+  app.ticker.maxFPS = frameRateLimit.value
   previewRuntime.app = app
   previewRuntime.previewStore = useModelStore()
 

@@ -33,6 +33,7 @@ type AppConfig struct {
 	NextArgMode               string                          `json:"nextArgMode,omitempty"`
 	LegacyExpressionBlendMode bool                            `json:"legacyExpressionBlendMode"`
 	MotionExpressionFolders   *MotionExpressionFolderSettings `json:"motionExpressionFolders,omitempty"`
+	PreviewFrameRateLimit     *int                            `json:"previewFrameRateLimit,omitempty"`
 }
 
 type MotionExpressionFolderSettings struct {
@@ -143,6 +144,23 @@ func (a *App) SetMotionExpressionFolderSettings(enabled bool, separator string) 
 	defer a.mu.Unlock()
 	cfg := a.loadConfig()
 	cfg.MotionExpressionFolders = &MotionExpressionFolderSettings{Enabled: enabled, Separator: separator}
+	return a.saveConfig(cfg)
+}
+
+func (a *App) GetPreviewFrameRateLimit() *int {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewFrameRateLimit
+}
+
+func (a *App) SetPreviewFrameRateLimit(limit int) error {
+	if limit < 0 {
+		return fmt.Errorf("invalid preview frame rate limit: %d", limit)
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewFrameRateLimit = &limit
 	return a.saveConfig(cfg)
 }
 

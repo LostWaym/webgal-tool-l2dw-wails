@@ -17,14 +17,10 @@ import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
-import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
-import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
 import { usePreviewFrameRateLimit } from '../../composables/usePreviewFrameRateLimit'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 
 const store = useModelStore()
-const filterPresetModal = useFilterPresetModal()
-const snapshotModal = useTransformSnapshotModal()
 const { frameRateLimit } = usePreviewFrameRateLimit()
 
 const containerRef = ref<HTMLDivElement | null>(null)
@@ -33,12 +29,6 @@ const containerRef = ref<HTMLDivElement | null>(null)
 const hintsExpanded = ref(true)
 function toggleHints() {
   hintsExpanded.value = !hintsExpanded.value
-}
-
-// 便签块：折叠状态独立于操作提示，由用户手工切换
-const stickyExpanded = ref(true)
-function toggleSticky() {
-  stickyExpanded.value = !stickyExpanded.value
 }
 
 function onShortcutClick(e: MouseEvent, entry: ShortcutEntry) {
@@ -685,39 +675,7 @@ const hints = computed<HintsView>(() => {
   }
 })
 
-// 便签模块：选择滤镜按钮（背景 / 舞台 / 立绘 可用；立绘组无独立滤镜状态，不显示）
-const showSelectFilterBtn = computed(() => {
-  const type = resolveShortcutTargetType(store.selectedId)
-  return type === 'background' || type === 'stage' || type === 'model'
-})
-
-// 便签模块：重载模型配置按钮（仅 Live2D 立绘且有 wmdl 路径时显示）
-const showReloadConfigBtn = computed(() => {
-  const model = store.selectedModel
-  return !!model && model.kind === 'live2d' && !!model.wmdlConfig?.wmdlFilePath
-})
-
-// 便签模块：变换快照列表按钮（背景 / 舞台 / 立绘 可用；立绘组不需要）
-const showSnapshotListBtn = computed(() => {
-  const type = resolveShortcutTargetType(store.selectedId)
-  return type === 'background' || type === 'stage' || type === 'model'
-})
-
 const msg = useMessage()
-
-function onOpenFilterPreset() {
-  filterPresetModal.open()
-}
-
-function onOpenSnapshotList() {
-  snapshotModal.open()
-}
-
-function onReloadModelConfig() {
-  if (!store.selectedId) return
-  emitter.emit(StageEvents.ReloadModel, store.selectedId)
-  msg.success('已从磁盘重新加载配置')
-}
 
 let app: PIXI.Application | null = null
 const live2dById = new Map<string, Live2DModel>()
@@ -1251,25 +1209,32 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
 
 async function reloadOne(id: string) {
   const entry = store.models.find((m) => m.id === id)
-  if (!entry) return
-  // 图片立绘没有 wmdl 可重载
-  if (entry.kind === 'image') return
-  if (!entry.wmdlConfig?.wmdlFilePath) return
-
-  const ok = await store.reloadWmdlConfig(id)
-  if (!ok) return
-
-  store.selectedId = null
-  removeOne(id)
-  await loadWmdlModels(entry)
-  // 加载完成后恢复 playing 状态
-  if (entry.playing.motion) {
-    await store.playMotion(id, entry.playing.motion.group, entry.playing.motion.index, entry.playing.motion.name)
+  if (!entry || entry.kind === 'image' || !entry.wmdlConfig?.wmdlFilePath) {
+    msg.error('无法重载模型配置：未找到模型配置文件')
+    return
   }
-  if (entry.playing.expression) {
-    await store.playExpression(id, entry.playing.expression.index, entry.playing.expression.name)
+
+  let restoreSelection = false
+  try {
+    if (!(await store.reloadWmdlConfig(id))) throw new Error('未找到模型配置文件')
+    restoreSelection = store.selectedId === id
+    if (restoreSelection) store.selectedId = null
+    removeOne(id)
+    await loadWmdlModels(entry)
+    if (entry.playing.motion) {
+      await store.playMotion(id, entry.playing.motion.group, entry.playing.motion.index, entry.playing.motion.name)
+    }
+    if (entry.playing.expression) {
+      await store.playExpression(id, entry.playing.expression.index, entry.playing.expression.name)
+    }
+    msg.success('已从磁盘重新加载配置')
+  } catch (error) {
+    msg.error(`重载模型配置失败：${error}`)
+  } finally {
+    if (restoreSelection && store.selectedId === null && store.models.some(model => model.id === id)) {
+      store.selectedId = id
+    }
   }
-  store.selectedId = id
 }
 
 function removeOne(id: string) {
@@ -1972,50 +1937,6 @@ function dispose() {
           </section>
         </div>
       </div>
-      <div
-        v-if="showSelectFilterBtn || showReloadConfigBtn || showSnapshotListBtn"
-        class="stage__sticky"
-        :class="{ 'is-collapsed': !stickyExpanded }"
-      >
-        <button
-          type="button"
-          class="stage__hints-toggle"
-          :aria-expanded="stickyExpanded"
-          :aria-label="stickyExpanded ? '收起便签' : '展开便签'"
-          @click="toggleSticky"
-        >
-          <span class="stage__hints-toggle-text">便签</span>
-          <span class="stage__hints-toggle-icon" aria-hidden="true">{{ stickyExpanded ? '▾' : '▸' }}</span>
-        </button>
-        <div v-show="stickyExpanded" class="stage__hints-body">
-          <div class="stage__hints-buttons">
-            <button
-              v-if="showSelectFilterBtn"
-              type="button"
-              class="stage__hints-sticky-btn"
-              @click="onOpenFilterPreset"
-            >
-              选择滤镜
-            </button>
-            <button
-              v-if="showReloadConfigBtn"
-              type="button"
-              class="stage__hints-sticky-btn"
-              @click="onReloadModelConfig"
-            >
-              重载模型配置
-            </button>
-            <button
-              v-if="showSnapshotListBtn"
-              type="button"
-              class="stage__hints-sticky-btn"
-              @click="onOpenSnapshotList"
-            >
-              变换快照列表
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 </template>
@@ -2161,19 +2082,6 @@ function dispose() {
   user-select: none;
 }
 
-.stage__sticky {
-  font-size: 12px;
-  line-height: 1.5;
-  color: #fff;
-  text-shadow:
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000,
-    1px 1px 0 #000,
-    0 0 2px rgba(0, 0, 0, 0.85);
-  user-select: none;
-}
-
 .stage__hints-toggle {
   pointer-events: auto;
   display: inline-flex;
@@ -2270,33 +2178,7 @@ function dispose() {
   flex: 1 1 auto;
 }
 
-.stage__hints-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.stage__hints-sticky-btn {
-  pointer-events: auto;
-  padding: 3px 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  text-shadow: inherit;
-}
-
-.stage__hints-sticky-btn:hover,
-.stage__hints-sticky-btn:focus-visible {
-  background: rgba(255, 255, 255, 0.22);
-  outline: none;
-}
-
-.stage__hints.is-collapsed .stage__hints-toggle,
-.stage__sticky.is-collapsed .stage__hints-toggle {
+.stage__hints.is-collapsed .stage__hints-toggle {
   background: rgba(0, 0, 0, 0.55);
 }
 </style>

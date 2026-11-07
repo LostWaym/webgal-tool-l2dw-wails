@@ -38,9 +38,9 @@ export async function reloadTextureAt(
   model: Live2DModel,
   textureIndex: number,
   absPath: string,
-): Promise<void> {
+): Promise<boolean> {
   const textures = (model as any).textures as PIXI.Texture[] | undefined
-  if (!textures || textureIndex >= textures.length) return
+  if (!textures || textureIndex >= textures.length) return false
 
   try {
     const tex = await loadFreshTexture(absPath)
@@ -55,8 +55,10 @@ export async function reloadTextureAt(
     }
 
     textures[textureIndex] = tex
+    return true
   } catch (e) {
     console.warn('reloadTextureAt failed', absPath, e)
+    return false
   }
 }
 
@@ -64,13 +66,15 @@ export async function reloadTextureAt(
 export async function reloadAllModelTextures(
   model: Live2DModel,
   jsonAbsPath: string,
-): Promise<void> {
+): Promise<boolean> {
   const absPaths = resolveTextureAbsPaths(model, jsonAbsPath)
   const textures = (model as any).textures as PIXI.Texture[] | undefined
-  if (!textures) return
+  if (!textures || !absPaths.length || absPaths.length !== textures.length) return false
+  let success = true
   for (let i = 0; i < absPaths.length && i < textures.length; i++) {
-    await reloadTextureAt(model, i, absPaths[i])
+    if (!(await reloadTextureAt(model, i, absPaths[i]))) success = false
   }
+  return success
 }
 
 export interface TextureWatcher {

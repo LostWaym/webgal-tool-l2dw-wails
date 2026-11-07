@@ -19,7 +19,7 @@ import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { isSpecialId, getSpecialName, SpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import { filterBySearch } from '../../utils/searchUtils'
 import emitter, { StageEvents } from '../../stores/emitter'
-import { reloadAllModelTextures } from '../../live2d/textureUtils'
+import { usePreviewModelReload } from '../../composables/usePreviewModelReload'
 import { useMessage } from '../../composables/useMessage'
 import { useDraggableScroll } from '../../composables/useDraggableScroll'
 import { useMotionExpressionFolders } from '../../composables/useMotionExpressionFolders'
@@ -76,6 +76,7 @@ const expressionCollapsed = ref(false)
 const panelWidth = ref(280)
 const hoveredTab = ref<TabKey | null>(null) // 当前悬停的页签
 const msg = useMessage()
+const { reloadConfig, reloadTextures } = usePreviewModelReload()
 
 // 根据选中物体动态生成可显示的页签
 const visibleTabs = ref<TabConfig[]>([])
@@ -599,25 +600,12 @@ function commitFigureTemplates() {
 function onReloadModel() {
   const id = store.selectedId
   if (!id) return
-  emitter.emit(StageEvents.ReloadModel, id)
-  msg.success('已从磁盘重新加载配置')
+  reloadConfig(id)
 }
 
 async function onReloadTextures() {
   const id = store.selectedId
-  const entry = store.selectedModel
-  if (!id || !entry?.wmdlModels) return
-
-  const wmdlInfo = previewRuntime.wmdlSubModels.get(id)
-
-  for (const subId of wmdlInfo?.subModelIds ?? []) {
-    const model = previewRuntime.live2dModels.get(subId)
-    const subEntry = entry.wmdlModels.find(m => m.id === subId)
-    if (model && subEntry?.jsonAbsPath) {
-      await reloadAllModelTextures(model, subEntry.jsonAbsPath)
-    }
-  }
-  msg.success('已从磁盘重新加载纹理')
+  if (id) await reloadTextures(id)
 }
 
 function generateFigureTemplate() {

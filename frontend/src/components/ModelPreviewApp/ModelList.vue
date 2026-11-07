@@ -7,6 +7,7 @@ import { PickImageFile } from '../../../wailsjs/go/main/App'
 import { useBackgroundHistoryModal } from '../../composables/useBackgroundHistoryModal'
 import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
+import { usePreviewModelReload } from '../../composables/usePreviewModelReload'
 import eyeIcon from '../../assets/icons/eye.png'
 import eyeOffIcon from '../../assets/icons/eye-off.png'
 
@@ -15,6 +16,7 @@ const emit = defineEmits<{ (e: 'project'): void; (e: 'settings'): void }>()
 const bgHistoryModal = useBackgroundHistoryModal()
 const filterPresetModal = useFilterPresetModal()
 const snapshotModal = useTransformSnapshotModal()
+const { reloadConfig, reloadTextures } = usePreviewModelReload()
 const dragFromIndex = ref<number | null>(null)
 
 async function onAdd() {
@@ -195,6 +197,19 @@ function onDragEnd() {
                 <rect x="3" y="6" width="18" height="14" rx="2" />
                 <path d="M8 6l1.5-2h5L16 6" />
                 <circle cx="12" cy="13" r="3" />
+              </svg>
+            </button>
+            <button v-if="m.kind === 'live2d' && m.wmdlConfig?.wmdlFilePath" type="button" class="model-row__quick-btn" title="重载模型配置" aria-label="重载模型配置" @click.stop="reloadConfig(m.id)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 7v5h-5M4 17v-5h5" />
+                <path d="M5.5 9a7 7 0 0 1 11.8-2L20 12M4 12l2.7 5a7 7 0 0 0 11.8-2" />
+              </svg>
+            </button>
+            <button v-if="m.kind === 'live2d'" type="button" class="model-row__quick-btn" title="重载纹理" aria-label="重载纹理" @click.stop="reloadTextures(m.id)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="8" cy="9" r="1.5" />
+                <path d="m4 18 5-5 3 3 3-3 5 5" />
               </svg>
             </button>
           </div>

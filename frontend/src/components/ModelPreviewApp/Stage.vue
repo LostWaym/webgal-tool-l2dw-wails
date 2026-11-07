@@ -18,10 +18,12 @@ import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { usePreviewFrameRateLimit } from '../../composables/usePreviewFrameRateLimit'
+import { usePreviewFocusBoxOffset } from '../../composables/usePreviewFocusBoxOffset'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 
 const store = useModelStore()
 const { frameRateLimit } = usePreviewFrameRateLimit()
+const { offsetY: focusBoxOffsetY } = usePreviewFocusBoxOffset()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 
@@ -276,6 +278,7 @@ function startTransform(mode: TransformMode) {
     // 画注视方框（挂 wrapper 下，天然跟随模型 rts）
     const half = FOCUS_BOX_SIZE / 2
     focusBox = new PIXI.Graphics()
+    focusBox.y = focusBoxOffsetY.value
     focusBox.lineStyle(4, 0x2f80ed, 0.9)
     focusBox.drawRect(-half, -half, FOCUS_BOX_SIZE, FOCUS_BOX_SIZE)
     focusBox.lineStyle(2, 0x2f80ed, 0.5)
@@ -546,9 +549,10 @@ function applyFocusFromPointer(clientX: number, clientY: number) {
   const local = wrapper.toLocal(new PIXI.Point(px, py))
   const half = FOCUS_BOX_SIZE / 2
   // 中心→鼠标线段与方框边界的交点（框内即鼠标本身，框外取边交点）
-  const k = Math.min(half / Math.max(Math.abs(local.x), Math.abs(local.y)), 1)
+  const offsetLocalY = local.y - focusBoxOffsetY.value
+  const k = Math.min(half / Math.max(Math.abs(local.x), Math.abs(offsetLocalY)), 1)
   const nx = (local.x * k) / half
-  const ny = (-local.y * k) / half
+  const ny = (-offsetLocalY * k) / half
   store.setFocusState(focusTargetId, {
     x: Math.round(nx * 100) / 100,
     y: Math.round(ny * 100) / 100,
@@ -703,6 +707,10 @@ let lastMouseY = 0
 
 watch(frameRateLimit, (limit) => {
   if (app) app.ticker.maxFPS = limit
+})
+
+watch(focusBoxOffsetY, (offset) => {
+  if (focusBox) focusBox.y = offset
 })
 
 onMounted(() => {

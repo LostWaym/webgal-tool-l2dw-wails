@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,6 +35,7 @@ type AppConfig struct {
 	LegacyExpressionBlendMode bool                            `json:"legacyExpressionBlendMode"`
 	MotionExpressionFolders   *MotionExpressionFolderSettings `json:"motionExpressionFolders,omitempty"`
 	PreviewFrameRateLimit     *int                            `json:"previewFrameRateLimit,omitempty"`
+	PreviewFocusBoxOffsetY    *float64                        `json:"previewFocusBoxOffsetY,omitempty"`
 }
 
 type MotionExpressionFolderSettings struct {
@@ -161,6 +163,23 @@ func (a *App) SetPreviewFrameRateLimit(limit int) error {
 	defer a.mu.Unlock()
 	cfg := a.loadConfig()
 	cfg.PreviewFrameRateLimit = &limit
+	return a.saveConfig(cfg)
+}
+
+func (a *App) GetPreviewFocusBoxOffsetY() *float64 {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewFocusBoxOffsetY
+}
+
+func (a *App) SetPreviewFocusBoxOffsetY(offset float64) error {
+	if math.IsNaN(offset) || math.IsInf(offset, 0) {
+		return fmt.Errorf("invalid focus box offset: %v", offset)
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewFocusBoxOffsetY = &offset
 	return a.saveConfig(cfg)
 }
 

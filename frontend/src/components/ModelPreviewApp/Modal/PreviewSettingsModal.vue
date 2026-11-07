@@ -5,6 +5,8 @@ import { GetLegacyExpressionBlendMode, SetLegacyExpressionBlendMode } from '../.
 import { useMessage } from '../../../composables/useMessage'
 import { useMotionExpressionFolders } from '../../../composables/useMotionExpressionFolders'
 import { PREVIEW_FRAME_RATE_LIMITS, usePreviewFrameRateLimit } from '../../../composables/usePreviewFrameRateLimit'
+import { usePreviewFocusBoxOffset } from '../../../composables/usePreviewFocusBoxOffset'
+import NumberInput from '../../common/NumberInput.vue'
 
 const props = defineProps<{ visible: boolean; initialTab?: 'motionExpression' }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -14,6 +16,7 @@ watch(() => props.visible, (visible) => {
 })
 const folders = useMotionExpressionFolders()
 const { frameRateLimit, update: updateFrameRateLimit } = usePreviewFrameRateLimit()
+const { offsetY: focusBoxOffsetY, update: updateFocusBoxOffsetY } = usePreviewFocusBoxOffset()
 const legacyMode = ref(config.legacyExpressionBlendMode)
 let changed = false
 let save = Promise.resolve()
@@ -73,6 +76,9 @@ function onSeparatorInput(event: Event) {
                 <option v-for="limit in PREVIEW_FRAME_RATE_LIMITS" :key="limit" :value="limit">{{ limit === 0 ? '无限制' : `${limit} 帧` }}</option>
               </select>
               <p>仅影响预览主舞台，修改后立即生效并自动保存。</p>
+              <label class="focus-offset-label">注视框 Y 轴偏移</label>
+              <NumberInput :model-value="focusBoxOffsetY" :step="1" @update:model-value="updateFocusBoxOffsetY" />
+              <p>按 L 调整注视时使用，单位为模型变换空间坐标；正值向下，负值向上。修改后自动保存。</p>
             </template>
             <template v-else>
               <label><input type="checkbox" :checked="folders.settings.enabled" @change="onFoldersEnabledChange"> 启用文件夹划分</label>
@@ -90,17 +96,17 @@ function onSeparatorInput(event: Event) {
 </template>
 
 <style scoped>
-.settings-mask { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
-.settings-modal { width: min(620px, 94vw); background: #1d2026; border: 1px solid #454d5a; border-radius: 9px; color: #e6e6e6; box-shadow: 0 12px 40px #0008; }
-header, footer { display: flex; align-items: center; padding: 14px 18px; }
+.settings-mask { position: fixed; inset: 0; z-index: 9999; box-sizing: border-box; padding: 10vh 10vw; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
+.settings-modal { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: #1d2026; border: 1px solid #454d5a; border-radius: 9px; color: #e6e6e6; box-shadow: 0 12px 40px #0008; }
+header, footer { display: flex; flex-shrink: 0; align-items: center; padding: 14px 18px; }
 header { border-bottom: 1px solid #373d48; }
 h2 { flex: 1; margin: 0; font-size: 16px; }
-.body { display: flex; min-height: 220px; }
-.settings-tabs { width: 140px; flex-shrink: 0; padding: 12px 8px; border-right: 1px solid #373d48; }
+.body { display: flex; flex: 1; min-height: 0; }
+.settings-tabs { width: 140px; flex-shrink: 0; overflow-y: auto; padding: 12px 8px; border-right: 1px solid #373d48; }
 .settings-tabs button { display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; }
 .settings-tabs button.active { background: #303b4d; color: #a9c8ed; }
-.settings-content { flex: 1; min-width: 0; padding: 18px; }
-.separator-label, .frame-rate-label { margin-top: 20px; }
+.settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 18px; }
+.separator-label, .frame-rate-label, .focus-offset-label { margin-top: 20px; }
 .separator-input, .frame-rate-select { box-sizing: border-box; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #495464; border-radius: 5px; color: inherit; background: #171a20; }
 label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 p { margin: 10px 0 0; color: #aeb7c5; font-size: 13px; line-height: 1.6; }

@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
 import ModelList from './components/ModelPreviewApp/ModelList.vue'
 import Stage from './components/ModelPreviewApp/Stage.vue'
 import ModelActionPanel from './components/ModelPreviewApp/ModelActionPanel.vue'
+import FocusMode from './components/ModelPreviewApp/FocusMode.vue'
 import TransformSnapshotModal from './components/ModelPreviewApp/Modal/TransformSnapshotModal.vue'
 import FilterPresetModal from './components/ModelPreviewApp/Modal/FilterPresetModal.vue'
 import BackgroundHistoryModal from './components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue'
@@ -15,10 +16,12 @@ import ColorPickerModal from './components/common/ColorPickerModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
 import { useModelStore } from './stores/previewStore'
 import { useShortcuts } from './composables/useShortcuts'
+import { usePreviewModelReload } from './composables/usePreviewModelReload'
 import emitter, { StageEvents } from './stores/emitter'
 
 const store = useModelStore()
-const { handleShortcut } = useShortcuts()
+const { handleShortcut, isInputFocused } = useShortcuts()
+const { reloadConfig } = usePreviewModelReload()
 
 // Blender 风格变换操作状态：让侧边栏呈现变暗且不可点击
 const isTransforming = ref(false)
@@ -26,6 +29,33 @@ const projectVisible = ref(false)
 const settingsVisible = ref(false)
 const settingsTab = ref<'motionExpression' | undefined>()
 const stageVisible = ref(true)
+const focusVisible = ref(false)
+const focusMode = ref<InstanceType<typeof FocusMode> | null>(null)
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'r') {
+    e.preventDefault()
+    if (e.repeat || isInputFocused()) return
+    if (focusVisible.value) {
+      void focusMode.value?.reload()
+    } else if (store.selectedModel?.kind === 'live2d' && stageVisible.value) {
+      reloadConfig(store.selectedModel.id)
+    }
+    return
+  }
+  if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'q') {
+    if (isInputFocused()) return
+    if (focusVisible.value) {
+      e.preventDefault()
+      focusVisible.value = false
+    } else if (store.selectedModel?.kind !== 'image' && store.selectedModel?.wmdlConfig) {
+      e.preventDefault()
+      focusVisible.value = true
+    }
+    return
+  }
+  if (!focusVisible.value) handleShortcut(e)
+}
 
 async function loadProject(project: PreviewProject, path: string) {
   projectVisible.value = false
@@ -56,12 +86,12 @@ function closeSettings() {
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', handleShortcut)
+  window.addEventListener('keydown', onKeydown)
   emitter.on(StageEvents.TransformStart, onTransformStart)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleShortcut)
+  window.removeEventListener('keydown', onKeydown)
   emitter.off(StageEvents.TransformStart, onTransformStart)
 })
 </script>
@@ -69,7 +99,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="app" :class="{ 'is-transforming': isTransforming }">
     <ModelList class="app__left" @project="projectVisible = true" @settings="settingsVisible = true" />
-    <Stage v-if="stageVisible" class="app__right" />
+    <Stage v-if="stageVisible" class="app__right" :interaction-disabled="focusVisible" />
     <ModelActionPanel v-if="store.selectedId" @open-motion-expression-settings="openMotionExpressionSettings" />
     <TransformSnapshotModal />
     <FilterPresetModal />
@@ -77,6 +107,7 @@ onBeforeUnmount(() => {
     <PreviewProjectModal :visible="projectVisible" @close="projectVisible = false" @load="loadProject" />
     <PreviewSettingsModal :visible="settingsVisible" :initial-tab="settingsTab" @close="closeSettings" />
     <ColorPickerModal />
+    <FocusMode v-if="focusVisible" ref="focusMode" @close="focusVisible = false" />
     <MessageHost />
   </div>
 </template>

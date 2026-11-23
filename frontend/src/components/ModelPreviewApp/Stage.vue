@@ -22,6 +22,7 @@ import { usePreviewFocusBoxOffset } from '../../composables/usePreviewFocusBoxOf
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 
 const store = useModelStore()
+const props = defineProps<{ interactionDisabled?: boolean }>()
 const { frameRateLimit } = usePreviewFrameRateLimit()
 const { offsetY: focusBoxOffsetY } = usePreviewFocusBoxOffset()
 
@@ -73,6 +74,9 @@ type AxisLock = 'none' | 'x' | 'y'
 const transformMode = ref<TransformMode>('none')
 const axisLock = ref<AxisLock>('none')
 const isTransforming = computed(() => transformMode.value !== 'none')
+watch(() => props.interactionDisabled, disabled => {
+  if (disabled && isTransforming.value) cancelTransform()
+})
 
 // 注视模式（l）状态
 let focusTargetId: string | null = null
@@ -1070,6 +1074,22 @@ watch(
 // baseX/baseY 锚定的是 stageMain 内部坐标系的中心，与画布像素无关，
 // 在 loadOne 里 setBasePosition 一次即可，无需随 resize 更新。
 
+async function restoreLoadedFigure(id: string) {
+  const entry = store.models.find(m => m.id === id)
+  if (!entry) return
+  const wrapper = containersById.get(id)
+  if (wrapper) {
+    wrapper.visible = entry.visible
+    wrapper.zIndex = store.models.findIndex(m => m.id === id)
+    figureContainer?.sortChildren()
+  }
+  if (entry.kind !== 'live2d') return
+  store.setFocusState(id, store.figureFocusStates[id] ?? {})
+  store.setBlinkState(id, store.figureBlinkStates[id] ?? {})
+  if (entry.playing.motion) await store.playMotion(id, entry.playing.motion.group, entry.playing.motion.index, entry.playing.motion.name)
+  if (entry.playing.expression) await store.playExpression(id, entry.playing.expression.index, entry.playing.expression.name)
+}
+
 async function loadOne(id: string) {
   if (!app) return
   const entry = store.models.find((m) => m.id === id)
@@ -1082,20 +1102,8 @@ async function loadOne(id: string) {
       await loadWmdlModels(entry)
     }
 
-    const wrapper = containersById.get(id)
-    if (wrapper) {
-      wrapper.visible = entry.visible
-      wrapper.zIndex = store.models.findIndex(m => m.id === id)
-      figureContainer?.sortChildren()
-    }
-    if (entry.kind === 'live2d') {
-      try {
-        store.setFocusState(id, store.figureFocusStates[id] ?? {})
-        store.setBlinkState(id, store.figureBlinkStates[id] ?? {})
-        if (entry.playing.motion) await store.playMotion(id, entry.playing.motion.group, entry.playing.motion.index, entry.playing.motion.name)
-        if (entry.playing.expression) await store.playExpression(id, entry.playing.expression.index, entry.playing.expression.name)
-      } catch (err) { console.warn('Failed to restore figure playback:', err) }
-    }
+    try { await restoreLoadedFigure(id) }
+    catch (err) { console.warn('Failed to restore figure state:', err) }
     store.selectedId = id
   } catch (err) {
     console.error('Failed to load figure:', err)
@@ -1214,30 +1222,35 @@ async function loadWmdlModels(entry: NonNullable<ReturnType<typeof store.models.
   store.applyFilterToContainer(entry.id, mainWrapper)
 }
 
+const reloadingModels = new Set<string>()
+
 async function reloadOne(id: string) {
   const entry = store.models.find((m) => m.id === id)
-  if (!entry || entry.kind === 'image' || !entry.wmdlConfig?.wmdlFilePath) {
-    msg.error('无法重载模型配置：未找到模型配置文件')
+  if (!entry || entry.kind !== 'live2d' || !entry.wmdlModels.length) {
+    msg.error('无法重载模型：未找到 Live2D 模型')
     return
   }
+  if (reloadingModels.has(id)) return
+  reloadingModels.add(id)
 
   let restoreSelection = false
+  let rebuilding = false
   try {
-    if (!(await store.reloadWmdlConfig(id))) throw new Error('未找到模型配置文件')
+    const hasConfigFile = !!entry.wmdlConfig?.wmdlFilePath
+    if (hasConfigFile && !(await store.reloadWmdlConfig(id))) throw new Error('未找到模型配置文件')
     restoreSelection = store.selectedId === id
     if (restoreSelection) store.selectedId = null
     removeOne(id)
+    rebuilding = true
     await loadWmdlModels(entry)
-    if (entry.playing.motion) {
-      await store.playMotion(id, entry.playing.motion.group, entry.playing.motion.index, entry.playing.motion.name)
-    }
-    if (entry.playing.expression) {
-      await store.playExpression(id, entry.playing.expression.index, entry.playing.expression.name)
-    }
-    msg.success('已从磁盘重新加载配置')
+    await restoreLoadedFigure(id)
+    rebuilding = false
+    msg.success(hasConfigFile ? '已从磁盘重新加载配置' : '已重新加载 Live2D 模型')
   } catch (error) {
-    msg.error(`重载模型配置失败：${error}`)
+    if (rebuilding) removeOne(id)
+    msg.error(`重载模型失败：${error}`)
   } finally {
+    reloadingModels.delete(id)
     if (restoreSelection && store.selectedId === null && store.models.some(model => model.id === id)) {
       store.selectedId = id
     }
@@ -1280,6 +1293,7 @@ function attachDomHandlers() {
   }
 
   const onPointerDown = (e: PointerEvent) => {
+    if (props.interactionDisabled) return
     // 点击 canvas 时移除输入框焦点，避免快捷键被拦截
     if (document.activeElement instanceof HTMLInputElement ||
         document.activeElement instanceof HTMLTextAreaElement ||
@@ -1312,6 +1326,7 @@ function attachDomHandlers() {
   }
 
   const onPointerMove = (e: PointerEvent) => {
+    if (props.interactionDisabled) return
     // 中键拖拽 Root
     if (!isTransforming.value && isMiddleDown && rootContainer) {
       const dx = (e.clientX - lastMouseX) * DRAG_SENSITIVITY
@@ -1557,6 +1572,7 @@ function attachDomHandlers() {
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
+    if (props.interactionDisabled) return
     if (e.key === 'F1') {
       e.preventDefault()
       // 若当前选中了模型，把对应 wmdl 文件路径透传给编辑器进程，启动后自动加载
@@ -1612,6 +1628,7 @@ function attachDomHandlers() {
 
     // 输入框焦点时不响应变换快捷键
     if (isInputFocused()) return
+    if (e.ctrlKey || e.altKey || e.metaKey) return
 
     // g / s / r / l 进入变换模式（l = 注视）
     if (e.key === 'g' || e.key === 's' || e.key === 'r' || e.key === 'l') {

@@ -42,6 +42,7 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
   let lastMoveX = 0
   let lastMoveY = 0
   let scrollEl: HTMLElement | null = null
+  let clickCleanupTimer: ReturnType<typeof setTimeout> | null = null
   const containerRef = shallowRef<HTMLElement | null>(null)
 
   function inertiaLoop() {
@@ -127,10 +128,18 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
     hasDragged = false
   }
 
-  function onMouseUp() {
+  function clearClickCapture() {
+    document.removeEventListener('click', onClickCapture, true)
+    if (clickCleanupTimer !== null) clearTimeout(clickCleanupTimer)
+    clickCleanupTimer = null
+  }
+
+  function onMouseUp(e: MouseEvent) {
+    if (e.button !== 0) return
     isDragging.value = false
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
+    clickCleanupTimer = setTimeout(clearClickCapture, 0)
 
     velocity.x *= INERTIA_MULTIPLIER
     velocity.y *= INERTIA_MULTIPLIER
@@ -144,6 +153,7 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
 
   onUnmounted(() => {
     stopInertia()
+    clearClickCapture()
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
   })
@@ -152,11 +162,13 @@ export function useDraggableScroll(options: DraggableScrollOptions = {}) {
     isDragging: readonly(isDragging),
     containerRef,
     scrollToItem,
+    stopInertia,
     scrollHandlers: {
       onMousedown(e: MouseEvent) {
         if (e.button !== 0) return
         hasDragged = false
         stopInertia()
+        clearClickCapture()
         document.addEventListener('click', onClickCapture, { capture: true, once: true })
         startPos.x = e.clientX
         startPos.y = e.clientY

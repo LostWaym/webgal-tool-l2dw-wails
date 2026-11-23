@@ -20,6 +20,7 @@ const msg = useMessage()
 const props = defineProps<{
   /** wmdl 模型组配置（含子模型列表）。为空时不渲染任何模型。 */
   wmdlConfig?: WmdlConfig | null
+  playbackRate?: number
 }>()
 const emit = defineEmits<{ (e: 'loaded'): void; (e: 'load-error'): void }>()
 
@@ -88,6 +89,10 @@ async function init() {
     preserveDrawingBuffer: true,
   })
   app.ticker.maxFPS = 60
+  app.ticker.add(() => {
+    if (props.playbackRate === undefined || !app) return
+    for (const model of subModels) model.update(app.ticker.deltaMS * props.playbackRate)
+  })
 
   host.appendChild(app.view as HTMLCanvasElement)
 
@@ -253,6 +258,7 @@ async function loadWmdlModels(config: WmdlConfig | null | undefined) {
       const model = await Live2DModel.from(url, {
         idleMotionGroup: '',
         autoInteract: false,
+        autoUpdate: props.playbackRate === undefined,
       })
 
       // 加载期间发生了更新的重载请求，丢弃本次结果

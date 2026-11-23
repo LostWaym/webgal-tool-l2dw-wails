@@ -23,6 +23,8 @@ import { usePreviewModelReload } from '../../composables/usePreviewModelReload'
 import { useMessage } from '../../composables/useMessage'
 import { useDraggableScroll } from '../../composables/useDraggableScroll'
 import { useMotionExpressionFolders } from '../../composables/useMotionExpressionFolders'
+import { extractMotions, extractExpressions, nameSegments as splitName, directoryContents as getDirectoryContents } from '../../utils/motionExpressionList'
+import type { MotionInfo, ExpressionInfo } from '../../utils/motionExpressionList'
 import SearchInput from '../common/SearchInput.vue'
 import NumberInput from '../common/NumberInput.vue'
 import FocusPicker from '../common/FocusPicker.vue'
@@ -109,17 +111,6 @@ watch(() => store.selectedId, (newId) => {
     }
   }
 }, { immediate: true })
-
-interface MotionInfo {
-  group: string
-  index: number
-  name: string
-}
-
-interface ExpressionInfo {
-  index: number
-  name: string
-}
 
 const motions = ref<MotionInfo[]>([])
 const expressions = ref<ExpressionInfo[]>([])
@@ -367,44 +358,6 @@ function getLive2DModel(): Live2DModel | undefined {
   const wmdlInfo = previewRuntime.wmdlSubModels.get(store.selectedId)
   const firstSubId = wmdlInfo?.subModelIds?.[0]
   return firstSubId ? previewRuntime.live2dModels.get(firstSubId) : undefined
-}
-
-// 提取动作列表并按名称字母排序
-function extractMotions(model: Live2DModel): MotionInfo[] {
-  if (!model.internalModel?.motionManager?.definitions) return []
-
-  const defs = model.internalModel.motionManager.definitions as Record<string, any[]>
-  const result: MotionInfo[] = []
-
-  for (const [group, list] of Object.entries(defs)) {
-    for (let i = 0; i < list.length; i++) {
-      const def = list[i]
-      result.push({
-        group,
-        index: i,
-        name: def.name || `${group}`,
-      })
-    }
-  }
-
-  // 按动作名称进行字母排序
-  result.sort((a, b) => a.name.localeCompare(b.name))
-  return result
-}
-
-// 提取表情列表并按名称字母排序
-function extractExpressions(model: Live2DModel): ExpressionInfo[] {
-  const mm = model.internalModel?.motionManager as any
-  const em = mm?.expressionManager
-  if (!em?.definitions) return []
-
-  const defs = em.definitions as any[]
-  const result = defs.map((def, i) => ({
-    index: i,
-    name: def.name || def.Name || def.file || def.File || `expression_${i}`,
-  }))
-  result.sort((a, b) => a.name.localeCompare(b.name))
-  return result
 }
 
 // 立绘模板（live2d 走 wmdlConfig，image 走 store 全局模板）
@@ -695,9 +648,7 @@ function generateStageTransformTemplate() {
 }
 
 function nameSegments(name: string): string[] {
-  if (!folders.active.value) return [name]
-  const segments = name.split(folders.settings.separator).filter(Boolean)
-  return segments.length ? segments : [name]
+  return splitName(name, folders.active.value, folders.settings.separator)
 }
 
 function itemName(item: { name: string }): string {
@@ -705,22 +656,7 @@ function itemName(item: { name: string }): string {
 }
 
 function directoryContents<T extends { name: string }>(items: T[], path: string[], query: string) {
-  if (query.trim()) {
-    const matching = filterBySearch(items, query, item => item.name)
-    return { matching, folders: [] as string[], entries: matching }
-  }
-  const matching = items.filter(item => {
-      const segments = nameSegments(item.name)
-      return path.every((part, index) => segments[index] === part) && segments.length > path.length
-    })
-  const folders = new Set<string>()
-  const entries: T[] = []
-  for (const item of matching) {
-    const segments = nameSegments(item.name)
-    if (segments.length > path.length + 1) folders.add(segments[path.length])
-    else entries.push(item)
-  }
-  return { matching, folders: Array.from(folders).sort((a, b) => a.localeCompare(b)), entries }
+  return getDirectoryContents(items, path, query, folders.active.value, folders.settings.separator)
 }
 
 const motionDirectory = computed(() => directoryContents(motions.value, motionPath.value, motionSearch.value))

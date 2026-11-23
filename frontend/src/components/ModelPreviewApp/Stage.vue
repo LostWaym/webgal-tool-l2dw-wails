@@ -1111,15 +1111,7 @@ async function loadOne(id: string) {
 async function loadImageFigure(entry: NonNullable<ReturnType<typeof store.models.find>>) {
   if (!app || !entry.imageUrl) return
 
-  // 同步 state 到 wrapper
   const wrapper = new L2dwContainer()
-  wrapper.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
-  wrapper.x = entry.state.x ?? 0
-  wrapper.y = entry.state.y ?? 0
-  wrapper.scale.x = entry.state.scale?.x ?? 1
-  wrapper.scale.y = entry.state.scale?.y ?? 1
-  wrapper.rotation = ((entry.state.rotation ?? 0) * Math.PI) / 180
-
   figureContainer?.addChild(wrapper)
   containersById.set(entry.id, wrapper)
   previewRuntime.modelWrappers = containersById
@@ -1145,6 +1137,13 @@ async function loadImageFigure(entry: NonNullable<ReturnType<typeof store.models
   const scale = Math.min(STAGE_WIDTH / imgW, STAGE_HEIGHT / imgH)
   sprite.width = imgW * scale
   sprite.height = imgH * scale
+
+  wrapper.setBasePosition(STAGE_WIDTH / 2, STAGE_HEIGHT - sprite.height / 2)
+  wrapper.x = entry.state.x ?? 0
+  wrapper.y = entry.state.y ?? 0
+  wrapper.scale.x = entry.state.scale?.x ?? 1
+  wrapper.scale.y = entry.state.scale?.y ?? 1
+  wrapper.rotation = ((entry.state.rotation ?? 0) * Math.PI) / 180
 
   wrapper.addChild(sprite)
   store.applyFilterToContainer(entry.id, wrapper)

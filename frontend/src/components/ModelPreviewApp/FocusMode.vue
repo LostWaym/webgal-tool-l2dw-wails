@@ -12,6 +12,8 @@ import { filterBySearch } from '../../utils/searchUtils'
 import { useMessage } from '../../composables/useMessage'
 import { configurePreviewPlaybackClocks } from '../../live2d/previewPlaybackClock'
 import { useFocusPlaybackRate, MIN_FOCUS_PLAYBACK_RATE, MAX_FOCUS_PLAYBACK_RATE } from '../../composables/useFocusPlaybackRate'
+import { captureModelParameters, restoreModelParameters } from '../../live2d/coreAdapter'
+import type { ModelParameterSnapshot } from '../../live2d/coreAdapter'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 const store = useModelStore()
@@ -50,7 +52,7 @@ type Kind = 'motion' | 'expression'
 type Item = MotionInfo | ExpressionInfo
 let generation = 0
 let pending = Promise.resolve()
-let gesture: { type: Kind; key: string | null; original: Item | null } | null = null
+let gesture: { type: Kind; key: string | null; original: Item | null; snapshots: ModelParameterSnapshot[] } | null = null
 const gestureHint = ref<{ x: number; y: number; text: string } | null>(null)
 const playSequence = { motion: 0, expression: 0 }
 
@@ -68,7 +70,7 @@ function isSelected(type: Kind, item: Item): boolean {
   if (type === 'motion') return playing?.motion?.group === (item as MotionInfo).group && playing.motion.index === item.index
   return playing?.expression?.index === item.index
 }
-function playPreview(type: Kind, item: Item | null) {
+function playPreview(type: Kind, item: Item | null, snapshots?: ModelParameterSnapshot[]) {
   const token = generation
   const sequence = ++playSequence[type]
   const models = preview.value?.getLoadedModels() ?? []
@@ -77,6 +79,8 @@ function playPreview(type: Kind, item: Item | null) {
     for (const model of models) {
       if (token !== generation || sequence !== playSequence[type]) return
       const manager = model.internalModel.motionManager as any
+      const snapshot = snapshots?.find(value => value.model === model)
+      if (snapshot) restoreModelParameters(snapshot)
       if (type === 'motion') {
         if (item) {
           const motion = item as MotionInfo
@@ -93,6 +97,8 @@ function playPreview(type: Kind, item: Item | null) {
           expressions.currentExpression = expressions.defaultExpression
         }
       }
+      if (token !== generation || sequence !== playSequence[type]) return
+      if (snapshot) restoreModelParameters(snapshot)
     }
   }).catch(err => console.error('专注预览播放失败', err))
 }
@@ -159,9 +165,10 @@ function onRightDown(e: MouseEvent, type: Kind, item: Item) {
   if (e.button !== 2 || !ready.value) return
   e.preventDefault()
   const original = type === 'motion' ? entry.value?.playing.motion : entry.value?.playing.expression
-  gesture = { type, key: itemKey(type, item), original: original ? { ...original } : null }
+  const snapshots = captureModelParameters(preview.value?.getLoadedModels() ?? [])
+  gesture = { type, key: itemKey(type, item), original: original ? { ...original } : null, snapshots }
   updateGestureHint(e, item)
-  playPreview(type, item)
+  playPreview(type, item, snapshots)
   window.addEventListener('mousemove', onRightMove)
   window.addEventListener('mouseup', onRightUp)
   window.addEventListener('blur', cancelGesture)
@@ -174,7 +181,7 @@ function onRightMove(e: MouseEvent) {
   updateGestureHint(e, item)
   if (key === gesture.key) return
   gesture.key = key
-  if (item) playPreview(gesture.type, item)
+  if (item) playPreview(gesture.type, item, gesture.snapshots)
 }
 function endGesture() {
   gestureHint.value = null
@@ -184,10 +191,10 @@ function endGesture() {
 }
 function cancelGesture() {
   if (!gesture) return
-  const { type, original } = gesture
+  const { type, original, snapshots } = gesture
   gesture = null
   endGesture()
-  playPreview(type, original)
+  playPreview(type, original, snapshots)
 }
 function onRightUp(e: MouseEvent) {
   if (e.button !== 2 || !gesture) return
@@ -197,12 +204,13 @@ function onRightUp(e: MouseEvent) {
   const type = gesture.type
   const lastKey = gesture.key
   const original = gesture.original
+  const snapshots = gesture.snapshots
   gesture = null
   endGesture()
   if (item) {
-    if (key !== lastKey) playPreview(type, item)
+    if (key !== lastKey) playPreview(type, item, snapshots)
     commit(type, item, true)
-  } else playPreview(type, original)
+  } else playPreview(type, original, snapshots)
 }
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && gesture) {

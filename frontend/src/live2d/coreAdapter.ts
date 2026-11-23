@@ -282,6 +282,48 @@ export function writePartOpacity(selectedModelId: string | null, id: string, val
 
 /* 内部实现 */
 
+export interface ModelParameterSnapshot {
+  model: Live2DModel
+  values: Array<{ id: string; value: number }>
+}
+
+/** 读取独立模型实例的当前参数，不依赖全局运行时注册表。 */
+export function captureModelParameters(models: Live2DModel[]): ModelParameterSnapshot[] {
+  return models.map(model => {
+    const core: any = model.internalModel?.coreModel
+    const values: Array<{ id: string; value: number }> = []
+    if (typeof core?.getParameterCount === 'function' && typeof core.getParameterValueById === 'function') {
+      for (let i = 0; i < core.getParameterCount(); i++) {
+        const id = core._parameterIds?.[i]
+        if (id == null) continue
+        const value = core.getParameterValueById(id)
+        if (Number.isFinite(value)) values.push({ id: String(id), value })
+      }
+    } else if (typeof core?.getParamFloat === 'function') {
+      const ctx = core.getModelContext?.()
+      const params = Array.isArray(ctx?._$pb) ? ctx._$pb : []
+      for (const param of params.slice(0, ctx?._$qo ?? 0)) {
+        if (!param?.id) continue
+        const value = core.getParamFloat(param.id)
+        if (Number.isFinite(value)) values.push({ id: String(param.id), value })
+      }
+    }
+    return { model, values }
+  })
+}
+
+/** 写回参数并同步运行时的参数缓存，避免下一帧载入旧值。 */
+export function restoreModelParameters(snapshot: ModelParameterSnapshot): void {
+  const core: any = snapshot.model.internalModel?.coreModel
+  if (!core) return
+  for (const { id, value } of snapshot.values) {
+    if (typeof core.setParameterValueById === 'function') core.setParameterValueById(id, value)
+    else if (typeof core.setParamFloat === 'function') core.setParamFloat(id, value)
+  }
+  if (typeof core.saveParameters === 'function') core.saveParameters()
+  else if (typeof core.saveParam === 'function') core.saveParam()
+}
+
 function readParametersInternal(model: Live2DModel): ParamEntry[] {
   const core: any = (model as any).internalModel?.coreModel
   if (!core) return []

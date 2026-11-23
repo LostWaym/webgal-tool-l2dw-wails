@@ -19,6 +19,7 @@ import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { usePreviewFrameRateLimit } from '../../composables/usePreviewFrameRateLimit'
 import { usePreviewFocusBoxOffset } from '../../composables/usePreviewFocusBoxOffset'
+import { usePreviewRotationSnap } from '../../composables/usePreviewRotationSnap'
 import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../composables/usePreviewGuideVisibility'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 import { GUIDE_SNAP_PX, PREVIEW_FRAME, hitPreviewGuide, placePreviewGuide, previewGuideEnds, previewGuideKey, snapPreviewGuide, type GuideAxis, type PreviewGuide } from '../../utils/previewGuides'
@@ -27,6 +28,7 @@ const store = useModelStore()
 const props = defineProps<{ interactionDisabled?: boolean; guideManagerVisible?: boolean }>()
 const { frameRateLimit } = usePreviewFrameRateLimit()
 const { offsetY: focusBoxOffsetY } = usePreviewFocusBoxOffset()
+const { interval: rotationSnap } = usePreviewRotationSnap()
 const { alwaysShowGuides } = usePreviewGuideVisibility()
 
 const containerRef = ref<HTMLDivElement | null>(null)
@@ -125,6 +127,7 @@ let startY = 0
 let startScaleX = 1
 let startScaleY = 1
 let startRotation = 0
+let rotationDelta = 0
 
 // 变换开始时鼠标的屏幕坐标
 let tStartMouseX = 0
@@ -336,6 +339,7 @@ function startTransform(mode: TransformMode) {
   transformMode.value = mode
   axisLock.value = 'none'
   baseInitialized = false
+  rotationDelta = 0
 
   const id = store.selectedId
 
@@ -1513,6 +1517,22 @@ function attachDomHandlers() {
     applyMove(e.altKey && !e.ctrlKey && !e.metaKey)
   }
 
+  function applyRotation(alt: boolean) {
+    const id = store.selectedId
+    if (!id) return
+    const group = isCurrentFigureGroup()
+    const target = group ? groupContainers.get(id) : getTransformTarget()
+    if (!target) return
+    const angle = (group ? groupStartRotation : startRotation) + rotationDelta
+    const degrees = angle * 180 / Math.PI
+    target.rotation = alt
+      ? Math.round(degrees / rotationSnap.value) * rotationSnap.value * Math.PI / 180
+      : angle
+    if (group) syncDummyToTarget(target)
+    emitter.emit(StageEvents.TransformChange, id)
+    refreshTransformHint()
+  }
+
   const onPointerDown = (e: PointerEvent) => {
     if (props.interactionDisabled) return
     // 点击 canvas 时移除输入框焦点，避免快捷键被拦截
@@ -1593,6 +1613,7 @@ function attachDomHandlers() {
       // 立绘组：按"组中心为基准"应用 GRS 到所有目标
       if (isCurrentFigureGroup()) {
         handleFigureGroupPointerMove(e)
+        if (transformMode.value === 'r') return
         emitter.emit(StageEvents.TransformChange, store.selectedId)
         refreshTransformHint()
         return
@@ -1648,8 +1669,9 @@ function attachDomHandlers() {
           const curDirY = dy / len
           const cosA = startDirX * curDirX + startDirY * curDirY
           const sinA = startDirX * curDirY - startDirY * curDirX
-          const deltaAngle = Math.atan2(sinA, cosA)
-          target.rotation = startRotation + deltaAngle
+          rotationDelta = Math.atan2(sinA, cosA)
+          applyRotation(e.altKey)
+          return
         }
         emitter.emit(StageEvents.TransformChange, store.selectedId)
         refreshTransformHint()
@@ -1737,9 +1759,8 @@ function attachDomHandlers() {
       const curDirY = dy / len
       const cosA = startDirX * curDirX + startDirY * curDirY
       const sinA = startDirX * curDirY - startDirY * curDirX
-      const deltaAngle = Math.atan2(sinA, cosA)
-      groupContainer.rotation = groupStartRotation + deltaAngle
-      syncDummyToTarget(groupContainer)
+      rotationDelta = Math.atan2(sinA, cosA)
+      applyRotation(e.altKey)
     }
   }
 
@@ -1853,11 +1874,17 @@ function attachDomHandlers() {
       e.preventDefault()
       return
     }
+    if (transformMode.value === 'r' && e.key === 'Alt') {
+      if (!e.repeat) applyRotation(true)
+      e.preventDefault()
+      return
+    }
     if (e.ctrlKey || e.metaKey) return
 
     const key = e.key.toLowerCase()
     const isAxisKey = key === 'x' || key === 'y'
-    if (e.altKey && !(isGuideMove.value && (isAxisKey || key === 'enter' || key === 'escape'))) return
+    if (e.altKey && !(isGuideMove.value && (isAxisKey || key === 'enter' || key === 'escape')) &&
+        !(transformMode.value === 'r' && (key === 'enter' || key === 'escape' || key === ' '))) return
 
     if (key === 'm' && !isTransforming.value) {
       if (!e.repeat) {
@@ -1968,6 +1995,10 @@ function attachDomHandlers() {
       updateMoveAlt(e)
       e.preventDefault()
     }
+    if (!props.interactionDisabled && transformMode.value === 'r' && e.key === 'Alt') {
+      applyRotation(false)
+      e.preventDefault()
+    }
   }
 
   const onBlur = () => {
@@ -1977,6 +2008,7 @@ function attachDomHandlers() {
       altHeldInMove.value = false
       if (!props.interactionDisabled && isGuideMove.value) applyMove(false)
     }
+    if (!props.interactionDisabled && transformMode.value === 'r') applyRotation(false)
   }
 
   window.addEventListener('keydown', onKeyDown)
@@ -2158,6 +2190,7 @@ function dispose() {
       <div class="transform-hint__line">鼠标移动控制{{ transformHint.modeName }}，左键确定，右键取消</div>
       <div class="transform-hint__line">按 X / Y 锁定对应轴（未锁轴会回滚到起点）</div>
       <div v-if="isGuideMove" class="transform-hint__line">按住 Alt 显示游标并吸附（{{ GUIDE_SNAP_PX }} px）</div>
+      <div v-if="transformMode === 'r'" class="transform-hint__line">按住 Alt 按 {{ rotationSnap }}° 间隔吸附旋转</div>
       <div class="transform-hint__line" v-if="transformMode !== 'r'">当前锁定轴：{{ transformHint.axis }}</div>
       <div class="transform-hint__line">当前 X={{ transformHint.x }}，Y={{ transformHint.y }}</div>
       <div class="transform-hint__line" v-if="transformMode !== 'g'">缩放 X={{ transformHint.scaleX }}，Y={{ transformHint.scaleY }}</div>

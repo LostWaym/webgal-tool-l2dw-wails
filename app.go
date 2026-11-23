@@ -37,6 +37,7 @@ type AppConfig struct {
 	MotionExpressionFolders   *MotionExpressionFolderSettings `json:"motionExpressionFolders,omitempty"`
 	PreviewFrameRateLimit     *int                            `json:"previewFrameRateLimit,omitempty"`
 	PreviewFocusBoxOffsetY    *float64                        `json:"previewFocusBoxOffsetY,omitempty"`
+	PreviewRotationSnap       *float64                        `json:"previewRotationSnap,omitempty"`
 	PreviewGuidesVisible      bool                            `json:"previewGuidesVisible,omitempty"`
 	PreviewViewport           *PreviewViewportSettings        `json:"previewViewport,omitempty"`
 }
@@ -177,6 +178,23 @@ func (a *App) SetPreviewFrameRateLimit(limit int) error {
 	defer a.mu.Unlock()
 	cfg := a.loadConfig()
 	cfg.PreviewFrameRateLimit = &limit
+	return a.saveConfig(cfg)
+}
+
+func (a *App) GetPreviewRotationSnap() *float64 {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewRotationSnap
+}
+
+func (a *App) SetPreviewRotationSnap(interval float64) error {
+	if math.IsNaN(interval) || math.IsInf(interval, 0) || interval < 0.01 {
+		return fmt.Errorf("invalid preview rotation snap interval: %v", interval)
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewRotationSnap = &interval
 	return a.saveConfig(cfg)
 }
 

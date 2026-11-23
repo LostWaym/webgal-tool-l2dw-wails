@@ -8,6 +8,7 @@ import { PREVIEW_FRAME_RATE_LIMITS, usePreviewFrameRateLimit } from '../../../co
 import { usePreviewFocusBoxOffset } from '../../../composables/usePreviewFocusBoxOffset'
 import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../../composables/usePreviewGuideVisibility'
 import { usePreviewViewportSettings } from '../../../composables/usePreviewViewportSettings'
+import { usePreviewRotationSnap } from '../../../composables/usePreviewRotationSnap'
 import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../composables/usePreviewViewportSettings'
 import NumberInput from '../../common/NumberInput.vue'
 
@@ -22,6 +23,7 @@ const { frameRateLimit, update: updateFrameRateLimit } = usePreviewFrameRateLimi
 const { offsetY: focusBoxOffsetY, update: updateFocusBoxOffsetY } = usePreviewFocusBoxOffset()
 const { alwaysShowGuides, update: updateGuideVisibility } = usePreviewGuideVisibility()
 const viewport = usePreviewViewportSettings()
+const { interval: rotationSnap, update: updateRotationSnap } = usePreviewRotationSnap()
 const viewportVersions: Array<{ key: PreviewViewportVersion; label: string }> = [
   { key: 'cubism2', label: 'Cubism 2' },
   { key: 'cubism3', label: 'Cubism 3+' },
@@ -93,6 +95,9 @@ function onSeparatorInput(event: Event) {
                 <option v-for="limit in PREVIEW_FRAME_RATE_LIMITS" :key="limit" :value="limit">{{ limit === 0 ? '无限制' : `${limit} 帧` }}</option>
               </select>
               <p>仅影响预览主舞台，修改后立即生效并自动保存。</p>
+              <label>旋转吸附间隔（度）</label>
+              <NumberInput :model-value="rotationSnap" :min="0.01" :step="0.01" @update:model-value="updateRotationSnap" />
+              <p>预览舞台按 R 旋转时，按住 Alt 吸附到最近的间隔倍数。修改后自动保存。</p>
               <label class="focus-offset-label">注视框 Y 轴偏移</label>
               <NumberInput :model-value="focusBoxOffsetY" :step="1" @update:model-value="updateFocusBoxOffsetY" />
               <p>按 L 调整注视时使用，单位为模型变换空间坐标；正值向下，负值向上。修改后自动保存。</p>

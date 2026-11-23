@@ -51,7 +51,7 @@ export function applyNextFlag(lines: string[]): string[] {
 }
 
 /** 快捷键适用的目标类型；与 useShortcuts 内的 store.selectedId 判定保持一致 */
-export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'figureGroup' | 'none'
+export type ShortcutTargetType = 'model' | 'background' | 'stage' | 'camera' | 'figureGroup' | 'none'
 
 export interface ShortcutEntry {
   key: string
@@ -66,7 +66,7 @@ export interface ShortcutEntry {
 
 type ShortcutHandlerKey =
   | 'modelFigure' | 'modelTransform' | 'modelSplit' | 'modelMerge' | 'modelHide'
-  | 'bgSetImage' | 'bgTransform' | 'bgMerge' | 'stageTransform'
+  | 'bgSetImage' | 'bgTransform' | 'bgMerge' | 'stageTransform' | 'cameraTransform'
   | 'openEditor' | 'openActorEditor' | 'openMotionEditor'
 
 export interface ShortcutHint {
@@ -93,6 +93,7 @@ function getResourceRelativePath(absPath: string, markerFolder: 'background' | '
 export function resolveShortcutTargetType(selectedId: string | null): ShortcutTargetType {
   if (!selectedId) return 'none'
   if (isFigureGroupId(selectedId)) return 'figureGroup'
+  if (selectedId === SpecialId.Camera) return 'camera'
   if (isSpecialId(selectedId)) {
     return selectedId === SpecialId.BgContainer ? 'background' : 'stage'
   }
@@ -387,6 +388,32 @@ const handler = {
     if (shouldShowToast) useMessage().success(`复制主场景变换指令成功!!`)
     return inst
   },
+
+  cameraTransform: (): Inst | null => {
+    const store = useModelStore()
+    const camera = previewRuntime.specialContainers.get(SpecialId.Camera)
+    const stage = previewRuntime.specialContainers.get(SpecialId.StageMain)
+    if (!camera || !stage || !Number.isFinite(camera.scale.x) || camera.scale.x <= 0) {
+      useMessage().error('镜头缩放必须大于零')
+      return null
+    }
+    const dx = stage.x - camera.x
+    const dy = stage.y - camera.y
+    const cos = Math.cos(camera.rotation)
+    const sin = Math.sin(camera.rotation)
+    const scale = camera.scale.x
+    const data = buildTransformData(
+      (cos * dx + sin * dy) / scale,
+      (-sin * dx + cos * dy) / scale,
+      stage.scale.x / scale,
+      stage.scale.y / scale,
+      stage.rotation - camera.rotation,
+      pickNonDefaultFilters(store.getFilterState(SpecialId.StageMain)),
+    )
+    const inst = parseInst(store.stageTransformTemplate.replace('%me%', JSON.stringify(data)))
+    useMessage().success('复制镜头对应的主场景变换指令成功!!')
+    return inst
+  },
 }
 
 /**
@@ -468,6 +495,14 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
     targets: ['stage'],
     handlerKey: 'stageTransform',
     run: () => handler.stageTransform(),
+  },
+  {
+    key: 't',
+    keys: 'Ctrl + T',
+    description: '复制镜头对应的主场景变换指令 (setTransform)',
+    targets: ['camera'],
+    handlerKey: 'cameraTransform',
+    run: () => handler.cameraTransform(),
   },
 ]
 

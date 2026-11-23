@@ -7,6 +7,7 @@
 export const SpecialId = {
   StageMain: '__stage_main__',
   BgContainer: '__bg_container__',
+  Camera: '__camera__',
 } as const
 
 export type SpecialIdValue = typeof SpecialId[keyof typeof SpecialId]
@@ -14,14 +15,15 @@ export type SpecialIdValue = typeof SpecialId[keyof typeof SpecialId]
 export const SPECIAL_IDS: readonly SpecialIdValue[] = [
   SpecialId.StageMain,
   SpecialId.BgContainer,
+  SpecialId.Camera,
 ]
 
 export function isSpecialId(id: string | null | undefined): id is SpecialIdValue {
-  return id === SpecialId.StageMain || id === SpecialId.BgContainer
+  return SPECIAL_IDS.some(specialId => specialId === id)
 }
 
 export function getSpecialName(id: SpecialIdValue): string {
-  return id === SpecialId.StageMain ? '*主场景*' : '*背景*'
+  return id === SpecialId.StageMain ? '*主场景*' : id === SpecialId.BgContainer ? '*背景*' : '*镜头*'
 }
 
 /** 立绘组 ID 前缀：与 ModelEntry id 区分（避免冲突） */

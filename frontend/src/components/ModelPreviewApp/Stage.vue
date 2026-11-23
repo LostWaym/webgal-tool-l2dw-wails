@@ -574,6 +574,7 @@ interface HintsView {
 const TARGET_LABELS: Record<ReturnType<typeof resolveShortcutTargetType>, string> = {
   background: '背景',
   stage: '主场景',
+  camera: '镜头',
   model: '立绘',
   figureGroup: '立绘组',
   none: '未选中',
@@ -669,6 +670,7 @@ const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
 const MOUSE_HINTS_BY_TYPE: Record<ReturnType<typeof resolveShortcutTargetType>, MouseHint[]> = {
   background: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
   stage: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}],
+  camera: [{keys: '变换操作', description: 'G-拖拽 S-等比缩放 R-旋转'}],
   model: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转'}, {keys: '注视操作', description: 'L-鼠标调整注视方向'}],
   figureGroup: [{keys: '变换操作', description: 'G-拖拽 S-缩放 R-旋转（按组中心）'}],
   none: [],
@@ -806,6 +808,18 @@ async function init() {
   frameContainer.addChild(frame)
   rootContainer.addChild(frameContainer)
 
+  const camera = new PIXI.Container()
+  const cameraFrame = new PIXI.Graphics()
+  cameraFrame.lineStyle(16, 0xffdd00)
+  cameraFrame.drawRect(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2, STAGE_WIDTH, STAGE_HEIGHT)
+  cameraFrame.moveTo(0, -STAGE_HEIGHT / 2)
+  cameraFrame.lineTo(0, -STAGE_HEIGHT / 2 - 100)
+  cameraFrame.drawCircle(0, -STAGE_HEIGHT / 2 - 130, 30)
+  camera.addChild(cameraFrame)
+  camera.visible = store.selectedId === SpecialId.Camera
+  rootContainer.addChild(camera)
+  previewRuntime.specialContainers.set(SpecialId.Camera, camera)
+
   stopObservingViewport = observePixiViewport(app, container, rootContainer, fitBackground)
 
   attachDomHandlers()
@@ -840,6 +854,7 @@ async function init() {
   }
   applyTransform(stageMain, store.stageState)
   applyTransform(backgroundContainer, store.bgState)
+  applyTransform(camera, store.cameraState)
   store.setFilterState(SpecialId.StageMain, store.stageFilterState)
   store.setFilterState(SpecialId.BgContainer, store.bgFilterState)
   if (store.backgroundUrl) void loadBackground(store.backgroundUrl)
@@ -1018,6 +1033,8 @@ watch(
   (id) => {
     setCursor('default')
     updateFigureGroupCrosshair()
+    const camera = previewRuntime.specialContainers.get(SpecialId.Camera)
+    if (camera) camera.visible = id === SpecialId.Camera
   },
   { immediate: true },
 )
@@ -1400,8 +1417,10 @@ function attachDomHandlers() {
           const dx = p.x - startScreenMP.x
           const dy = p.y - startScreenMP.y
           const dist = Math.sqrt(dx * dx + dy * dy)
-          const factor = dist > 0 ? dist / startDist : 1
-          if (axisLock.value === 'x') {
+          const factor = dist > 0 && startDist > 0 ? dist / startDist : 1
+          if (store.selectedId === SpecialId.Camera) {
+            target.scale.set(Math.max(0.01, startScaleX * factor))
+          } else if (axisLock.value === 'x') {
             target.scale.x = startScaleX * factor
           } else if (axisLock.value === 'y') {
             target.scale.y = startScaleY * factor
@@ -1666,6 +1685,10 @@ function attachDomHandlers() {
 
     // 变换中：x / y 锁定轴，并把未锁轴回滚到起点
     if (isTransforming.value && (e.key === 'x' || e.key === 'y')) {
+      if (store.selectedId === SpecialId.Camera && transformMode.value === 's') {
+        e.preventDefault()
+        return
+      }
       if (axisLock.value === e.key) {
         axisLock.value = 'none'
       } else {

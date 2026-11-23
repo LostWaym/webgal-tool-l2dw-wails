@@ -82,6 +82,7 @@ const { reloadConfig, reloadTextures } = usePreviewModelReload()
 
 // 根据选中物体动态生成可显示的页签
 const visibleTabs = ref<TabConfig[]>([])
+const transformSection = ref<'basic' | 'filter' | 'focus' | 'blink'>('basic')
 
 watch(() => store.selectedId, (newId) => {
   if (!newId) {
@@ -97,6 +98,9 @@ watch(() => store.selectedId, (newId) => {
     visibleTabs.value = [TAB_CONFIGS.bgInfo, TAB_CONFIGS.transform]
   } else if (newId === SpecialId.StageMain) {
     visibleTabs.value = [TAB_CONFIGS.stageInfo, TAB_CONFIGS.transform]
+  } else if (newId === SpecialId.Camera) {
+    visibleTabs.value = [TAB_CONFIGS.transform]
+    transformSection.value = 'basic'
   } else {
     const entry = store.models.find((m) => m.id === newId)
     if (entry?.kind === 'image') {
@@ -137,7 +141,6 @@ let _updatingTransform = false
 const filterState = computed<FilterState>(
   () => store.getFilterState(store.selectedId),
 )
-const transformSection = ref<'basic' | 'filter' | 'focus' | 'blink'>('basic')
 
 /** 每个 group: { title, items: { key, label, min?, max?, step?, boolean?, colorPicker? }[] } */
 // FILTER_GROUPS / FilterItemSpec / FilterGroupSpec 现已从 utils/consts 导入
@@ -871,8 +874,13 @@ function onLabelDragMove(e: MouseEvent) {
     container.y = newVal
     newState.y = newVal
   } else if (_dragAxis === 'scaleX') {
-    container.scale.x = newVal
-    newState.scale.x = newVal
+    const value = store.selectedId === SpecialId.Camera ? Math.max(0.01, newVal) : newVal
+    container.scale.x = value
+    newState.scale.x = value
+    if (store.selectedId === SpecialId.Camera) {
+      container.scale.y = value
+      newState.scale.y = value
+    }
   } else if (_dragAxis === 'scaleY') {
     container.scale.y = newVal
     newState.scale.y = newVal
@@ -1057,7 +1065,7 @@ function onLabelDragEnd() {
     <div v-else-if="activeTab === 'transform'" class="panel__motion-expression">
       <div class="transform-toolbar" role="group" aria-label="变换模块">
         <button type="button" :class="{ 'is-active': transformSection === 'basic' }" :aria-pressed="transformSection === 'basic'" @click="transformSection = 'basic'">基础</button>
-        <button type="button" :class="{ 'is-active': transformSection === 'filter' }" :aria-pressed="transformSection === 'filter'" @click="transformSection = 'filter'">滤镜</button>
+        <button v-if="store.selectedId !== SpecialId.Camera" type="button" :class="{ 'is-active': transformSection === 'filter' }" :aria-pressed="transformSection === 'filter'" @click="transformSection = 'filter'">滤镜</button>
         <template v-if="showLive2dParams">
           <button type="button" :class="{ 'is-active': transformSection === 'focus' }" :aria-pressed="transformSection === 'focus'" @click="transformSection = 'focus'">注视</button>
           <button type="button" :class="{ 'is-active': transformSection === 'blink' }" :aria-pressed="transformSection === 'blink'" @click="transformSection = 'blink'">眨眼</button>
@@ -1097,17 +1105,18 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--pair">
-                <label title="X 缩放" @mousedown="(e) => onLabelDragStart('scaleX', e)">缩X</label>
+                <label title="X 缩放" @mousedown="(e) => onLabelDragStart('scaleX', e)">{{ store.selectedId === SpecialId.Camera ? '缩放' : '缩X' }}</label>
                 <NumberInput
                   :model-value="transformState.scale.x"
                   :step="0.01"
                   :min="0.01"
                   :max="10"
                   :precision="3"
-                  @update:model-value="(v: number) => { transformState.scale.x = v; onTransformInput() }"
+                  @update:model-value="(v: number) => { transformState.scale.x = v; if (store.selectedId === SpecialId.Camera) transformState.scale.y = v; onTransformInput() }"
                 />
-                <label title="Y 缩放" @mousedown="(e) => onLabelDragStart('scaleY', e)">缩Y</label>
+                <label v-if="store.selectedId !== SpecialId.Camera" title="Y 缩放" @mousedown="(e) => onLabelDragStart('scaleY', e)">缩Y</label>
                 <NumberInput
+                  v-if="store.selectedId !== SpecialId.Camera"
                   :model-value="transformState.scale.y"
                   :step="0.01"
                   :min="0.01"
@@ -1128,7 +1137,7 @@ function onLabelDragEnd() {
                 />
               </div>
             </li>
-            <li class="list-item list-item--row">
+            <li v-if="store.selectedId !== SpecialId.Camera" class="list-item list-item--row">
               <div class="form-row form-row--btn form-row--snapshot">
                 <button class="snapshot-btn" @click="onApplySnapshot">变换快照列表</button>
                 <button class="snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>

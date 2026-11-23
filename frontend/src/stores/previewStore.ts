@@ -215,6 +215,7 @@ export const useModelStore = defineStore('models', {
     bgState: { ...DEFAULT_TRANSFORM_STATE } as TransformState,
     /** 主场景容器（StageMain）的变换状态 */
     stageState: { ...DEFAULT_TRANSFORM_STATE } as TransformState,
+    cameraState: { ...DEFAULT_TRANSFORM_STATE, scale: { ...DEFAULT_TRANSFORM_STATE.scale } } as TransformState,
     /** 变换快照列表 */
     transformSnapshots: [] as TransformSnapshot[],
     /** 模态打开时缓存的原始变换（关闭时用于恢复） */
@@ -256,6 +257,7 @@ export const useModelStore = defineStore('models', {
       // 特殊容器
       if (id === SpecialId.StageMain) return state.stageState
       if (id === SpecialId.BgContainer) return state.bgState
+      if (id === SpecialId.Camera) return state.cameraState
       // 普通模型
       const model = state.models.find((m) => m.id === id)
       return model?.state ?? { ...DEFAULT_TRANSFORM_STATE }
@@ -532,6 +534,10 @@ export const useModelStore = defineStore('models', {
       }
       if (id === SpecialId.BgContainer) {
         this.bgState = state
+        return
+      }
+      if (id === SpecialId.Camera) {
+        this.cameraState = state
         return
       }
       // 普通模型

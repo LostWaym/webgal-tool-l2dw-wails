@@ -8,6 +8,7 @@ import TransformSnapshotModal from './components/ModelPreviewApp/Modal/Transform
 import FilterPresetModal from './components/ModelPreviewApp/Modal/FilterPresetModal.vue'
 import BackgroundHistoryModal from './components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue'
 import PreviewProjectModal from './components/ModelPreviewApp/Modal/PreviewProjectModal.vue'
+import PreviewGuideManagerModal from './components/ModelPreviewApp/Modal/PreviewGuideManagerModal.vue'
 import PreviewSettingsModal from './components/ModelPreviewApp/Modal/PreviewSettingsModal.vue'
 import { applyPreviewProject } from './utils/previewProject'
 import type { PreviewProject } from './utils/previewProject'
@@ -17,15 +18,18 @@ import MessageHost from './components/common/MessageHost.vue'
 import { useModelStore } from './stores/previewStore'
 import { useShortcuts } from './composables/useShortcuts'
 import { usePreviewModelReload } from './composables/usePreviewModelReload'
+import { usePreviewGuideVisibility } from './composables/usePreviewGuideVisibility'
 import emitter, { StageEvents } from './stores/emitter'
 
 const store = useModelStore()
 const { handleShortcut, isInputFocused } = useShortcuts()
 const { reloadConfig } = usePreviewModelReload()
+const guideVisibility = usePreviewGuideVisibility()
 
 // Blender 风格变换操作状态：让侧边栏呈现变暗且不可点击
 const isTransforming = ref(false)
 const projectVisible = ref(false)
+const guideManagerVisible = ref(false)
 const settingsVisible = ref(false)
 const settingsTab = ref<'motionExpression' | undefined>()
 const stageVisible = ref(true)
@@ -33,7 +37,20 @@ const focusVisible = ref(false)
 const focusMode = ref<InstanceType<typeof FocusMode> | null>(null)
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'r') {
+  if (guideManagerVisible.value) return
+  const ctrlOnly = e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey
+  const key = e.key.toLowerCase()
+  if (ctrlOnly && key === 'm') {
+    if (!stageVisible.value || focusVisible.value || isInputFocused() || document.activeElement instanceof HTMLSelectElement) return
+    e.preventDefault()
+    if (!e.repeat) {
+      const visible = !guideVisibility.alwaysShowGuides.value
+      guideVisibility.update(visible)
+      useMessage().info(visible ? '已开启常驻游标显示' : '已关闭常驻游标显示')
+    }
+    return
+  }
+  if (ctrlOnly && key === 'r') {
     e.preventDefault()
     if (e.repeat || isInputFocused()) return
     if (focusVisible.value) {
@@ -43,7 +60,7 @@ function onKeydown(e: KeyboardEvent) {
     }
     return
   }
-  if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'q') {
+  if (ctrlOnly && key === 'q') {
     if (isInputFocused()) return
     if (focusVisible.value) {
       e.preventDefault()
@@ -98,13 +115,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app" :class="{ 'is-transforming': isTransforming }">
-    <ModelList class="app__left" @project="projectVisible = true" @settings="settingsVisible = true" />
-    <Stage v-if="stageVisible" class="app__right" :interaction-disabled="focusVisible" />
+    <ModelList class="app__left" @project="projectVisible = true" @guides="guideManagerVisible = true" @settings="settingsVisible = true" />
+    <Stage v-if="stageVisible" class="app__right" :interaction-disabled="focusVisible || guideManagerVisible" :guide-manager-visible="guideManagerVisible" />
     <ModelActionPanel v-if="store.selectedId" @open-motion-expression-settings="openMotionExpressionSettings" />
     <TransformSnapshotModal />
     <FilterPresetModal />
     <BackgroundHistoryModal />
     <PreviewProjectModal :visible="projectVisible" @close="projectVisible = false" @load="loadProject" />
+    <PreviewGuideManagerModal :visible="guideManagerVisible" @close="guideManagerVisible = false" />
     <PreviewSettingsModal :visible="settingsVisible" :initial-tab="settingsTab" @close="closeSettings" />
     <ColorPickerModal />
     <FocusMode v-if="focusVisible" ref="focusMode" @close="focusVisible = false" />

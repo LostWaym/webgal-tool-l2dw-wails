@@ -61,7 +61,7 @@ function close() { if (!busy.value) { selected.value = null; emit('close') } }
             <h3>立绘组（{{ selected.project.figureGroups.length }}）</h3>
             <ul><li v-for="g in selected.project.figureGroups" :key="g.id">{{ g.name }} · {{ g.targetIds.length }} 个立绘 / {{ g.targetGroupIds.length }} 个嵌套组</li></ul>
             <h3>场景与其他</h3>
-            <ul><li>背景：{{ selected.project.background.path || '默认背景' }}</li><li>背景与主场景变换、滤镜及指令模板</li><li>变换快照：{{ selected.project.snapshots.length }} 个</li><li>图片立绘模板及变换模板</li></ul>
+            <ul><li>背景：{{ selected.project.background.path || '默认背景' }}</li><li>背景与主场景变换、滤镜及指令模板</li><li>舞台游标：{{ selected.project.guides?.length ?? 0 }} 条</li><li>变换快照：{{ selected.project.snapshots.length }} 个</li><li>图片立绘模板及变换模板</li></ul>
             <div v-if="selected.missing.length" class="missing"><strong>缺失资源（{{ selected.missing.length }}）</strong><ul><li v-for="path in selected.missing" :key="path">{{ path }}</li></ul></div>
           </template>
           <p v-else class="empty">选择项目后，可在此查看加载清单。</p>

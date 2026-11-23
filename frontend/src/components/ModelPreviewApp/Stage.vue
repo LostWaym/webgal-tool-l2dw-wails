@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import * as PIXI from 'pixi.js'
 import { LoaderResource } from 'pixi.js'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
@@ -19,12 +19,15 @@ import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { usePreviewFrameRateLimit } from '../../composables/usePreviewFrameRateLimit'
 import { usePreviewFocusBoxOffset } from '../../composables/usePreviewFocusBoxOffset'
+import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../composables/usePreviewGuideVisibility'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
+import { GUIDE_SNAP_PX, PREVIEW_FRAME, hitPreviewGuide, placePreviewGuide, previewGuideEnds, previewGuideKey, snapPreviewGuide, type GuideAxis, type PreviewGuide } from '../../utils/previewGuides'
 
 const store = useModelStore()
-const props = defineProps<{ interactionDisabled?: boolean }>()
+const props = defineProps<{ interactionDisabled?: boolean; guideManagerVisible?: boolean }>()
 const { frameRateLimit } = usePreviewFrameRateLimit()
 const { offsetY: focusBoxOffsetY } = usePreviewFocusBoxOffset()
+const { alwaysShowGuides } = usePreviewGuideVisibility()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 
@@ -69,13 +72,46 @@ function onNextModeChange(e: Event) {
 // Blender 风格变换操作（g/s/r + x/y 轴锁定）
 // ─────────────────────────────────────────────────────────────────────────────
 type TransformMode = 'none' | 'g' | 's' | 'r' | 'l'
-type AxisLock = 'none' | 'x' | 'y'
+type AxisLock = 'none' | GuideAxis
+type GuideMode = 'none' | 'delete' | GuideAxis
 
 const transformMode = ref<TransformMode>('none')
 const axisLock = ref<AxisLock>('none')
 const isTransforming = computed(() => transformMode.value !== 'none')
+const guideMode = ref<GuideMode>('none')
+const guideCandidate = shallowRef<PreviewGuide>()
+const snappedGuides = shallowRef<readonly PreviewGuide[]>([])
+const altHeldInMove = ref(false)
+const isGuideMove = computed(() => transformMode.value === 'g' && !!store.selectedId && !isSpecialId(store.selectedId))
+const guidesVisible = computed(() =>
+  alwaysShowGuides.value || props.guideManagerVisible || guideMode.value !== 'none' || (transformMode.value === 'g' && altHeldInMove.value),
+)
+const guideCursor = computed(() => {
+  if (guideMode.value === 'none') return
+  if (guideMode.value === 'delete') return 'stage__canvas--guide-delete'
+  return guideCandidate.value ? 'stage__canvas--guide-add' : 'stage__canvas--guide-blocked'
+})
+
+function setGuideMode(mode: GuideMode) {
+  guideMode.value = mode
+  guideCandidate.value = undefined
+}
+
+function updateSnappedGuides(guides: readonly PreviewGuide[] = []) {
+  const current = snappedGuides.value
+  if (guides.length !== current.length || guides.some((guide, i) => guide !== current[i])) {
+    snappedGuides.value = guides
+  }
+}
+
+function onStageRightClick() {
+  if (guideMode.value !== 'none') setGuideMode('none')
+}
+
 watch(() => props.interactionDisabled, disabled => {
-  if (disabled && isTransforming.value) cancelTransform()
+  if (!disabled) return
+  if (isTransforming.value) cancelTransform()
+  setGuideMode('none')
 })
 
 // 注视模式（l）状态
@@ -507,6 +543,8 @@ function endTransform() {
   }
 
   transformMode.value = 'none'
+  altHeldInMove.value = false
+  updateSnappedGuides()
   axisLock.value = 'none'
   baseInitialized = false
   groupDummyEntries = []
@@ -584,6 +622,8 @@ const TARGET_LABELS: Record<ReturnType<typeof resolveShortcutTargetType>, string
 const COMMON_MOUSE_HINTS: MouseHint[] = [
   { keys: '中键拖动', description: '平移舞台视图' },
   { keys: '鼠标滚轮', description: '缩放舞台视图' },
+  { keys: 'M', description: '进入 / 退出游标模式' },
+  { keys: PREVIEW_GUIDE_VISIBILITY_KEYS, description: '切换常驻显示游标' },
 ]
 // F1 / F2 都是数据驱动的快捷键提示，仅可点击触发（点击等价于按下 F1/F2）
 const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
@@ -704,12 +744,95 @@ let stageMain: PIXI.Container | null = null
 let backgroundContainer: L2dwContainer | null = null
 let figureContainer: PIXI.Container | null = null
 let frameContainer: PIXI.Container | null = null
+let guideGraphics: PIXI.Graphics | null = null
 /** groupId -> 该立绘组专属 L2dwContainer（始终挂在 stageMain 下） */
 const groupContainers = new Map<string, L2dwContainer>()
 
 let isMiddleDown = false
 let lastMouseX = 0
 let lastMouseY = 0
+
+function getGuideViewport() {
+  if (!app || !rootContainer || !frameContainer) return
+  const frame = frameContainer
+  const rect = app.view.getBoundingClientRect()
+  if (!rect.width || !rect.height || !app.screen.width || !app.screen.height) return
+  const cssX = rect.width / app.screen.width
+  const cssY = rect.height / app.screen.height
+  return {
+    frame,
+    pixels: { x: cssX * rootContainer.scale.x, y: cssY * rootContainer.scale.y },
+    toFrame: (clientX: number, clientY: number) => frame.toLocal(
+      new PIXI.Point((clientX - rect.left) / cssX, (clientY - rect.top) / cssY),
+    ),
+  }
+}
+
+function snapMovePosition(target: PIXI.Container, x: number, y: number, lock: AxisLock) {
+  const viewport = getGuideViewport()
+  const parent = target.parent
+  if (!viewport || !parent) return
+  const { frame, pixels } = viewport
+  const baseX = target.position.x - target.x
+  const baseY = target.position.y - target.y
+  const local = { x: x + baseX, y: y + baseY }
+  const anchor = frame.toLocal(local, parent)
+  const snapped = snapPreviewGuide(store.guides, anchor, pixels, lock)
+  if (!snapped) return
+
+  if (lock === 'none') {
+    const position = parent.toLocal(snapped.point, frame)
+    if (Number.isFinite(position.x) && Number.isFinite(position.y)) {
+      return { position: { x: position.x - baseX, y: position.y - baseY }, guides: snapped.guides }
+    }
+    return
+  }
+
+  // 主场景可能已旋转：只沿立绘的可动轴移动，求它和绝对游标的交点。
+  const step = frame.toLocal({ ...local, [lock]: local[lock] + 1 }, parent)
+  const projection = step[lock] - anchor[lock]
+  const length = Math.hypot(step.x - anchor.x, step.y - anchor.y)
+  if (Math.abs(projection) <= length * 1e-6) return
+  const delta = (snapped.point[lock] - anchor[lock]) / projection
+  if (Number.isFinite(delta)) {
+    return { position: { x, y, [lock]: (lock === 'x' ? x : y) + delta }, guides: snapped.guides }
+  }
+}
+
+function drawGuides() {
+  const graphics = guideGraphics
+  if (!graphics) return
+  graphics.visible = guidesVisible.value
+  if (!graphics.visible) return
+  const viewport = getGuideViewport()
+  if (!viewport) return
+  const unit = 1 / Math.min(viewport.pixels.x, viewport.pixels.y)
+  const candidate = guideCandidate.value
+  const deleting = guideMode.value === 'delete'
+  const draw = (guide: PreviewGuide, color: number, alpha: number, width = 1) => {
+    const [a, b] = previewGuideEnds(guide)
+    graphics.lineStyle(width * unit, color, alpha)
+    graphics.moveTo(a.x, a.y)
+    graphics.lineTo(b.x, b.y)
+    graphics.lineStyle(0)
+    graphics.beginFill(color, alpha)
+    graphics.drawCircle(a.x, a.y, 3 * unit)
+    graphics.drawCircle(b.x, b.y, 3 * unit)
+    graphics.endFill()
+  }
+  graphics.clear()
+  const matched = snappedGuides.value.filter(guide => store.guides.includes(guide))
+  for (const guide of store.guides) {
+    if (!matched.includes(guide)) draw(guide, deleting && guide === candidate ? 0xff8268 : 0x60dcff, 0.95)
+  }
+  for (const guide of matched) draw(guide, 0x63ff8d, 1, 2.2)
+  if (candidate && !deleting) {
+    const key = previewGuideKey(candidate)
+    if (!store.guides.some(guide => previewGuideKey(guide) === key)) draw(candidate, 0x60dcff, 0.5)
+  }
+}
+
+watch([() => store.guides, guideMode, guideCandidate, guidesVisible, snappedGuides], drawGuides, { deep: true })
 
 watch(frameRateLimit, (limit) => {
   if (app) app.ticker.maxFPS = limit
@@ -785,27 +908,20 @@ async function init() {
   // 创建边框容器（rootContainer 的子节点，渲染层级最高）
   frameContainer = new PIXI.Container()
   const frame = new PIXI.Graphics()
+  const { left, right, top, bottom } = PREVIEW_FRAME
   frame.lineStyle(2, 0x00FF00)
-  frame.drawRect(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2, STAGE_WIDTH, STAGE_HEIGHT)
+  frame.drawRect(left, top, right - left, bottom - top)
   // 四个顶点处的横竖延伸线（向外溢出边框）
   const ext = 1280
-  frame.moveTo(-STAGE_WIDTH / 2 - ext, -STAGE_HEIGHT / 2)
-  frame.lineTo(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
-  frame.moveTo(STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
-  frame.lineTo(STAGE_WIDTH / 2 + ext, -STAGE_HEIGHT / 2)
-  frame.moveTo(-STAGE_WIDTH / 2 - ext, STAGE_HEIGHT / 2)
-  frame.lineTo(-STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
-  frame.moveTo(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
-  frame.lineTo(STAGE_WIDTH / 2 + ext, STAGE_HEIGHT / 2)
-  frame.moveTo(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2 - ext)
-  frame.lineTo(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
-  frame.moveTo(-STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
-  frame.lineTo(-STAGE_WIDTH / 2, STAGE_HEIGHT / 2 + ext)
-  frame.moveTo(STAGE_WIDTH / 2, -STAGE_HEIGHT / 2 - ext)
-  frame.lineTo(STAGE_WIDTH / 2, -STAGE_HEIGHT / 2)
-  frame.moveTo(STAGE_WIDTH / 2, STAGE_HEIGHT / 2)
-  frame.lineTo(STAGE_WIDTH / 2, STAGE_HEIGHT / 2 + ext)
-  frameContainer.addChild(frame)
+  for (const [x, dx] of [[left, -ext], [right, ext]]) {
+    for (const [y, dy] of [[top, -ext], [bottom, ext]]) {
+      frame.moveTo(x + dx, y)
+      frame.lineTo(x, y)
+      frame.lineTo(x, y + dy)
+    }
+  }
+  guideGraphics = new PIXI.Graphics()
+  frameContainer.addChild(frame, guideGraphics)
   rootContainer.addChild(frameContainer)
 
   const camera = new PIXI.Container()
@@ -822,7 +938,12 @@ async function init() {
   rootContainer.addChild(camera)
   previewRuntime.specialContainers.set(SpecialId.Camera, camera)
 
-  stopObservingViewport = observePixiViewport(app, container, rootContainer, fitBackground)
+  stopObservingViewport = observePixiViewport(app, container, rootContainer, () => {
+    fitBackground()
+    guideCandidate.value = undefined
+    drawGuides()
+  })
+  drawGuides()
 
   attachDomHandlers()
 
@@ -1032,10 +1153,7 @@ watch(
 
 watch(
   () => store.selectedId,
-  () => {
-    setCursor('default')
-    updateFigureGroupCrosshair()
-  },
+  updateFigureGroupCrosshair,
   { immediate: true },
 )
 
@@ -1316,9 +1434,83 @@ function removeOne(id: string) {
 function attachDomHandlers() {
   if (!app) return
   const canvas = app.view as HTMLCanvasElement
+  let movePointer: PIXI.Point | undefined
+  let guidePointer: PIXI.Point | undefined
 
   const toScreen = (clientX: number, clientY: number): PIXI.Point => {
     return new PIXI.Point(clientX, clientY)
+  }
+
+  const trackGuidePointer = (e: MouseEvent) => {
+    guidePointer = e.target === canvas ? toScreen(e.clientX, e.clientY) : undefined
+  }
+
+  const editGuideAtPointer = (commit = false) => {
+    const mode = guideMode.value
+    const viewport = mode !== 'none' && guidePointer ? getGuideViewport() : undefined
+    if (mode === 'none' || !guidePointer || !viewport) {
+      guideCandidate.value = undefined
+      return
+    }
+    const point = viewport.toFrame(guidePointer.x, guidePointer.y)
+    const candidate = mode === 'delete'
+      ? hitPreviewGuide(store.guides, point, viewport.pixels)
+      : placePreviewGuide(mode, point)
+    guideCandidate.value = candidate
+    if (!commit || !candidate) return
+    if (mode === 'delete') {
+      store.deleteGuide(candidate)
+      guideCandidate.value = hitPreviewGuide(store.guides, point, viewport.pixels)
+    } else {
+      store.saveGuide(candidate)
+    }
+  }
+
+  const onCanvasEnter = (e: PointerEvent) => {
+    if (props.interactionDisabled || isMiddleDown) return
+    trackGuidePointer(e)
+    editGuideAtPointer()
+  }
+
+  const onCanvasLeave = () => {
+    guidePointer = undefined
+    guideCandidate.value = undefined
+  }
+
+  function applyMove(alt: boolean) {
+    if (!rootContainer || !store.selectedId) {
+      updateSnappedGuides()
+      return
+    }
+    const id = store.selectedId
+    const group = isFigureGroupId(id)
+    const target = group ? groupContainers.get(id) : getTransformTarget()
+    if (!target) {
+      updateSnappedGuides()
+      return
+    }
+    const originX = group ? groupStartCenterX : startX
+    const originY = group ? groupStartCenterY : startY
+    const pointer = baseInitialized ? movePointer : undefined
+    const scale = rootContainer.scale.x
+    const lock = axisLock.value
+    const x = originX + (pointer && lock !== 'y' ? (pointer.x - tStartMouseX) / scale : 0)
+    const y = originY + (pointer && lock !== 'x' ? (pointer.y - tStartMouseY) / scale : 0)
+    const snapped = alt && isGuideMove.value && store.guides.length ? snapMovePosition(target, x, y, lock) : undefined
+    target.x = snapped?.position.x ?? x
+    target.y = snapped?.position.y ?? y
+    updateSnappedGuides(snapped?.guides)
+    if (group) {
+      store.updateFigureGroup(id, { x: target.x, y: target.y })
+      syncDummyToTarget(target)
+    }
+    emitter.emit(StageEvents.TransformChange, id)
+    refreshTransformHint()
+  }
+
+  function updateMoveAlt(e: MouseEvent | KeyboardEvent) {
+    altHeldInMove.value = e.altKey
+    applyMove(e.altKey && !e.ctrlKey && !e.metaKey)
   }
 
   const onPointerDown = (e: PointerEvent) => {
@@ -1344,9 +1536,17 @@ function attachDomHandlers() {
       }
     }
 
+    if (guideMode.value !== 'none' && e.button === 0 && e.target === canvas) {
+      trackGuidePointer(e)
+      editGuideAtPointer(true)
+      e.preventDefault()
+      return
+    }
+
     // 中键优先：中键按下即标记拖拽
     if (e.button === 1 && rootContainer) {
       isMiddleDown = true
+      guideCandidate.value = undefined
       lastMouseX = e.clientX
       lastMouseY = e.clientY
       e.preventDefault()
@@ -1356,6 +1556,7 @@ function attachDomHandlers() {
 
   const onPointerMove = (e: PointerEvent) => {
     if (props.interactionDisabled) return
+    trackGuidePointer(e)
     // 中键拖拽 Root
     if (!isTransforming.value && isMiddleDown && rootContainer) {
       const dx = (e.clientX - lastMouseX) * DRAG_SENSITIVITY
@@ -1366,6 +1567,8 @@ function attachDomHandlers() {
       lastMouseY = e.clientY
       return
     }
+    if (guideMode.value !== 'none') editGuideAtPointer()
+
     // Blender 风格变换操作中：鼠标移动实时应用
     if (isTransforming.value) {
       if (!rootContainer) return
@@ -1373,6 +1576,17 @@ function attachDomHandlers() {
       // 注视模式：鼠标位置映射到方框内的 [-1,1]
       if (transformMode.value === 'l') {
         applyFocusFromPointer(e.clientX, e.clientY)
+        return
+      }
+
+      if (transformMode.value === 'g') {
+        if (!baseInitialized) {
+          tStartMouseX = e.clientX
+          tStartMouseY = e.clientY
+          baseInitialized = true
+        }
+        movePointer = toScreen(e.clientX, e.clientY)
+        updateMoveAlt(e)
         return
       }
 
@@ -1388,8 +1602,6 @@ function attachDomHandlers() {
       if (target) {
         // 首次移动时记录起点 / 起点距离 / 起点方向
         if (!baseInitialized) {
-          tStartMouseX = e.clientX
-          tStartMouseY = e.clientY
           // target 在屏幕坐标系下的锚点（canvas 中心 + target 偏移 × rootContainer scale）
           startScreenMP = pixiToClientCoords(target, { x: 0, y: 0 }, app!)
 
@@ -1409,21 +1621,7 @@ function attachDomHandlers() {
           baseInitialized = true
         }
 
-        const scale = rootContainer.scale.x
-
-        if (transformMode.value === 'g') {
-          // g：相对起点的位移差值
-          const dx = (e.clientX - tStartMouseX) / scale
-          const dy = (e.clientY - tStartMouseY) / scale
-          if (axisLock.value === 'x') {
-            target.x = startX + dx
-          } else if (axisLock.value === 'y') {
-            target.y = startY + dy
-          } else {
-            target.x = startX + dx
-            target.y = startY + dy
-          }
-        } else if (transformMode.value === 's') {
+        if (transformMode.value === 's') {
           // s：鼠标到模型距离 / 起点距离 = 缩放倍数
           const p = toScreen(e.clientX, e.clientY)
           const dx = p.x - startScreenMP.x
@@ -1483,7 +1681,6 @@ function attachDomHandlers() {
   /**
    * 立绘组模式下的鼠标移动处理：只改 groupContainer 的 rts，然后同步给所有 target。
    *
-   * - g：groupContainer.x/y += dx；同步更新 store.group.x/y
    * - s：groupContainer.scale *= factor
    * - r：groupContainer.rotation += deltaAngle
    */
@@ -1497,8 +1694,6 @@ function attachDomHandlers() {
 
     // 首次移动时记录 s/r 模式用的"起点距离 / 方向"
     if (!baseInitialized) {
-      tStartMouseX = e.clientX
-      tStartMouseY = e.clientY
       if (transformMode.value === 's') {
         const p = toScreen(e.clientX, e.clientY)
         const dx = p.x - groupStartScreenMP.x
@@ -1513,30 +1708,6 @@ function attachDomHandlers() {
         startDirY = dy / len
       }
       baseInitialized = true
-    }
-
-    const scale = rootContainer.scale.x
-
-    if (transformMode.value === 'g') {
-      const dx = (e.clientX - tStartMouseX) / scale
-      const dy = (e.clientY - tStartMouseY) / scale
-      // g 模式：把 dx/dy 加到 groupContainer.x/y + 同步 store.group.x/y
-      // base 始终固定为舞台中心，s/r 基准不受影响
-      const g = store.figureGroups.find((gg) => gg.id === id)
-      if (!g) return
-      if (axisLock.value === 'x') {
-        groupContainer.x = groupStartCenterX + dx
-        store.updateFigureGroup(id, { x: groupContainer.x, y: groupStartCenterY })
-      } else if (axisLock.value === 'y') {
-        groupContainer.y = groupStartCenterY + dy
-        store.updateFigureGroup(id, { x: groupStartCenterX, y: groupContainer.y })
-      } else {
-        groupContainer.x = groupStartCenterX + dx
-        groupContainer.y = groupStartCenterY + dy
-        store.updateFigureGroup(id, { x: groupContainer.x, y: groupContainer.y })
-      }
-      syncDummyToTarget(groupContainer)
-      return
     }
 
     if (transformMode.value === 's') {
@@ -1574,6 +1745,10 @@ function attachDomHandlers() {
 
   const onPointerUp = (e: PointerEvent) => {
     // pointerup 一定触发（任意按钮），统一清空中键状态
+    if (isMiddleDown && !props.interactionDisabled && e.type !== 'pointercancel') {
+      trackGuidePointer(e)
+      editGuideAtPointer()
+    }
     isMiddleDown = false
   }
 
@@ -1599,16 +1774,21 @@ function attachDomHandlers() {
     }
     rootContainer.scale.set(newScale)
     store.applyRootScaleToAllContainers(newScale)
+    trackGuidePointer(e)
+    if (guideMode.value !== 'none') editGuideAtPointer()
+    drawGuides()
   }
 
   canvas.addEventListener('wheel', onWheel, { passive: false })
+  canvas.addEventListener('pointerenter', onCanvasEnter)
+  canvas.addEventListener('pointerleave', onCanvasLeave)
 
   // 检测输入框焦点
   const isInputFocused = () => {
     const active = document.activeElement
     if (!active) return false
     const tag = active.tagName.toLowerCase()
-    return tag === 'input' || tag === 'textarea' || (active as HTMLElement).isContentEditable
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || (active as HTMLElement).isContentEditable
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -1666,9 +1846,37 @@ function attachDomHandlers() {
       return
     }
 
-    // 输入框焦点时不响应变换快捷键
+    // 输入框焦点时不响应舞台快捷键
     if (isInputFocused()) return
-    if (e.ctrlKey || e.altKey || e.metaKey) return
+    if (transformMode.value === 'g' && e.key === 'Alt') {
+      if (!e.repeat) updateMoveAlt(e)
+      e.preventDefault()
+      return
+    }
+    if (e.ctrlKey || e.metaKey) return
+
+    const key = e.key.toLowerCase()
+    const isAxisKey = key === 'x' || key === 'y'
+    if (e.altKey && !(isGuideMove.value && (isAxisKey || key === 'enter' || key === 'escape'))) return
+
+    if (key === 'm' && !isTransforming.value) {
+      if (!e.repeat) {
+        setGuideMode(guideMode.value === 'none' ? 'delete' : 'none')
+        editGuideAtPointer()
+      }
+      e.preventDefault()
+      return
+    }
+    if (guideMode.value !== 'none') {
+      if (isAxisKey) {
+        if (!e.repeat) {
+          setGuideMode(guideMode.value === key ? 'delete' : key)
+          editGuideAtPointer()
+        }
+        e.preventDefault()
+      }
+      return
+    }
 
     // g / s / r / l 进入变换模式（l = 注视）
     if (e.key === 'g' || e.key === 's' || e.key === 'r' || e.key === 'l') {
@@ -1696,15 +1904,17 @@ function attachDomHandlers() {
     }
 
     // 变换中：x / y 锁定轴，并把未锁轴回滚到起点
-    if (isTransforming.value && (e.key === 'x' || e.key === 'y')) {
+    if (isTransforming.value && isAxisKey) {
       if (store.selectedId === SpecialId.Camera && transformMode.value === 's') {
         e.preventDefault()
         return
       }
-      if (axisLock.value === e.key) {
-        axisLock.value = 'none'
-      } else {
-        axisLock.value = e.key as AxisLock
+      e.preventDefault()
+      if (e.repeat) return
+      axisLock.value = axisLock.value === key ? 'none' : key
+      if (transformMode.value === 'g') {
+        updateMoveAlt(e)
+        return
       }
       if (isCurrentFigureGroup()) {
         // 立绘组模式：把 groupContainer 的"未锁定轴"回滚到起点
@@ -1713,11 +1923,7 @@ function attachDomHandlers() {
           const gc = groupContainers.get(gid)
           if (gc) {
             // 回滚后强制让 PIXI 重新计算 child 的世界矩阵，方便后续 mouse move 继续作用
-            if (transformMode.value === 'g') {
-              // 把 groupContainer.x/y 重置回拖动开始时的位置
-              gc.x = groupStartCenterX
-              gc.y = groupStartCenterY
-            } else if (transformMode.value === 's') {
+            if (transformMode.value === 's') {
               gc.scale.x = groupStartScaleX
               gc.scale.y = groupStartScaleY
             } else if (transformMode.value === 'r') {
@@ -1726,19 +1932,11 @@ function attachDomHandlers() {
             if (stageMain) stageMain.updateTransform()
           }
         }
-        e.preventDefault()
         return
       }
       const target = getTransformTarget()
       if (target) {
-        if (transformMode.value === 'g') {
-          if (axisLock.value === 'x') target.y = startY
-          else if (axisLock.value === 'y') target.x = startX
-          else {
-            target.x = startX
-            target.y = startY
-          }
-        } else if (transformMode.value === 's') {
+        if (transformMode.value === 's') {
           if (axisLock.value === 'x') target.scale.y = startScaleY
           else if (axisLock.value === 'y') target.scale.x = startScaleX
           else {
@@ -1747,7 +1945,6 @@ function attachDomHandlers() {
           }
         }
       }
-      e.preventDefault()
       return
     }
 
@@ -1766,7 +1963,25 @@ function attachDomHandlers() {
     }
   }
 
+  const onKeyUp = (e: KeyboardEvent) => {
+    if (!props.interactionDisabled && transformMode.value === 'g' && e.key === 'Alt') {
+      updateMoveAlt(e)
+      e.preventDefault()
+    }
+  }
+
+  const onBlur = () => {
+    isMiddleDown = false
+    onCanvasLeave()
+    if (altHeldInMove.value) {
+      altHeldInMove.value = false
+      if (!props.interactionDisabled && isGuideMove.value) applyMove(false)
+    }
+  }
+
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
+  window.addEventListener('blur', onBlur)
 
   // Save for cleanup
   previewRuntime.cleanup = () => {
@@ -1775,13 +1990,11 @@ function attachDomHandlers() {
     window.removeEventListener('pointerup', onPointerUp)
     window.removeEventListener('pointercancel', onPointerUp)
     canvas.removeEventListener('wheel', onWheel)
+    canvas.removeEventListener('pointerenter', onCanvasEnter)
+    canvas.removeEventListener('pointerleave', onCanvasLeave)
     window.removeEventListener('keydown', onKeyDown)
-  }
-}
-
-function setCursor(c: string) {
-  if (containerRef.value) {
-    containerRef.value.style.cursor = c
+    window.removeEventListener('keyup', onKeyUp)
+    window.removeEventListener('blur', onBlur)
   }
 }
 
@@ -1906,6 +2119,7 @@ function dispose() {
     frameContainer.destroy({ children: true })
     frameContainer = null
   }
+  guideGraphics = null
 
   if (app) {
     if (typeof previewRuntime.cleanup === 'function') previewRuntime.cleanup()
@@ -1931,8 +2145,8 @@ function dispose() {
 </script>
 
 <template>
-  <section class="stage" @contextmenu.prevent>
-    <div ref="containerRef" class="stage__canvas" />
+  <section class="stage" @pointerdown.right="onStageRightClick" @contextmenu.prevent>
+    <div ref="containerRef" class="stage__canvas" :class="guideCursor" />
     <!-- 变换操作遮罩 -->
     <div
       v-if="isTransforming"
@@ -1943,10 +2157,17 @@ function dispose() {
       <div class="transform-hint__title">正在{{ transformHint.modeName }}</div>
       <div class="transform-hint__line">鼠标移动控制{{ transformHint.modeName }}，左键确定，右键取消</div>
       <div class="transform-hint__line">按 X / Y 锁定对应轴（未锁轴会回滚到起点）</div>
+      <div v-if="isGuideMove" class="transform-hint__line">按住 Alt 显示游标并吸附（{{ GUIDE_SNAP_PX }} px）</div>
       <div class="transform-hint__line" v-if="transformMode !== 'r'">当前锁定轴：{{ transformHint.axis }}</div>
       <div class="transform-hint__line">当前 X={{ transformHint.x }}，Y={{ transformHint.y }}</div>
       <div class="transform-hint__line" v-if="transformMode !== 'g'">缩放 X={{ transformHint.scaleX }}，Y={{ transformHint.scaleY }}</div>
       <div class="transform-hint__line" v-if="transformMode !== 'g'">旋转 {{ transformHint.rotationDeg }}°</div>
+    </div>
+    <div v-else-if="guideMode !== 'none'" class="stage__transform-hint stage__guide-hint">
+      <div class="transform-hint__title">舞台游标</div>
+      <div v-if="guideMode === 'delete'" class="transform-hint__line">删除模式：左键点中游标删除</div>
+      <div v-else class="transform-hint__line">在绿框内左键放置{{ guideMode === 'x' ? '竖线（X）' : '横线（Y）' }}</div>
+      <div class="transform-hint__line">X / Y 切换放置，再按同键回到删除；M 或右键退出</div>
     </div>
     <!-- 左上角：复制指令的 -next 后处理模式 -->
     <div v-if="!isTransforming" class="stage__next-mode">
@@ -1965,7 +2186,7 @@ function dispose() {
     <!-- <p v-if="!store.models.length && !backgroundSprite" class="stage__hint">
       点击左上角 “加载模型” 按钮选择 Live2D 模型文件 (.model.json 或 .model3.json)
     </p> -->
-    <div v-if="!isTransforming" class="stage__bottom-blocks">
+    <div v-if="!isTransforming && guideMode === 'none'" class="stage__bottom-blocks">
       <div class="stage__hints" :class="{ 'is-collapsed': !hintsExpanded }">
         <button
           type="button"
@@ -2020,10 +2241,23 @@ function dispose() {
 .stage__canvas {
   position: absolute;
   inset: 0;
+  cursor: default;
 }
 
 .stage__canvas :deep(canvas) {
   display: block;
+}
+
+.stage__canvas--guide-add {
+  cursor: url('../../assets/cursors/guide-add.svg') 12 12, crosshair;
+}
+
+.stage__canvas--guide-delete {
+  cursor: url('../../assets/cursors/guide-delete.svg') 3 3, pointer;
+}
+
+.stage__canvas--guide-blocked {
+  cursor: not-allowed;
 }
 
 .stage__overlay {
@@ -2048,6 +2282,10 @@ function dispose() {
   z-index: 10;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   user-select: none;
+}
+
+.stage__guide-hint {
+  pointer-events: none;
 }
 
 .transform-hint__title {

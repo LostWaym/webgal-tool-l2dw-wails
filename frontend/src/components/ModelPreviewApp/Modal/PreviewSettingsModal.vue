@@ -6,6 +6,7 @@ import { useMessage } from '../../../composables/useMessage'
 import { useMotionExpressionFolders } from '../../../composables/useMotionExpressionFolders'
 import { PREVIEW_FRAME_RATE_LIMITS, usePreviewFrameRateLimit } from '../../../composables/usePreviewFrameRateLimit'
 import { usePreviewFocusBoxOffset } from '../../../composables/usePreviewFocusBoxOffset'
+import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../../composables/usePreviewGuideVisibility'
 import { usePreviewViewportSettings } from '../../../composables/usePreviewViewportSettings'
 import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../composables/usePreviewViewportSettings'
 import NumberInput from '../../common/NumberInput.vue'
@@ -19,6 +20,7 @@ watch(() => props.visible, (visible) => {
 const folders = useMotionExpressionFolders()
 const { frameRateLimit, update: updateFrameRateLimit } = usePreviewFrameRateLimit()
 const { offsetY: focusBoxOffsetY, update: updateFocusBoxOffsetY } = usePreviewFocusBoxOffset()
+const { alwaysShowGuides, update: updateGuideVisibility } = usePreviewGuideVisibility()
 const viewport = usePreviewViewportSettings()
 const viewportVersions: Array<{ key: PreviewViewportVersion; label: string }> = [
   { key: 'cubism2', label: 'Cubism 2' },
@@ -53,6 +55,10 @@ function onChange(event: Event) {
 
 function onFrameRateLimitChange(event: Event) {
   updateFrameRateLimit(Number((event.target as HTMLSelectElement).value))
+}
+
+function onGuideVisibilityChange(event: Event) {
+  updateGuideVisibility((event.target as HTMLInputElement).checked)
 }
 
 function onFoldersEnabledChange(event: Event) {
@@ -90,6 +96,8 @@ function onSeparatorInput(event: Event) {
               <label class="focus-offset-label">注视框 Y 轴偏移</label>
               <NumberInput :model-value="focusBoxOffsetY" :step="1" @update:model-value="updateFocusBoxOffsetY" />
               <p>按 L 调整注视时使用，单位为模型变换空间坐标；正值向下，负值向上。修改后自动保存。</p>
+              <label class="guide-visibility-label"><input type="checkbox" :checked="alwaysShowGuides" @change="onGuideVisibilityChange"> 常驻显示游标</label>
+              <p>{{ PREVIEW_GUIDE_VISIBILITY_KEYS }} 可切换此设置。关闭时，游标只在编辑游标或 G 移动时按住 Alt 的情况下显示。</p>
             </template>
             <template v-else-if="activeTab === 'motionExpression'">
               <label><input type="checkbox" :checked="folders.settings.enabled" @change="onFoldersEnabledChange"> 启用文件夹划分</label>
@@ -130,7 +138,7 @@ h2 { flex: 1; margin: 0; font-size: 16px; }
 .settings-tabs button { display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; }
 .settings-tabs button.active { background: #303b4d; color: #a9c8ed; }
 .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 18px; }
-.separator-label, .frame-rate-label, .focus-offset-label { margin-top: 20px; }
+.separator-label, .frame-rate-label, .focus-offset-label, .guide-visibility-label { margin-top: 20px; }
 .viewport-section { margin-top: 24px; }
 .viewport-section h3 { margin: 0 0 12px; font-size: 15px; }
 .viewport-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }

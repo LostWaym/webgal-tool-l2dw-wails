@@ -20,6 +20,7 @@ import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
 import { previewRuntime } from '../utils/runtimeRegistry'
 import { DEFAULT_FILTER_PROPERTY_VALUES, FILTER_PROPERTY_KEYS, writeFilterStateToContainer } from '../live2d/L2dwContainer'
 import type { L2dwContainer } from '../live2d/L2dwContainer'
+import { isPreviewGuide, previewGuideKey, type PreviewGuide } from '../utils/previewGuides'
 
 interface MotionState {
   group: string
@@ -217,6 +218,7 @@ export const useModelStore = defineStore('models', {
     bgState: { ...DEFAULT_TRANSFORM_STATE } as TransformState,
     /** 主场景容器（StageMain）的变换状态 */
     stageState: { ...DEFAULT_TRANSFORM_STATE } as TransformState,
+    guides: [] as PreviewGuide[],
     cameraState: { ...DEFAULT_TRANSFORM_STATE, scale: { ...DEFAULT_TRANSFORM_STATE.scale } } as TransformState,
     cameraFrameVisible: false,
     /** 变换快照列表 */
@@ -283,6 +285,22 @@ export const useModelStore = defineStore('models', {
     },
   },
   actions: {
+    saveGuide(guide: PreviewGuide, original?: PreviewGuide): boolean {
+      if (!isPreviewGuide(guide)) return false
+      const index = original ? this.guides.indexOf(original) : -1
+      if (original && index === -1) return false
+      const key = previewGuideKey(guide)
+      if (this.guides.some((item, i) => i !== index && previewGuideKey(item) === key)) return false
+      if (index === -1) this.guides.push(guide)
+      else Object.assign(this.guides[index], guide)
+      return true
+    },
+
+    deleteGuide(guide: PreviewGuide): void {
+      const index = this.guides.indexOf(guide)
+      if (index >= 0) this.guides.splice(index, 1)
+    },
+
     setMotionSearch(v: string): void {
       if (!this.selectedId) return
       this.motionSearchMap[this.selectedId] = v

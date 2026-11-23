@@ -31,6 +31,7 @@
 - **预览设置 / 帧率限制 / 动作表情文件夹**：设置界面在 `frontend/src/components/ModelPreviewApp/Modal/PreviewSettingsModal.vue`，帧率与文件夹设置分别由 `frontend/src/composables/usePreviewFrameRateLimit.ts`、`frontend/src/composables/useMotionExpressionFolders.ts` 共享并通过 `app.go` 持久化。
 - **预览视口初始设置**：`frontend/src/composables/usePreviewViewportSettings.ts` 按 Cubism 版本共享并通过 `app.go` 持久化，供 `frontend/src/components/common/Live2dPreview.vue` 使用。
 - **GRS**：预览舞台对立绘等对象的快捷键变换操作，入口为 `frontend/src/components/ModelPreviewApp/Stage.vue`。
+- **舞台游标 / 吸附参考线**：预览舞台的绝对坐标参考线；舞台操作在 `frontend/src/components/ModelPreviewApp/Stage.vue`，几何计算在 `frontend/src/utils/previewGuides.ts`。坐标归预览项目，也可在同模块的 `Modal/PreviewGuideManagerModal.vue` 单独管理和导入导出。常驻显示由 `frontend/src/composables/usePreviewGuideVisibility.ts` 共享并通过 `app.go` 持久化。
 - **镜头 / 取景框**：预览编辑器的特殊物体；舞台显示与操作在 `frontend/src/components/ModelPreviewApp/Stage.vue`，主场景指令换算在 `frontend/src/composables/useShortcuts.ts`。
 - **立绘组 / 立绘组快捷键复制**：数据归预览 store 管理；复制分发入口为 `frontend/src/composables/useShortcuts.ts` 的 `runShortcutForFigureGroup`。
 - **背景 / 历史背景**：背景入口在立绘列表；历史界面与状态控制分别为 `frontend/src/components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue`、`frontend/src/composables/useBackgroundHistoryModal.ts`，历史数据归预览 store。

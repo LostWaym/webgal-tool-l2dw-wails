@@ -26,6 +26,7 @@ const (
 	slotExpression = "expression"
 	slotWmdl       = "wmdl"
 	slotProject    = "project"
+	slotGuides     = "guides"
 )
 
 // AppConfig stores persistent user preferences.
@@ -36,6 +37,7 @@ type AppConfig struct {
 	MotionExpressionFolders   *MotionExpressionFolderSettings `json:"motionExpressionFolders,omitempty"`
 	PreviewFrameRateLimit     *int                            `json:"previewFrameRateLimit,omitempty"`
 	PreviewFocusBoxOffsetY    *float64                        `json:"previewFocusBoxOffsetY,omitempty"`
+	PreviewGuidesVisible      bool                            `json:"previewGuidesVisible,omitempty"`
 	PreviewViewport           *PreviewViewportSettings        `json:"previewViewport,omitempty"`
 }
 
@@ -175,6 +177,20 @@ func (a *App) SetPreviewFrameRateLimit(limit int) error {
 	defer a.mu.Unlock()
 	cfg := a.loadConfig()
 	cfg.PreviewFrameRateLimit = &limit
+	return a.saveConfig(cfg)
+}
+
+func (a *App) GetPreviewGuidesVisible() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewGuidesVisible
+}
+
+func (a *App) SetPreviewGuidesVisible(visible bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewGuidesVisible = visible
 	return a.saveConfig(cfg)
 }
 
@@ -695,6 +711,24 @@ func (a *App) SavePreviewProjectFileDialog() (string, error) {
 		Title:           "项目另存为",
 		DefaultFilename: "project.w2proj",
 		Filters:         []runtime.FileFilter{{DisplayName: "预览项目", Pattern: "*.w2proj"}},
+	})
+}
+
+var previewGuidesFileFilter = runtime.FileFilter{DisplayName: "游标 JSON", Pattern: "*.json"}
+
+func (a *App) PickPreviewGuidesFile() (string, error) {
+	return a.runPicker(runtime.OpenDialogOptions{
+		Title:   "选择游标文件",
+		Filters: []runtime.FileFilter{previewGuidesFileFilter},
+	}, slotGuides, pickerFile)
+}
+
+func (a *App) SavePreviewGuidesFileDialog() (string, error) {
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:                "导出游标",
+		DefaultFilename:      "preview_guides.json",
+		CanCreateDirectories: true,
+		Filters:              []runtime.FileFilter{previewGuidesFileFilter},
 	})
 }
 

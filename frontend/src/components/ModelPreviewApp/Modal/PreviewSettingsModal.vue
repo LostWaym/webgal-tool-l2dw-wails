@@ -7,6 +7,7 @@ import { useMotionExpressionFolders } from '../../../composables/useMotionExpres
 import { PREVIEW_FRAME_RATE_LIMITS, usePreviewFrameRateLimit } from '../../../composables/usePreviewFrameRateLimit'
 import { usePreviewFocusBoxOffset } from '../../../composables/usePreviewFocusBoxOffset'
 import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../../composables/usePreviewGuideVisibility'
+import { usePreviewGuideOverflow } from '../../../composables/usePreviewGuideOverflow'
 import { usePreviewViewportSettings } from '../../../composables/usePreviewViewportSettings'
 import { usePreviewRotationSnap } from '../../../composables/usePreviewRotationSnap'
 import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../composables/usePreviewViewportSettings'
@@ -22,6 +23,7 @@ const folders = useMotionExpressionFolders()
 const { frameRateLimit, update: updateFrameRateLimit } = usePreviewFrameRateLimit()
 const { offsetY: focusBoxOffsetY, update: updateFocusBoxOffsetY } = usePreviewFocusBoxOffset()
 const { alwaysShowGuides, update: updateGuideVisibility } = usePreviewGuideVisibility()
+const { length: guideOverflow, update: updateGuideOverflow } = usePreviewGuideOverflow()
 const viewport = usePreviewViewportSettings()
 const { interval: rotationSnap, update: updateRotationSnap } = usePreviewRotationSnap()
 const viewportVersions: Array<{ key: PreviewViewportVersion; label: string }> = [
@@ -103,6 +105,9 @@ function onSeparatorInput(event: Event) {
               <p>按 L 调整注视时使用，单位为模型变换空间坐标；正值向下，负值向上。修改后自动保存。</p>
               <label class="guide-visibility-label"><input type="checkbox" :checked="alwaysShowGuides" @change="onGuideVisibilityChange"> 常驻显示游标</label>
               <p>{{ PREVIEW_GUIDE_VISIBILITY_KEYS }} 可切换此设置。关闭时，游标只在编辑游标或 G 移动时按住 Alt 的情况下显示。</p>
+              <label class="guide-visibility-label">游标溢出长度（像素）</label>
+              <NumberInput :model-value="guideOverflow" :min="0" :step="1" @update:model-value="updateGuideOverflow" />
+              <p>游标在画框两端各延伸的舞台坐标长度，随舞台缩放；设为 0 时不延伸。修改后自动保存。</p>
             </template>
             <template v-else-if="activeTab === 'motionExpression'">
               <label><input type="checkbox" :checked="folders.settings.enabled" @change="onFoldersEnabledChange"> 启用文件夹划分</label>

@@ -75,20 +75,20 @@ function nearestGuide(guides: readonly PreviewGuide[], distance: (guide: Preview
   return best
 }
 
-function segmentDistance(point: Point, guide: PreviewGuide, pixels: Point): number {
+function segmentDistance(point: Point, guide: PreviewGuide, pixels: Point, overflow: number): number {
   const across = guide.axis === 'x' ? 'y' : 'x'
   const [min, max] = guideRanges[across]
-  const outside = Math.max(min - point[across], 0, point[across] - max)
+  const outside = Math.max(min - overflow - point[across], 0, point[across] - max - overflow)
   return Math.hypot((point[guide.axis] - guide.position) * pixels[guide.axis], outside * pixels[across])
 }
 
-export function hitPreviewGuide(guides: readonly PreviewGuide[], point: Point, pixels: Point) {
-  return nearestGuide(guides, guide => segmentDistance(point, guide, pixels), GUIDE_SNAP_PX)
+export function hitPreviewGuide(guides: readonly PreviewGuide[], point: Point, pixels: Point, overflow: number) {
+  return nearestGuide(guides, guide => segmentDistance(point, guide, pixels, overflow), GUIDE_SNAP_PX)
 }
 
-export function snapPreviewGuide(guides: readonly PreviewGuide[], point: Point, pixels: Point, lock: GuideAxis | 'none'): GuideSnap | undefined {
+export function snapPreviewGuide(guides: readonly PreviewGuide[], point: Point, pixels: Point, lock: GuideAxis | 'none', overflow: number): GuideSnap | undefined {
   const closestOnAxis = (axis: GuideAxis) => nearestGuide(guides, guide =>
-    guide.axis === axis ? Math.abs(point[axis] - guide.position) * pixels[axis] : Infinity,
+    guide.axis === axis ? segmentDistance(point, guide, pixels, overflow) : Infinity,
     GUIDE_SNAP_PX,
   )
   if (lock !== 'none') {
@@ -102,6 +102,6 @@ export function snapPreviewGuide(guides: readonly PreviewGuide[], point: Point, 
     return { point: { x: x.position, y: y.position }, guides: [x, y] }
   }
 
-  const guide = nearestGuide(guides, g => segmentDistance(point, g, pixels), GUIDE_SNAP_PX)
+  const guide = nearestGuide(guides, g => segmentDistance(point, g, pixels, overflow), GUIDE_SNAP_PX)
   return guide && { point: { ...point, [guide.axis]: guide.position }, guides: [guide] }
 }

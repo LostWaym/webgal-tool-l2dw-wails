@@ -39,6 +39,7 @@ type AppConfig struct {
 	PreviewFocusBoxOffsetY    *float64                        `json:"previewFocusBoxOffsetY,omitempty"`
 	PreviewRotationSnap       *float64                        `json:"previewRotationSnap,omitempty"`
 	PreviewGuidesVisible      bool                            `json:"previewGuidesVisible,omitempty"`
+	PreviewGuideOverflow      *float64                        `json:"previewGuideOverflow,omitempty"`
 	PreviewViewport           *PreviewViewportSettings        `json:"previewViewport,omitempty"`
 }
 
@@ -209,6 +210,23 @@ func (a *App) SetPreviewGuidesVisible(visible bool) error {
 	defer a.mu.Unlock()
 	cfg := a.loadConfig()
 	cfg.PreviewGuidesVisible = visible
+	return a.saveConfig(cfg)
+}
+
+func (a *App) GetPreviewGuideOverflow() *float64 {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewGuideOverflow
+}
+
+func (a *App) SetPreviewGuideOverflow(length float64) error {
+	if math.IsNaN(length) || math.IsInf(length, 0) || length < 0 {
+		return fmt.Errorf("invalid preview guide overflow: %v", length)
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewGuideOverflow = &length
 	return a.saveConfig(cfg)
 }
 

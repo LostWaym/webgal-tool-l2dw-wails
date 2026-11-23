@@ -21,6 +21,7 @@ import { usePreviewFrameRateLimit } from '../../composables/usePreviewFrameRateL
 import { usePreviewFocusBoxOffset } from '../../composables/usePreviewFocusBoxOffset'
 import { usePreviewRotationSnap } from '../../composables/usePreviewRotationSnap'
 import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../composables/usePreviewGuideVisibility'
+import { usePreviewGuideOverflow } from '../../composables/usePreviewGuideOverflow'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 import { GUIDE_SNAP_PX, PREVIEW_FRAME, hitPreviewGuide, placePreviewGuide, previewGuideEnds, previewGuideKey, snapPreviewGuide, type GuideAxis, type PreviewGuide } from '../../utils/previewGuides'
 
@@ -30,6 +31,7 @@ const { frameRateLimit } = usePreviewFrameRateLimit()
 const { offsetY: focusBoxOffsetY } = usePreviewFocusBoxOffset()
 const { interval: rotationSnap } = usePreviewRotationSnap()
 const { alwaysShowGuides } = usePreviewGuideVisibility()
+const { length: guideOverflow } = usePreviewGuideOverflow()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 
@@ -84,9 +86,10 @@ const guideMode = ref<GuideMode>('none')
 const guideCandidate = shallowRef<PreviewGuide>()
 const snappedGuides = shallowRef<readonly PreviewGuide[]>([])
 const altHeldInMove = ref(false)
-const isGuideMove = computed(() => transformMode.value === 'g' && !!store.selectedId && !isSpecialId(store.selectedId))
+const isGuideMove = computed(() => transformMode.value === 'g' && !!store.selectedId)
+const isMoveAltActive = computed(() => isGuideMove.value && altHeldInMove.value)
 const guidesVisible = computed(() =>
-  alwaysShowGuides.value || props.guideManagerVisible || guideMode.value !== 'none' || (transformMode.value === 'g' && altHeldInMove.value),
+  alwaysShowGuides.value || props.guideManagerVisible || guideMode.value !== 'none' || isMoveAltActive.value,
 )
 const guideCursor = computed(() => {
   if (guideMode.value === 'none') return
@@ -173,7 +176,7 @@ function getTransformTarget(): PIXI.Container | undefined {
   if (isSpecialId(id)) {
     return previewRuntime.specialContainers.get(id)
   }
-  return previewRuntime.modelWrappers.get(id)
+  return isFigureGroupId(id) ? groupContainers.get(id) : previewRuntime.modelWrappers.get(id)
 }
 
 /** 当前选中是否为立绘组 */
@@ -549,6 +552,7 @@ function endTransform() {
   transformMode.value = 'none'
   altHeldInMove.value = false
   updateSnappedGuides()
+  updateMoveCrosshair()
   axisLock.value = 'none'
   baseInitialized = false
   groupDummyEntries = []
@@ -749,6 +753,7 @@ let backgroundContainer: L2dwContainer | null = null
 let figureContainer: PIXI.Container | null = null
 let frameContainer: PIXI.Container | null = null
 let guideGraphics: PIXI.Graphics | null = null
+let moveCrosshair: PIXI.Graphics | null = null
 /** groupId -> 该立绘组专属 L2dwContainer（始终挂在 stageMain 下） */
 const groupContainers = new Map<string, L2dwContainer>()
 
@@ -765,6 +770,7 @@ function getGuideViewport() {
   const cssY = rect.height / app.screen.height
   return {
     frame,
+    cssScale: { x: cssX, y: cssY },
     pixels: { x: cssX * rootContainer.scale.x, y: cssY * rootContainer.scale.y },
     toFrame: (clientX: number, clientY: number) => frame.toLocal(
       new PIXI.Point((clientX - rect.left) / cssX, (clientY - rect.top) / cssY),
@@ -772,27 +778,30 @@ function getGuideViewport() {
   }
 }
 
-function snapMovePosition(target: PIXI.Container, x: number, y: number, lock: AxisLock) {
-  const viewport = getGuideViewport()
+type GuideViewport = NonNullable<ReturnType<typeof getGuideViewport>>
+
+function getParentMoveAnchor(target: PIXI.Container, x = target.x, y = target.y) {
+  return { x: target.position.x + (x - target.x), y: target.position.y + (y - target.y) }
+}
+
+function snapMovePosition(target: PIXI.Container, x: number, y: number, lock: AxisLock, viewport: GuideViewport) {
   const parent = target.parent
-  if (!viewport || !parent) return
+  if (!parent) return
   const { frame, pixels } = viewport
-  const baseX = target.position.x - target.x
-  const baseY = target.position.y - target.y
-  const local = { x: x + baseX, y: y + baseY }
+  const local = getParentMoveAnchor(target, x, y)
   const anchor = frame.toLocal(local, parent)
-  const snapped = snapPreviewGuide(store.guides, anchor, pixels, lock)
+  const snapped = snapPreviewGuide(store.guides, anchor, pixels, lock, guideOverflow.value)
   if (!snapped) return
 
   if (lock === 'none') {
     const position = parent.toLocal(snapped.point, frame)
     if (Number.isFinite(position.x) && Number.isFinite(position.y)) {
-      return { position: { x: position.x - baseX, y: position.y - baseY }, guides: snapped.guides }
+      return { position: { x: x + (position.x - local.x), y: y + (position.y - local.y) }, guides: snapped.guides }
     }
     return
   }
 
-  // 主场景可能已旋转：只沿立绘的可动轴移动，求它和绝对游标的交点。
+  // 父容器可能已旋转：只沿对象的可动轴移动，求它和绝对游标的交点。
   const step = frame.toLocal({ ...local, [lock]: local[lock] + 1 }, parent)
   const projection = step[lock] - anchor[lock]
   const length = Math.hypot(step.x - anchor.x, step.y - anchor.y)
@@ -801,6 +810,23 @@ function snapMovePosition(target: PIXI.Container, x: number, y: number, lock: Ax
   if (Number.isFinite(delta)) {
     return { position: { x, y, [lock]: (lock === 'x' ? x : y) + delta }, guides: snapped.guides }
   }
+}
+
+function updateMoveCrosshair(target?: PIXI.Container, viewport?: GuideViewport) {
+  const crosshair = moveCrosshair
+  if (!crosshair) return
+  crosshair.visible = false
+  if (!isMoveAltActive.value) return
+  target ??= getTransformTarget()
+  viewport ??= getGuideViewport()
+  if (!target?.parent || !viewport) return
+
+  const anchor = target.parent.toGlobal(getParentMoveAnchor(target))
+  if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return
+  crosshair.position.copyFrom(anchor)
+  const screenScale = 0.28
+  crosshair.scale.set(screenScale / viewport.cssScale.x, screenScale / viewport.cssScale.y)
+  crosshair.visible = true
 }
 
 function drawGuides() {
@@ -818,6 +844,14 @@ function drawGuides() {
     graphics.lineStyle(width * unit, color, alpha)
     graphics.moveTo(a.x, a.y)
     graphics.lineTo(b.x, b.y)
+    if (guideOverflow.value > 0) {
+      const dx = guide.axis === 'y' ? guideOverflow.value : 0
+      const dy = guide.axis === 'x' ? guideOverflow.value : 0
+      graphics.moveTo(a.x, a.y)
+      graphics.lineTo(a.x - dx, a.y - dy)
+      graphics.moveTo(b.x, b.y)
+      graphics.lineTo(b.x + dx, b.y + dy)
+    }
     graphics.lineStyle(0)
     graphics.beginFill(color, alpha)
     graphics.drawCircle(a.x, a.y, 3 * unit)
@@ -836,7 +870,7 @@ function drawGuides() {
   }
 }
 
-watch([() => store.guides, guideMode, guideCandidate, guidesVisible, snappedGuides], drawGuides, { deep: true })
+watch([() => store.guides, guideMode, guideCandidate, guidesVisible, snappedGuides, guideOverflow], drawGuides, { deep: true })
 
 watch(frameRateLimit, (limit) => {
   if (app) app.ticker.maxFPS = limit
@@ -942,10 +976,15 @@ async function init() {
   rootContainer.addChild(camera)
   previewRuntime.specialContainers.set(SpecialId.Camera, camera)
 
+  moveCrosshair = buildStageCrosshair(6, 8, 0xffffff)
+  moveCrosshair.visible = false
+  app.stage.addChild(moveCrosshair)
+
   stopObservingViewport = observePixiViewport(app, container, rootContainer, () => {
     fitBackground()
     guideCandidate.value = undefined
     drawGuides()
+    updateMoveCrosshair()
   })
   drawGuides()
 
@@ -1006,7 +1045,7 @@ function ensureGroupContainer(group: FigureGroupEntry): L2dwContainer {
   c.rotation = 0
 
   // 准心作为 groupContainer 的子节点，始终在原点（随容器同步变换）
-  const crosshair = buildFigureGroupCrosshair()
+  const crosshair = buildStageCrosshair()
   crosshair.visible = false
   c.addChild(crosshair)
 
@@ -1054,16 +1093,16 @@ function destroyGroupContainer(groupId: string): void {
 }
 
 /**
- * 构建立绘组准心 graphics：CS1.6 风十字准心（淡黄主线 + 黑描边，中间空心）
+ * 构建空心十字准星（主线 + 黑描边）
  * @param mainWidth 主线线宽
  * @param extraWidth 描边比主线粗多少（描边线宽 = mainWidth + extraWidth）
  */
-function buildFigureGroupCrosshair(
+function buildStageCrosshair(
   mainWidth = 8,
   extraWidth = 8,
+  color = 0xffff66,
 ): PIXI.Graphics {
   const g = new PIXI.Graphics()
-  const COLOR = 0xFFFF66   // 淡黄主线
   const OUTLINE = 0x000000 // 黑描边
   const W = 32              // 半长
   const GAP = 16             // 中间空隙
@@ -1076,8 +1115,8 @@ function buildFigureGroupCrosshair(
   g.moveTo(0, -W-4); g.lineTo(0, -GAP+4)
   g.moveTo(0, GAP-4); g.lineTo(0, W+4)
 
-  // 淡黄主线：叠在描边中央
-  g.lineStyle(mainWidth, COLOR)
+  // 主线叠在描边中央
+  g.lineStyle(mainWidth, color)
   g.moveTo(-W, 0); g.lineTo(-GAP, 0)
   g.moveTo(GAP, 0); g.lineTo(W, 0)
   g.moveTo(0, -W); g.lineTo(0, -GAP)
@@ -1093,6 +1132,7 @@ function updateFigureGroupCrosshair() {
     const ch = c.children.find((ch) => ch instanceof PIXI.Graphics) as PIXI.Graphics | undefined
     if (ch) ch.visible = false
   }
+  if (isMoveAltActive.value) return
   const id = store.selectedId
   if (id && isFigureGroupId(id)) {
     const c = groupContainers.get(id)
@@ -1156,7 +1196,7 @@ watch(
 )
 
 watch(
-  () => store.selectedId,
+  [() => store.selectedId, isMoveAltActive],
   updateFigureGroupCrosshair,
   { immediate: true },
 )
@@ -1458,13 +1498,13 @@ function attachDomHandlers() {
     }
     const point = viewport.toFrame(guidePointer.x, guidePointer.y)
     const candidate = mode === 'delete'
-      ? hitPreviewGuide(store.guides, point, viewport.pixels)
+      ? hitPreviewGuide(store.guides, point, viewport.pixels, guideOverflow.value)
       : placePreviewGuide(mode, point)
     guideCandidate.value = candidate
     if (!commit || !candidate) return
     if (mode === 'delete') {
       store.deleteGuide(candidate)
-      guideCandidate.value = hitPreviewGuide(store.guides, point, viewport.pixels)
+      guideCandidate.value = hitPreviewGuide(store.guides, point, viewport.pixels, guideOverflow.value)
     } else {
       store.saveGuide(candidate)
     }
@@ -1484,13 +1524,15 @@ function attachDomHandlers() {
   function applyMove(alt: boolean) {
     if (!rootContainer || !store.selectedId) {
       updateSnappedGuides()
+      updateMoveCrosshair()
       return
     }
     const id = store.selectedId
     const group = isFigureGroupId(id)
-    const target = group ? groupContainers.get(id) : getTransformTarget()
+    const target = getTransformTarget()
     if (!target) {
       updateSnappedGuides()
+      updateMoveCrosshair()
       return
     }
     const originX = group ? groupStartCenterX : startX
@@ -1500,7 +1542,8 @@ function attachDomHandlers() {
     const lock = axisLock.value
     const x = originX + (pointer && lock !== 'y' ? (pointer.x - tStartMouseX) / scale : 0)
     const y = originY + (pointer && lock !== 'x' ? (pointer.y - tStartMouseY) / scale : 0)
-    const snapped = alt && isGuideMove.value && store.guides.length ? snapMovePosition(target, x, y, lock) : undefined
+    const viewport = isMoveAltActive.value ? getGuideViewport() : undefined
+    const snapped = alt && viewport && store.guides.length ? snapMovePosition(target, x, y, lock, viewport) : undefined
     target.x = snapped?.position.x ?? x
     target.y = snapped?.position.y ?? y
     updateSnappedGuides(snapped?.guides)
@@ -1508,6 +1551,7 @@ function attachDomHandlers() {
       store.updateFigureGroup(id, { x: target.x, y: target.y })
       syncDummyToTarget(target)
     }
+    updateMoveCrosshair(target, viewport)
     emitter.emit(StageEvents.TransformChange, id)
     refreshTransformHint()
   }
@@ -1521,7 +1565,7 @@ function attachDomHandlers() {
     const id = store.selectedId
     if (!id) return
     const group = isCurrentFigureGroup()
-    const target = group ? groupContainers.get(id) : getTransformTarget()
+    const target = getTransformTarget()
     if (!target) return
     const angle = (group ? groupStartRotation : startRotation) + rotationDelta
     const degrees = angle * 180 / Math.PI
@@ -1798,6 +1842,7 @@ function attachDomHandlers() {
     trackGuidePointer(e)
     if (guideMode.value !== 'none') editGuideAtPointer()
     drawGuides()
+    updateMoveCrosshair()
   }
 
   canvas.addEventListener('wheel', onWheel, { passive: false })
@@ -2007,6 +2052,7 @@ function attachDomHandlers() {
     if (altHeldInMove.value) {
       altHeldInMove.value = false
       if (!props.interactionDisabled && isGuideMove.value) applyMove(false)
+      else updateMoveCrosshair()
     }
     if (!props.interactionDisabled && transformMode.value === 'r') applyRotation(false)
   }
@@ -2152,6 +2198,7 @@ function dispose() {
     frameContainer = null
   }
   guideGraphics = null
+  moveCrosshair = null
 
   if (app) {
     if (typeof previewRuntime.cleanup === 'function') previewRuntime.cleanup()
@@ -2189,7 +2236,7 @@ function dispose() {
       <div class="transform-hint__title">正在{{ transformHint.modeName }}</div>
       <div class="transform-hint__line">鼠标移动控制{{ transformHint.modeName }}，左键确定，右键取消</div>
       <div class="transform-hint__line">按 X / Y 锁定对应轴（未锁轴会回滚到起点）</div>
-      <div v-if="isGuideMove" class="transform-hint__line">按住 Alt 显示游标并吸附（{{ GUIDE_SNAP_PX }} px）</div>
+      <div v-if="isGuideMove" class="transform-hint__line">按住 Alt 显示准星与游标并吸附（{{ GUIDE_SNAP_PX }} px）</div>
       <div v-if="transformMode === 'r'" class="transform-hint__line">按住 Alt 按 {{ rotationSnap }}° 间隔吸附旋转</div>
       <div class="transform-hint__line" v-if="transformMode !== 'r'">当前锁定轴：{{ transformHint.axis }}</div>
       <div class="transform-hint__line">当前 X={{ transformHint.x }}，Y={{ transformHint.y }}</div>

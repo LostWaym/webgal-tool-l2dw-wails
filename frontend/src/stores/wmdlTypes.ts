@@ -48,6 +48,16 @@ export interface WmdlModelItem {
   jsonAbsPath: string
   offsetX: number
   offsetY: number
+  /**
+   * 子立绘缩放。1 = 不缩放。
+   *
+   * 对应 WebGAL 分层立绘 `.jsonl` 里每个部件的 `xscale` / `yscale`
+   * （引擎侧是 `n.scale.set(scale * xScale, scale * yScale)`，锚点 0.5）。
+   * 主模型（models[0]）恒为 1；旧 `.wmdl` 没有这两个字段，读出来也是 1，
+   * 所以对旧文件渲染结果没有任何影响。
+   */
+  scaleX: number
+  scaleY: number
   /** Cached motions parsed from this model's descriptor json. */
   motions: MotionEntry[]
   /** Cached expressions parsed from this model's descriptor json. */
@@ -106,5 +116,8 @@ export interface ExternalWmdl {
     modelRelativePath: string
     offsetX?: number
     offsetY?: number
+    /** 子立绘缩放，缺省 1（旧文件没有这两个字段，读成 1 → 向后兼容） */
+    scaleX?: number
+    scaleY?: number
   }>
 }

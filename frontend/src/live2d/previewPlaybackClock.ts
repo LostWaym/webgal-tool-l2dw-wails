@@ -9,7 +9,7 @@ function getCubism2Clock(): Cubism2Clock | undefined {
   return typeof clock?.getUserTimeMSec === 'function' ? clock : undefined
 }
 
-function isCubism2(model: Live2DModel): boolean {
+export function isCubism2(model: Live2DModel): boolean {
   return typeof (model.internalModel.coreModel as any)?.setParameterValueById !== 'function'
 }
 

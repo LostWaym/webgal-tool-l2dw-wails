@@ -11,8 +11,11 @@ import type { WmdlConfig, ParamCalc } from '../../stores/wmdlTypes'
 import { useMessage } from '../../composables/useMessage'
 import { SaveScreenshot } from '../../../wailsjs/go/main/App'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
+import { isCubism2 } from '../../live2d/previewPlaybackClock'
+import { usePreviewViewportSettings } from '../../composables/usePreviewViewportSettings'
 
 const msg = useMessage()
+const viewportSettings = usePreviewViewportSettings()
 
 // pixi-live2d-display reads window.PIXI.Ticker
 ;(window as any).PIXI = PIXI
@@ -50,6 +53,13 @@ let detachDomHandlers: (() => void) | null = null
 
 // 初始视口（用于重置）
 const initialViewport = { x: 0, y: 0, scale: 1 }
+let viewportModified = false
+
+watch(viewportSettings.settings, () => {
+  if (!app || !subModels.length) return
+  updateInitialViewport()
+  if (!viewportModified) applyInitialViewport()
+}, { deep: true })
 
 onMounted(async () => {
   await init()
@@ -184,6 +194,7 @@ function attachDomHandlers() {
     if (!isDragging || !rootContainer) return
     const dx = e.clientX - dragLastX
     const dy = e.clientY - dragLastY
+    if (dx || dy) viewportModified = true
     rootContainer.x += dx
     rootContainer.y += dy
     dragLastX = e.clientX
@@ -199,6 +210,7 @@ function attachDomHandlers() {
   const onWheel = (e: WheelEvent) => {
     if (!rootContainer) return
     e.preventDefault()
+    viewportModified = true
     const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
     const next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x * factor))
     rootContainer.scale.set(next)
@@ -227,6 +239,7 @@ function attachDomHandlers() {
 async function loadWmdlModels(config: WmdlConfig | null | undefined) {
   if (!app || !rootContainer || !stageMain) return
   const token = ++loadSeq
+  viewportModified = false
 
   // 销毁旧的子模型与 wrapper
   for (const m of subModels) {
@@ -280,7 +293,7 @@ async function loadWmdlModels(config: WmdlConfig | null | undefined) {
     }
 
     writeFilterStateToContainer(wrapper, currentFilterState, currentScale)
-    fitModel()
+    fitModel(!viewportModified)
     emit('loaded')
   } catch (err) {
     console.error('Live2dPreview failed to load model group:', err)
@@ -288,37 +301,31 @@ async function loadWmdlModels(config: WmdlConfig | null | undefined) {
   }
 }
 
-/**
- * FitInside: 在 STAGE 坐标系下，模型组长边贴齐 STAGE 边界，整体不被裁剪。
- * rootContainer 自身负责把整个 STAGE 缩放到适配 host。
- */
-function fitModel() {
-  if (!wrapper || !rootContainer || !app) return
+/** 根据画布尺寸和模型版本计算重置视口。 */
+function updateInitialViewport() {
+  if (!rootContainer || !app) return
   const host = containerRef.value
-  if (!host) return
+  if (!host || host.clientHeight <= 0) return
+  const model = subModels[0]
+  const setting = model
+    ? viewportSettings.settings.value[isCubism2(model) ? 'cubism2' : 'cubism3']
+    : { x: 0, y: 0, scale: 1 }
+  initialViewport.x = app.screen.width / 2 + setting.x
+  initialViewport.y = app.screen.height / 2 + setting.y
+  initialViewport.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, computeFitScale(host.clientHeight) * setting.scale))
+}
 
-  const h = host.clientHeight
-  if (h <= 0) return
-
-  // 模型组为空时不做 fit 处理（仅保留 rootContainer 居中）
-  if (subModels.length === 0) {
-    initialViewport.x = rootContainer.x
-    initialViewport.y = rootContainer.y
-    initialViewport.scale = computeFitScale(h)
-    rootContainer.scale.set(initialViewport.scale)
-    currentScale = initialViewport.scale
-    return
-  }
-
-  // 记录初始视口（重置按钮使用）：重置到 fitModel 时计算的自适应 scale
-  initialViewport.x = rootContainer.x
-  initialViewport.y = rootContainer.y
-  initialViewport.scale = computeFitScale(h)
-  // 把当前 rootContainer 也同步到 fitScale，避免多次 resize 时累积误差
+function applyInitialViewport() {
+  if (!rootContainer) return
+  rootContainer.position.set(initialViewport.x, initialViewport.y)
   rootContainer.scale.set(initialViewport.scale)
   currentScale = initialViewport.scale
-  // 重置后再写一次滤镜，使 scale 敏感字段（blur/bevelThickness/bloomBlur）按新 scale 重新换算
   if (wrapper) writeFilterStateToContainer(wrapper, currentFilterState, currentScale)
+}
+
+function fitModel(apply = true) {
+  updateInitialViewport()
+  if (apply) applyInitialViewport()
 }
 
 /** 把 FilterState 按当前 rootContainer 缩放写入 wrapper。 */
@@ -340,9 +347,9 @@ function resetFilter() {
 /** 重置视口到 fitModel 时记录的初始位置和缩放 */
 function resetViewport() {
   if (!rootContainer) return
-  rootContainer.x = initialViewport.x
-  rootContainer.y = initialViewport.y
-  rootContainer.scale.set(initialViewport.scale)
+  viewportModified = false
+  updateInitialViewport()
+  applyInitialViewport()
 }
 
 /** 把 Blob 写入系统剪贴板。失败时通过气泡提示原因。 */

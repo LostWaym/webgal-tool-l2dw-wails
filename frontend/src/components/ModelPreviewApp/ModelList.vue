@@ -111,9 +111,9 @@ function onDragEnd() {
     <header class="model-list__header">
       <button class="add-btn" @click="onAdd">加载模型</button>
       <button class="add-btn" @click="onAddImage">加载图片</button>
+      <button class="add-btn" @click="onAddFigureGroup">新建立绘组</button>
     </header>
     <header class="model-list__header model-list__header--secondary">
-      <button class="add-btn add-btn--secondary" @click="onAddFigureGroup">新建立绘组</button>
       <button class="add-btn add-btn--secondary" @click="emit('project')">项目</button>
       <button class="add-btn add-btn--secondary" @click="emit('settings')">设置</button>
     </header>
@@ -289,6 +289,10 @@ function onDragEnd() {
 
 .add-btn:active {
   background: #22344c;
+}
+
+.model-list__header:not(.model-list__header--secondary) .add-btn {
+  font-size: 12px;
 }
 
 .add-btn:focus-visible {

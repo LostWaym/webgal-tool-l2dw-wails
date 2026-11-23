@@ -29,6 +29,7 @@
 - **操作区 / 页签 / 页签内容**：`frontend/src/components/ModelPreviewApp/ModelActionPanel.vue`；页签位于操作区上方，选中后显示对应内容。
 - **专注模式 / 动作表情快速预览**：入口在 `frontend/src/App.vue`，界面在 `frontend/src/components/ModelPreviewApp/FocusMode.vue`；动作表情列表数据和目录规则共用 `frontend/src/utils/motionExpressionList.ts`。
 - **预览设置 / 帧率限制 / 动作表情文件夹**：设置界面在 `frontend/src/components/ModelPreviewApp/Modal/PreviewSettingsModal.vue`，帧率与文件夹设置分别由 `frontend/src/composables/usePreviewFrameRateLimit.ts`、`frontend/src/composables/useMotionExpressionFolders.ts` 共享并通过 `app.go` 持久化。
+- **预览视口初始设置**：`frontend/src/composables/usePreviewViewportSettings.ts` 按 Cubism 版本共享并通过 `app.go` 持久化，供 `frontend/src/components/common/Live2dPreview.vue` 使用。
 - **GRS**：预览舞台对立绘等对象的快捷键变换操作，入口为 `frontend/src/components/ModelPreviewApp/Stage.vue`。
 - **立绘组 / 立绘组快捷键复制**：数据归预览 store 管理；复制分发入口为 `frontend/src/composables/useShortcuts.ts` 的 `runShortcutForFigureGroup`。
 - **背景 / 历史背景**：背景入口在立绘列表；历史界面与状态控制分别为 `frontend/src/components/ModelPreviewApp/Modal/BackgroundHistoryModal.vue`、`frontend/src/composables/useBackgroundHistoryModal.ts`，历史数据归预览 store。

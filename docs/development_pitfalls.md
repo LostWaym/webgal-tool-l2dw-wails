@@ -12,7 +12,7 @@
 
 ## Wails 与构建
 
-- **Wails 生成的 TypeScript 模型可能触发 `TS1011`**：前端 `postinstall`、`predev`、`prebuild` 会调用 `frontend/scripts/patch-wails-models.mjs` 修补生成物；生成绑定后使用项目脚本，不要手改 `frontend/wailsjs/`。
+- **Wails 生成的 TypeScript 模型可能触发 `TS1011` 或 Vite `Unexpected "]"`**：前端 `postinstall`、`predev`、`prebuild` 会调用 `frontend/scripts/patch-wails-models.mjs` 修补生成物；开发期间绑定可能再次生成，业务代码避免运行时导入 `wailsjs/go/models`。生成绑定后使用项目脚本，不要手改 `frontend/wailsjs/`。
 
 ## Live2D 与资源
 

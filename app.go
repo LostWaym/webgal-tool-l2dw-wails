@@ -36,6 +36,18 @@ type AppConfig struct {
 	MotionExpressionFolders   *MotionExpressionFolderSettings `json:"motionExpressionFolders,omitempty"`
 	PreviewFrameRateLimit     *int                            `json:"previewFrameRateLimit,omitempty"`
 	PreviewFocusBoxOffsetY    *float64                        `json:"previewFocusBoxOffsetY,omitempty"`
+	PreviewViewport           *PreviewViewportSettings        `json:"previewViewport,omitempty"`
+}
+
+type PreviewViewportTransform struct {
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Scale float64 `json:"scale"`
+}
+
+type PreviewViewportSettings struct {
+	Cubism2 PreviewViewportTransform `json:"cubism2"`
+	Cubism3 PreviewViewportTransform `json:"cubism3"`
 }
 
 type MotionExpressionFolderSettings struct {
@@ -170,6 +182,26 @@ func (a *App) GetPreviewFocusBoxOffsetY() *float64 {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.loadConfig().PreviewFocusBoxOffsetY
+}
+
+func (a *App) GetPreviewViewportSettings() *PreviewViewportSettings {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewViewport
+}
+
+func (a *App) SetPreviewViewportSettings(settings PreviewViewportSettings) error {
+	for _, value := range []PreviewViewportTransform{settings.Cubism2, settings.Cubism3} {
+		if math.IsNaN(value.X) || math.IsInf(value.X, 0) || math.IsNaN(value.Y) || math.IsInf(value.Y, 0) ||
+			math.IsNaN(value.Scale) || math.IsInf(value.Scale, 0) || value.Scale <= 0 {
+			return fmt.Errorf("invalid preview viewport settings")
+		}
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewViewport = &settings
+	return a.saveConfig(cfg)
 }
 
 func (a *App) SetPreviewFocusBoxOffsetY(offset float64) error {

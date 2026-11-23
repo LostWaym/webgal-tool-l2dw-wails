@@ -1553,10 +1553,19 @@ function attachDomHandlers() {
 
   // 滚轮缩放 Root（乘法因子：scale 大小时手感一致）
   const onWheel = (e: WheelEvent) => {
-    if (!rootContainer) return
+    if (!rootContainer || !app) return
     e.preventDefault()
     const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
-    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rootContainer.scale.x * factor))
+    const oldScale = rootContainer.scale.x
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * factor))
+    const rect = canvas.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) {
+      const x = (e.clientX - rect.left) * app.screen.width / rect.width
+      const y = (e.clientY - rect.top) * app.screen.height / rect.height
+      const ratio = newScale / oldScale
+      rootContainer.x = x - (x - rootContainer.x) * ratio
+      rootContainer.y = y - (y - rootContainer.y) * ratio
+    }
     rootContainer.scale.set(newScale)
     store.applyRootScaleToAllContainers(newScale)
   }

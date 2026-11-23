@@ -6,17 +6,27 @@ import { useMessage } from '../../../composables/useMessage'
 import { useMotionExpressionFolders } from '../../../composables/useMotionExpressionFolders'
 import { PREVIEW_FRAME_RATE_LIMITS, usePreviewFrameRateLimit } from '../../../composables/usePreviewFrameRateLimit'
 import { usePreviewFocusBoxOffset } from '../../../composables/usePreviewFocusBoxOffset'
+import { usePreviewViewportSettings } from '../../../composables/usePreviewViewportSettings'
+import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../composables/usePreviewViewportSettings'
 import NumberInput from '../../common/NumberInput.vue'
 
 const props = defineProps<{ visible: boolean; initialTab?: 'motionExpression' }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
-const activeTab = ref<'misc' | 'motionExpression'>('misc')
+const activeTab = ref<'misc' | 'motionExpression' | 'viewport'>('misc')
 watch(() => props.visible, (visible) => {
   if (visible && props.initialTab) activeTab.value = props.initialTab
 })
 const folders = useMotionExpressionFolders()
 const { frameRateLimit, update: updateFrameRateLimit } = usePreviewFrameRateLimit()
 const { offsetY: focusBoxOffsetY, update: updateFocusBoxOffsetY } = usePreviewFocusBoxOffset()
+const viewport = usePreviewViewportSettings()
+const viewportVersions: Array<{ key: PreviewViewportVersion; label: string }> = [
+  { key: 'cubism2', label: 'Cubism 2' },
+  { key: 'cubism3', label: 'Cubism 3+' },
+]
+function updateViewport(version: PreviewViewportVersion, field: keyof PreviewViewportTransform, value: number) {
+  viewport.update(version, { ...viewport.settings.value[version], [field]: value })
+}
 const legacyMode = ref(config.legacyExpressionBlendMode)
 let changed = false
 let save = Promise.resolve()
@@ -66,6 +76,7 @@ function onSeparatorInput(event: Event) {
           <nav class="settings-tabs" aria-label="设置分类">
             <button type="button" :class="{ active: activeTab === 'misc' }" :aria-current="activeTab === 'misc' ? 'page' : undefined" @click="activeTab = 'misc'">杂项</button>
             <button type="button" :class="{ active: activeTab === 'motionExpression' }" :aria-current="activeTab === 'motionExpression' ? 'page' : undefined" @click="activeTab = 'motionExpression'">动作/表情</button>
+            <button type="button" :class="{ active: activeTab === 'viewport' }" :aria-current="activeTab === 'viewport' ? 'page' : undefined" @click="activeTab = 'viewport'">预览视口</button>
           </nav>
           <div class="settings-content">
             <template v-if="activeTab === 'misc'">
@@ -80,12 +91,25 @@ function onSeparatorInput(event: Event) {
               <NumberInput :model-value="focusBoxOffsetY" :step="1" @update:model-value="updateFocusBoxOffsetY" />
               <p>按 L 调整注视时使用，单位为模型变换空间坐标；正值向下，负值向上。修改后自动保存。</p>
             </template>
-            <template v-else>
+            <template v-else-if="activeTab === 'motionExpression'">
               <label><input type="checkbox" :checked="folders.settings.enabled" @change="onFoldersEnabledChange"> 启用文件夹划分</label>
               <p>按动作和表情名称模拟文件夹，不修改模型数据。</p>
               <label class="separator-label" for="folder-separator">文件夹分隔符</label>
               <input id="folder-separator" class="separator-input" type="text" :value="folders.settings.separator" @input="onSeparatorInput">
               <p>留空时不划分文件夹；分隔符按完整文本匹配。</p>
+            </template>
+            <template v-else>
+              <p>在自适应视口基础上调整，修改后自动保存。偏移单位为画布逻辑像素，正值向右或向下；缩放 1 为原始适配大小。已手动调整的视口可通过重置按钮应用新设置。</p>
+              <section v-for="version in viewportVersions" :key="version.key" class="viewport-section">
+                <h3>{{ version.label }}</h3>
+                <div class="viewport-fields">
+                  <label>X 偏移 <NumberInput :model-value="viewport.settings.value[version.key].x" @update:model-value="updateViewport(version.key, 'x', $event)" /></label>
+                  <label>Y 偏移 <NumberInput :model-value="viewport.settings.value[version.key].y" @update:model-value="updateViewport(version.key, 'y', $event)" /></label>
+                  <label>缩放倍率 <NumberInput :model-value="viewport.settings.value[version.key].scale" :min="0.01" :step="0.01" @update:model-value="updateViewport(version.key, 'scale', $event)" /></label>
+                </div>
+                <button type="button" @click="viewport.reset(version.key)">恢复默认</button>
+              </section>
+              <p>适用于所有使用 Live2dPreview 的界面；混合版本模型组按第一个子模型的版本选择设置。</p>
             </template>
           </div>
         </div>
@@ -107,6 +131,10 @@ h2 { flex: 1; margin: 0; font-size: 16px; }
 .settings-tabs button.active { background: #303b4d; color: #a9c8ed; }
 .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 18px; }
 .separator-label, .frame-rate-label, .focus-offset-label { margin-top: 20px; }
+.viewport-section { margin-top: 24px; }
+.viewport-section h3 { margin: 0 0 12px; font-size: 15px; }
+.viewport-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.viewport-fields label { flex: 1; min-width: 160px; }
 .separator-input, .frame-rate-select { box-sizing: border-box; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #495464; border-radius: 5px; color: inherit; background: #171a20; }
 label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 p { margin: 10px 0 0; color: #aeb7c5; font-size: 13px; line-height: 1.6; }

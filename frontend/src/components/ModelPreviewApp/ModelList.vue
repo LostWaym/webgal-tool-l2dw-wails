@@ -128,6 +128,18 @@ function onDragEnd() {
       >
         <span class="model-row__name">{{ getSpecialName(id) }}</span>
         <button
+          v-if="id === SpecialId.Camera"
+          type="button"
+          class="model-row__visibility"
+          :aria-label="store.cameraFrameVisible ? '关闭镜头框常驻显示' : '开启镜头框常驻显示'"
+          :title="store.cameraFrameVisible ? '关闭镜头框常驻显示' : '开启镜头框常驻显示'"
+          :aria-pressed="store.cameraFrameVisible"
+          @click.stop="store.cameraFrameVisible = !store.cameraFrameVisible"
+        >
+          <img :src="store.cameraFrameVisible ? eyeIcon : eyeOffIcon" :alt="store.cameraFrameVisible ? '睁眼' : '闭眼'" />
+        </button>
+        <button
+          v-if="id !== SpecialId.Camera"
           class="model-row__bg-load model-row__filter"
           :aria-label="`为${getSpecialName(id)}选择滤镜`"
           title="选择滤镜"

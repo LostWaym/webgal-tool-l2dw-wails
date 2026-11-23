@@ -389,7 +389,7 @@ const handler = {
     return inst
   },
 
-  cameraTransform: (): Inst | null => {
+  cameraTransform: (shouldShowToast: boolean = true): Inst | null => {
     const store = useModelStore()
     const camera = previewRuntime.specialContainers.get(SpecialId.Camera)
     const stage = previewRuntime.specialContainers.get(SpecialId.StageMain)
@@ -411,7 +411,7 @@ const handler = {
       pickNonDefaultFilters(store.getFilterState(SpecialId.StageMain)),
     )
     const inst = parseInst(store.stageTransformTemplate.replace('%me%', JSON.stringify(data)))
-    useMessage().success('复制镜头对应的主场景变换指令成功!!')
+    if (shouldShowToast) useMessage().success('复制镜头对应的主场景变换指令成功!!')
     return inst
   },
 }
@@ -599,9 +599,10 @@ function runShortcutForFigureGroup(key: string): void {
     const stageEntry = SHORTCUTS.find(
       (s) => s.key === key && s.targets.includes('stage'),
     )
-    const stageInst = stageEntry
-      ? stageEntry.run()
-      : handler.stageTransform(false)
+    const stageInst = group.applyCameraToStageCopy
+      ? handler.cameraTransform(false)
+      : stageEntry ? stageEntry.run() : handler.stageTransform(false)
+    if (group.applyCameraToStageCopy && !stageInst) return
     if (stageInst) lines.push(...resultToLines(stageInst))
   }
 

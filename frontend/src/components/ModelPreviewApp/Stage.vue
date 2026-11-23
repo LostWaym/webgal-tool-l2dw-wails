@@ -7,7 +7,7 @@ import { useModelStore } from '../../stores/previewStore'
 import type { FigureGroupEntry, FocusState } from '../../stores/previewStore'
 import { toFileUrl } from '../../path_utils'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
-import { SpecialId } from '../../live2d/specialIds'
+import { SpecialId, MIN_CAMERA_SCALE } from '../../live2d/specialIds'
 import { OpenEditor, OpenActorEditor, OpenMotionEditor, GetNextArgMode, SetNextArgMode } from '../../../wailsjs/go/main/App'
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
 import { STAGE_WIDTH, STAGE_HEIGHT, FOCUS_BOX_SIZE } from '../../utils/consts'
@@ -816,7 +816,9 @@ async function init() {
   cameraFrame.lineTo(0, -STAGE_HEIGHT / 2 - 100)
   cameraFrame.drawCircle(0, -STAGE_HEIGHT / 2 - 130, 30)
   camera.addChild(cameraFrame)
-  camera.visible = store.selectedId === SpecialId.Camera
+  const cameraSelected = store.selectedId === SpecialId.Camera
+  camera.visible = cameraSelected || store.cameraFrameVisible
+  camera.alpha = cameraSelected ? 1 : 0.5
   rootContainer.addChild(camera)
   previewRuntime.specialContainers.set(SpecialId.Camera, camera)
 
@@ -1030,11 +1032,21 @@ watch(
 
 watch(
   () => store.selectedId,
-  (id) => {
+  () => {
     setCursor('default')
     updateFigureGroupCrosshair()
+  },
+  { immediate: true },
+)
+
+watch(
+  [() => store.selectedId, () => store.cameraFrameVisible],
+  ([id, pinned]) => {
     const camera = previewRuntime.specialContainers.get(SpecialId.Camera)
-    if (camera) camera.visible = id === SpecialId.Camera
+    if (!camera) return
+    const selected = id === SpecialId.Camera
+    camera.visible = selected || pinned
+    camera.alpha = selected ? 1 : 0.5
   },
   { immediate: true },
 )
@@ -1419,7 +1431,7 @@ function attachDomHandlers() {
           const dist = Math.sqrt(dx * dx + dy * dy)
           const factor = dist > 0 && startDist > 0 ? dist / startDist : 1
           if (store.selectedId === SpecialId.Camera) {
-            target.scale.set(Math.max(0.01, startScaleX * factor))
+            target.scale.set(Math.max(MIN_CAMERA_SCALE, startScaleX * factor))
           } else if (axisLock.value === 'x') {
             target.scale.x = startScaleX * factor
           } else if (axisLock.value === 'y') {

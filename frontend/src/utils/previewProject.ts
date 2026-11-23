@@ -77,6 +77,7 @@ function validate(raw: any): asserts raw is PreviewProject {
   }
   for (const g of raw.figureGroups) {
     if (!record(g) || typeof g.id !== 'string' || !g.id.startsWith('group:') || ids.has(g.id) || typeof g.name !== 'string' || !Number.isFinite(g.x) || !Number.isFinite(g.y) || !Array.isArray(g.targetIds) || !Array.isArray(g.targetGroupIds) || [...g.targetIds, ...g.targetGroupIds].some((id: any) => typeof id !== 'string') || [g.includeBackground, g.includeAllFigures, g.includeStageMainCmdCopy, g.editAnchorOnly].some(v => typeof v !== 'boolean')) throw new Error('项目立绘组数据无效')
+    if (g.applyCameraToStageCopy !== undefined && typeof g.applyCameraToStageCopy !== 'boolean') throw new Error('项目立绘组数据无效')
     ids.add(g.id)
   }
   if (raw.snapshots.some((s: any) => !record(s) || typeof s.id !== 'string' || typeof s.name !== 'string' || !transform(s))) throw new Error('项目快照数据无效')
@@ -144,8 +145,10 @@ export async function applyPreviewProject(store: Store, project: PreviewProject,
     }
     models.push({ id: saved.id, name: saved.name, kind: saved.kind, jsonPath: config?.models[0]?.jsonAbsPath || '', imageUrl: saved.kind === 'image' ? source : undefined, visible: saved.visible, playing: copy(saved.playing), state: copy(saved.state), wmdlModels: config?.models || [], wmdlConfig: config, isMoc3: config?.models[0]?.isMoc3 || false, ignoreFigureGroupSelect: saved.ignoreFigureGroupSelect })
   }
+  const cameraFrameVisible = store.cameraFrameVisible
   store.$reset()
-  store.$patch({ models, figureGroups: copy(project.figureGroups), backgroundUrl: project.background.path ? absolute(base, project.background.path) : null, bgState: copy(project.background.state), bgFilterState: copy(project.background.filter), bgTemplate: project.background.template, bgTransformTemplate: project.background.transformTemplate, stageState: copy(project.stage.state), stageFilterState: copy(project.stage.filter), stageTransformTemplate: project.stage.transformTemplate, transformSnapshots: copy(project.snapshots), imageFigureTemplate: project.imageTemplates.figure, imageTransformTemplate: project.imageTemplates.transform, figureFilterStates: copy(project.filters), figureFocusStates: copy(project.focus), figureBlinkStates: copy(project.blink) })
+  store.cameraFrameVisible = cameraFrameVisible
+  store.$patch({ models, figureGroups: copy(project.figureGroups).map(g => ({ ...g, applyCameraToStageCopy: g.applyCameraToStageCopy ?? false })), backgroundUrl: project.background.path ? absolute(base, project.background.path) : null, bgState: copy(project.background.state), bgFilterState: copy(project.background.filter), bgTemplate: project.background.template, bgTransformTemplate: project.background.transformTemplate, stageState: copy(project.stage.state), stageFilterState: copy(project.stage.filter), stageTransformTemplate: project.stage.transformTemplate, transformSnapshots: copy(project.snapshots), imageFigureTemplate: project.imageTemplates.figure, imageTransformTemplate: project.imageTemplates.transform, figureFilterStates: copy(project.filters), figureFocusStates: copy(project.focus), figureBlinkStates: copy(project.blink) })
   store.cameraState = copy(project.camera ?? DEFAULT_TRANSFORM_STATE)
   const camera = previewRuntime.specialContainers.get(SpecialId.Camera)
   if (camera) {

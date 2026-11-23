@@ -15,7 +15,7 @@ import {
   DEFAULT_IMAGE_FIGURE_TEMPLATE,
   DEFAULT_IMAGE_TRANSFORM_TEMPLATE,
 } from '../utils/consts'
-import { SpecialId, isSpecialId, isFigureGroupId, makeFigureGroupId } from '../live2d/specialIds'
+import { SpecialId, MIN_CAMERA_SCALE, isSpecialId, isFigureGroupId, makeFigureGroupId } from '../live2d/specialIds'
 import type { WmdlModelItem, WmdlConfig } from './wmdlTypes'
 import { previewRuntime } from '../utils/runtimeRegistry'
 import { DEFAULT_FILTER_PROPERTY_VALUES, FILTER_PROPERTY_KEYS, writeFilterStateToContainer } from '../live2d/L2dwContainer'
@@ -193,6 +193,8 @@ export interface FigureGroupEntry {
   includeAllFigures: boolean
   /** 是否在复制指令时附加主场景的指令内容 */
   includeStageMainCmdCopy: boolean
+  /** 复制主场景指令时应用镜头变换 */
+  applyCameraToStageCopy: boolean
   /** 是否仅编辑锚点（X/Y 与 G 拖拽只改锚点本身，不动目标与背景） */
   editAnchorOnly: boolean
 }
@@ -216,6 +218,7 @@ export const useModelStore = defineStore('models', {
     /** 主场景容器（StageMain）的变换状态 */
     stageState: { ...DEFAULT_TRANSFORM_STATE } as TransformState,
     cameraState: { ...DEFAULT_TRANSFORM_STATE, scale: { ...DEFAULT_TRANSFORM_STATE.scale } } as TransformState,
+    cameraFrameVisible: false,
     /** 变换快照列表 */
     transformSnapshots: [] as TransformSnapshot[],
     /** 模态打开时缓存的原始变换（关闭时用于恢复） */
@@ -587,16 +590,7 @@ export const useModelStore = defineStore('models', {
     applyTransformSnapshot(id: string): boolean {
       const snap = this.transformSnapshots.find((s) => s.id === id)
       if (!snap || !this.selectedId) return false
-      const current = this.getTransformState(this.selectedId)
-      const newState: TransformState = {
-        ...current,
-        x: snap.x,
-        y: snap.y,
-        scale: { x: snap.scale.x, y: snap.scale.y },
-        rotation: snap.rotation,
-      }
-      this.setTransformState(this.selectedId, newState)
-      syncTransformToPixi(this.selectedId, newState)
+      this.applyTransformSnapshotRaw(snap)
       return true
     },
 
@@ -604,11 +598,14 @@ export const useModelStore = defineStore('models', {
     applyTransformSnapshotRaw(snap: TransformSnapshot): void {
       if (!this.selectedId) return
       const current = this.getTransformState(this.selectedId)
+      const cameraScale = Number.isFinite(snap.scale.x) ? Math.max(MIN_CAMERA_SCALE, snap.scale.x) : 1
       const newState: TransformState = {
         ...current,
         x: snap.x,
         y: snap.y,
-        scale: { x: snap.scale.x, y: snap.scale.y },
+        scale: this.selectedId === SpecialId.Camera
+          ? { x: cameraScale, y: cameraScale }
+          : { x: snap.scale.x, y: snap.scale.y },
         rotation: snap.rotation,
       }
       this.setTransformState(this.selectedId, newState)
@@ -696,7 +693,7 @@ export const useModelStore = defineStore('models', {
      * patch 为部分字段，merge 到现有 state 上。
      */
     setFilterState(id: string | null, patch: Partial<FilterState>): void {
-      if (id == null) return
+      if (id == null || id === SpecialId.Camera) return
 
       let target: FilterState
       if (id === SpecialId.StageMain) {
@@ -717,7 +714,7 @@ export const useModelStore = defineStore('models', {
 
     /** 把指定 id 的 FilterState 重置回 DEFAULT_FILTER_STATE，并写回容器 */
     resetFilterState(id: string | null): void {
-      if (id == null) return
+      if (id == null || id === SpecialId.Camera) return
       const fresh = { ...DEFAULT_FILTER_STATE }
       if (id === SpecialId.StageMain) {
         this.stageFilterState = fresh
@@ -736,6 +733,7 @@ export const useModelStore = defineStore('models', {
     applyRootScaleToAllContainers(scale: number): void {
       this.rootContainerScale = scale
       for (const [id, c] of previewRuntime.specialContainers) {
+        if (id === SpecialId.Camera) continue
         const state = this.getFilterState(id)
         writeFilterStateToContainer(c as L2dwContainer, state, scale)
       }
@@ -812,6 +810,7 @@ export const useModelStore = defineStore('models', {
         includeBackground: false,
         includeAllFigures: false,
         includeStageMainCmdCopy: false,
+        applyCameraToStageCopy: false,
         editAnchorOnly: false,
       }
       this.figureGroups.push(group)

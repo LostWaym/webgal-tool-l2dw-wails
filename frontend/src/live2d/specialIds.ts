@@ -12,6 +12,8 @@ export const SpecialId = {
 
 export type SpecialIdValue = typeof SpecialId[keyof typeof SpecialId]
 
+export const MIN_CAMERA_SCALE = 0.01
+
 export const SPECIAL_IDS: readonly SpecialIdValue[] = [
   SpecialId.StageMain,
   SpecialId.BgContainer,

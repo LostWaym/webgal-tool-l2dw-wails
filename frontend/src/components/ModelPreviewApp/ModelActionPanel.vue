@@ -16,7 +16,7 @@ import {
   type FilterGroupSpec,
 } from '../../utils/consts'
 import { L2dwContainer } from '../../live2d/L2dwContainer'
-import { isSpecialId, getSpecialName, SpecialId, isFigureGroupId } from '../../live2d/specialIds'
+import { isSpecialId, getSpecialName, SpecialId, MIN_CAMERA_SCALE, isFigureGroupId } from '../../live2d/specialIds'
 import { filterBySearch } from '../../utils/searchUtils'
 import emitter, { StageEvents } from '../../stores/emitter'
 import { usePreviewModelReload } from '../../composables/usePreviewModelReload'
@@ -595,7 +595,7 @@ function onFigureGroupCenterChange(axis: 'x' | 'y', value: number) {
   store.applyFigureGroupAnchor(cur.id, axis, value)
 }
 
-function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures' | 'includeStageMainCmdCopy' | 'editAnchorOnly', checked: boolean) {
+function onFigureGroupFlagChange(key: 'includeBackground' | 'includeAllFigures' | 'includeStageMainCmdCopy' | 'applyCameraToStageCopy' | 'editAnchorOnly', checked: boolean) {
   const cur = store.selectedFigureGroup
   if (!cur) return
   store.updateFigureGroup(cur.id, { [key]: checked })
@@ -874,7 +874,7 @@ function onLabelDragMove(e: MouseEvent) {
     container.y = newVal
     newState.y = newVal
   } else if (_dragAxis === 'scaleX') {
-    const value = store.selectedId === SpecialId.Camera ? Math.max(0.01, newVal) : newVal
+    const value = store.selectedId === SpecialId.Camera ? Math.max(MIN_CAMERA_SCALE, newVal) : newVal
     container.scale.x = value
     newState.scale.x = value
     if (store.selectedId === SpecialId.Camera) {
@@ -1109,7 +1109,7 @@ function onLabelDragEnd() {
                 <NumberInput
                   :model-value="transformState.scale.x"
                   :step="0.01"
-                  :min="0.01"
+                  :min="store.selectedId === SpecialId.Camera ? MIN_CAMERA_SCALE : 0.01"
                   :max="10"
                   :precision="3"
                   @update:model-value="(v: number) => { transformState.scale.x = v; if (store.selectedId === SpecialId.Camera) transformState.scale.y = v; onTransformInput() }"
@@ -1577,6 +1577,16 @@ function onLabelDragEnd() {
             :checked="store.selectedFigureGroup.includeStageMainCmdCopy"
             @mousedown.prevent
             @change="onFigureGroupFlagChange('includeStageMainCmdCopy', ($event.target as HTMLInputElement).checked)"
+          />
+        </div>
+        <div v-if="store.selectedFigureGroup.includeStageMainCmdCopy" class="info-row">
+          <label class="info-label">主场景应用镜头变换</label>
+          <input
+            tabindex="-1"
+            type="checkbox"
+            :checked="store.selectedFigureGroup.applyCameraToStageCopy"
+            @mousedown.prevent
+            @change="onFigureGroupFlagChange('applyCameraToStageCopy', ($event.target as HTMLInputElement).checked)"
           />
         </div>
         <div class="info-row">

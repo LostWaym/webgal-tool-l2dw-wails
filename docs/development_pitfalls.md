@@ -17,6 +17,7 @@
 ## Live2D 与资源
 
 - **Cubism 2 动作时钟是全局入口**：运行时的动作队列读取 `UtSystem.getUserTimeMSec()`，仅缩放模型更新时间不能改变动作播放速度。独立预览变速应通过 `frontend/src/live2d/previewPlaybackClock.ts` 在同步队列调用期间临时提供模型时钟，并保证立即恢复，避免影响其他模型。
+- **直接写入的 Live2D 参数可能在变形前被覆盖**：Cubism 2 / 4 的自动眨眼、呼吸和物理在参数更新后运行。预览固定姿势时，可在实例的 `afterMotionUpdate` 写入供物理读取，并于 `beforeModelUpdate` 恢复需要固定的参数；共用预览入口为 `Live2dPreview.vue` 的 `fixedPose`。
 
 - **Pixi 高 DPI 下 `renderer.width/height` 不是场景逻辑尺寸**：它们包含 `resolution` 倍率；居中与 resize 位置换算使用 `app.screen.width/height`，否则非 100% 缩放下会偏移。共用入口为 `frontend/src/live2d/viewport.ts`，变更 DPR 时也同步 Pixi 6 的 `InteractionManager.resolution`；截图导出读取实际像素时仍应保留 `renderer.width/height`。
 - **本地模型资源不是普通前端静态资源**：绝对路径资源通过 `frontend/src/path_utils.ts` 的 `toFileUrl` 和后端 `/abs_files/` 路由访问；不要把磁盘路径直接当作普通网页静态路径。

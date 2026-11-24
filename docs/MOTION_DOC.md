@@ -58,7 +58,7 @@
 - 车道空白处拖动框选帧点，Ctrl + 单击切换选中、Ctrl + 框选增选；选区可跨普通轨道和组合器，筛选隐藏的帧仍保留选中。
 - 拖动已选帧可整体平移，采样曲线和播放头处的模型参数同步预览，限制在动画时长内；目标与未选帧冲突时停留在最近一次有效位置。Esc 或窗口失焦取消拖动。
 - Ctrl+C / Ctrl+X 复制或剪切选中帧，Ctrl+V 将最早帧对齐播放头并粘回原轨道；目标冲突、越界或轨道不存在时整批拒绝。剪贴板仅限当前编辑器会话，加载新动画会清空。
-- 主 header「立绘动作」读取第一个模型的动作列表（每组第一项），仅支持 Cubism 2 的 MTN；按文件采样逐帧导入，替换前确认，失败不替换时间轴。「工具 → 反烘焙」按普通轨道的增减方向保留端点、转折点及平台两端，是有损简化，执行前确认；组合器轨道不变。
+- 主 header「立绘动作」读取第一个模型的动作列表（每组第一项），支持 MTN 和 motion3 的参数轨道；按文件采样逐帧导入，替换前确认，失败不替换时间轴。「工具 → 反烘焙」独立于来源格式，按普通轨道的增减方向保留端点、转折点及平台两端，是有损简化，执行前确认；组合器轨道不变。
 - 组合器成员参数从普通参数列表中排除；组合器行受搜索栏过滤（匹配 def 显示名）
 - 组合器行头 dropdown 弹层 Teleport 到 body（fixed 定位）：底部行向上翻转 + 视口内夹紧；菜单内滚轮/拖滚动条不关闭，外部滚动/resize 关闭
 - 删组合器帧 / 拖帧点（非播放态）→ 预览即时重采样（关键帧变动 watch 同时覆盖 tracks 与 composers）
@@ -99,7 +99,7 @@
 | `frontend/src/components/MotionEditorApp/FrameSettingsModal.vue` | 帧率/时长模态 |
 | `frontend/src/components/MotionEditorApp/MotionExportModal.vue` | 导出模态（格式卡片 + fade 输入 + 保存对话框 + WriteTextFile） |
 | `frontend/src/utils/motionExport.ts` | 导出格式构建：`buildMtn` / `buildMotion3Json`（纯函数，规格见 `MOTION_FORMAT.md`） |
-| `frontend/src/utils/motionImport.ts` | MTN 逐帧导入与参数轨道反烘焙 |
+| `frontend/src/utils/motionImport.ts` | MTN / motion3 参数采样、逐帧导入和参数轨道反烘焙 |
 | `frontend/src/composables/useMotionExportModal.ts` | 导出模态 reactive 单例状态（visible / format） |
 | `frontend/src/components/ModelEditApp/ResizeHandle.vue` | 通用拖拽分隔条（本编辑器两处复用） |
 | `frontend/src/components/ModelEditApp/EditRangeCard.vue` | 通用参数滑条卡片（行头复用） |

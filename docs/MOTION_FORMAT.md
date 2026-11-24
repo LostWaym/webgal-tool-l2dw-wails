@@ -1,6 +1,6 @@
 # Live2D 动作文件格式参考（.mtn / motion3.json）
 
-本文档记录 Cubism 2 `.mtn` 与 Cubism 3+ `.motion3.json` 的结构参考，以及本项目 lanim 的导出映射和未来导入设想。用于动作格式、导入 / 导出开发参考。
+本文档记录 Cubism 2 `.mtn` 与 Cubism 3+ `.motion3.json` 的结构参考，以及本项目 lanim 的导入 / 导出映射。
 
 ## 维护规范
 
@@ -14,7 +14,7 @@
 - `.motion3.json`：`extres/game2/figure/on/mutsumi/adv_live2d_mutsumi_007_casual_spring_01/.mtn_exp/motions/mutsumi/mtn_idle01_C.motion3.json`
 
 导出实现：`frontend/src/utils/motionExport.ts`
-MTN 导入实现：`frontend/src/utils/motionImport.ts`，按采样逐帧建立 lanim 参数轨道；反烘焙由用户单独执行，不保留 fade 元数据。
+采样 / 导入实现：`frontend/src/utils/motionImport.ts`
 
 ---
 
@@ -133,9 +133,14 @@ PARAM_EYE_R_SMILE=0               ← 常量参数：只有一个值（整条动
 
 ---
 
-## 三、lanim 与两种格式的映射（本项目导出规则）
+## 三、lanim 与两种格式的映射
 
 lanim（`.lanim.json`）为帧制：`fps` / `durationFrames` / `tracks`（每 track = `paramId` + 按 frame 升序的 keys）。插值方式和采样函数 `sampleTrack` 以 `frontend/src/stores/motionEditor.ts` 为准。
+
+### .mtn / motion3.json → lanim
+
+- MTN 保留源帧及各参数行长度；motion3 按 `Meta.Fps` 采样 `Parameter` 曲线，末帧采样 `Meta.Duration`。非参数曲线跳过并提示。
+- 单帧表情预览直接使用源动作的采样值。导入只保留整数帧的参数值，不保留原曲线控制点、帧间阶跃、淡入淡出及循环元数据，也不自动反烘焙。
 
 ### lanim → .mtn
 

@@ -24,6 +24,7 @@ const props = defineProps<{
   /** wmdl 模型组配置（含子模型列表）。为空时不渲染任何模型。 */
   wmdlConfig?: WmdlConfig | null
   playbackRate?: number
+  fixedPose?: ReadonlyArray<{ id: string; val: number }>
 }>()
 const emit = defineEmits<{ (e: 'loaded'): void; (e: 'load-error'): void }>()
 
@@ -278,6 +279,16 @@ async function loadWmdlModels(config: WmdlConfig | null | undefined) {
       if (token !== loadSeq) {
         model.destroy()
         return
+      }
+
+      if (props.fixedPose !== undefined) {
+        const internal = model.internalModel
+        const applyPose = () => {
+          for (const { id, val } of props.fixedPose ?? []) writeParamByCalc(internal.coreModel, id, val, 'set')
+        }
+        // 先让物理读取采样参数，再在变形前覆盖自动眨眼、呼吸等对姿势的改动。
+        internal.on('afterMotionUpdate', applyPose)
+        internal.on('beforeModelUpdate', applyPose)
       }
 
       const scaleX = STAGE_WIDTH / model.width

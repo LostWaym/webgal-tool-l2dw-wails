@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ReadTextFile } from '../../../wailsjs/go/main/App'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { parseMotions, type MotionEntry } from '../../live2d/coreAdapter'
-import { pathCombine, pathDirname } from '../../path_utils'
-import type { LanimFile } from '../../stores/motionEditor'
 import type { WmdlConfig, WmdlModelItem } from '../../stores/wmdlTypes'
 import { useMessage } from '../../composables/useMessage'
-import { parseMtn } from '../../utils/motionImport'
+import { loadModelMotion } from '../../utils/loadModelMotion'
+import { motionFrameTime, sampleMotionFrame, type MotionSource } from '../../utils/motionImport'
 import { filterBySearch } from '../../utils/searchUtils'
 import Live2dPreview from '../common/Live2dPreview.vue'
 import SearchInput from '../common/SearchInput.vue'
@@ -18,10 +16,9 @@ const emit = defineEmits<{
 }>()
 
 const msg = useMessage()
-const preview = ref<InstanceType<typeof Live2dPreview> | null>(null)
 const previewReady = ref(false)
 const search = ref('')
-const anim = ref<LanimFile | null>(null)
+const motion = shallowRef<MotionSource | null>(null)
 const selected = ref<string | null>(null)
 const frame = ref(0)
 const loading = ref(false)
@@ -33,51 +30,36 @@ const previewConfig = computed<WmdlConfig>(() => ({
 }))
 const motions = computed(() => parseMotions(props.model.rawJsonObject, true))
 const filteredMotions = computed(() => filterBySearch(motions.value, search.value, (item) => item.name))
-const lastFrame = computed(() => anim.value
-  ? Math.max(0, ...anim.value.tracks.map((track) => track.keys.length - 1))
-  : 0)
+const editableDefaults = computed(() => props.model.initParams
+  .filter((param) => !props.physicsIds.has(param.id)))
 const sampledValues = computed(() => {
-  if (!anim.value) return []
-  const valid = new Set(props.model.initParams.map((param) => param.id))
-  return anim.value.tracks.flatMap((track) => {
-    if (!valid.has(track.paramId) || props.physicsIds.has(track.paramId) || !track.keys.length) return []
-    const key = track.keys[Math.min(frame.value, track.keys.length - 1)]
-    return [{ id: track.paramId, val: key.v }]
-  })
+  if (!motion.value) return []
+  const valid = new Set(editableDefaults.value.map((param) => param.id))
+  return sampleMotionFrame(motion.value, frame.value).filter(({ id }) => valid.has(id))
 })
-
-function updatePreview() {
-  if (!previewReady.value) return
-  const defaults = props.model.initParams
-    .filter((param) => !props.physicsIds.has(param.id))
-    .map((param) => ({ id: param.id, val: param.value, calc: 'set' as const }))
-  preview.value?.applyParameters(defaults)
-  preview.value?.applyParameters(sampledValues.value.map((item) => ({ ...item, calc: 'set' as const })))
-}
-
-watch([sampledValues, previewReady], updatePreview)
-
-async function selectMotion(item: MotionEntry) {
-  const token = ++loadToken
-  anim.value = null
+const pose = computed(() => {
+  const sampled = new Map(sampledValues.value.map(({ id, val }) => [id, val]))
+  return editableDefaults.value.map((param) => ({ id: param.id, val: sampled.get(param.id) ?? param.value }))
+})
+watch(() => props.model.jsonAbsPath, () => {
+  loadToken++
+  motion.value = null
   selected.value = null
   frame.value = 0
   loading.value = false
-  if (!item.path || !props.model.jsonAbsPath) {
-    msg.error(`动作「${item.name}」没有可用的文件路径`)
-    return
-  }
-  if (!item.path.toLowerCase().endsWith('.mtn')) {
-    msg.error(`动作「${item.name}」不是 MTN 文件`)
-    return
-  }
+  previewReady.value = false
+})
+
+async function selectMotion(item: MotionEntry) {
+  const token = ++loadToken
+  motion.value = null
+  selected.value = null
+  frame.value = 0
   loading.value = true
   try {
-    const path = pathCombine(pathDirname(props.model.jsonAbsPath), item.path)
-    const text = await ReadTextFile(path)
-    const result = parseMtn(text, item.name)
+    const result = await loadModelMotion(props.model.jsonAbsPath, item)
     if (token !== loadToken) return
-    anim.value = result
+    motion.value = result
     selected.value = item.name
   } catch (err) {
     if (token === loadToken) msg.error(`无法加载动作「${item.name}」：${err}`)
@@ -87,7 +69,7 @@ async function selectMotion(item: MotionEntry) {
 }
 
 function apply() {
-  if (!anim.value || !previewReady.value || loading.value) return
+  if (!motion.value || !previewReady.value || loading.value) return
   if (!sampledValues.value.length) {
     msg.warning('该动作没有可应用的模型参数')
     return
@@ -104,6 +86,9 @@ onBeforeUnmount(() => { loadToken++ })
       <section class="sample-modal" role="dialog" aria-modal="true" aria-labelledby="motion-sample-title">
         <header class="sample-header">
           <h2 id="motion-sample-title">从动作采样表情</h2>
+          <span v-if="motion?.skippedTargets.length" class="sample-warning" role="status">
+            已跳过非参数曲线：{{ motion.skippedTargets.join('、') }}
+          </span>
           <button type="button" class="sample-close" aria-label="关闭" @click="emit('close')">×</button>
         </header>
         <div class="sample-body">
@@ -119,17 +104,17 @@ onBeforeUnmount(() => { loadToken++ })
             </div>
           </aside>
           <div class="sample-preview">
-            <Live2dPreview ref="preview" :wmdl-config="previewConfig" @loaded="previewReady = true"
+            <Live2dPreview :wmdl-config="previewConfig" :fixed-pose="pose" @loaded="previewReady = true"
               @load-error="msg.error('采样预览模型加载失败')" />
           </div>
         </div>
         <div class="sample-timeline">
-          <span>{{ anim ? `${frame} / ${lastFrame} 帧 · ${(frame / anim.fps).toFixed(2)} 秒` : '请选择动作' }}</span>
-          <input v-model.number="frame" type="range" min="0" :max="lastFrame" step="1" :disabled="!anim || loading" aria-label="动作采样帧" />
+          <span>{{ motion ? `${frame} / ${motion.lastFrame} 帧 · ${motionFrameTime(motion, frame).toFixed(2)} 秒` : '请选择动作' }}</span>
+          <input v-model.number="frame" type="range" min="0" :max="motion?.lastFrame ?? 0" step="1" :disabled="!motion || loading" aria-label="动作采样帧" />
         </div>
         <footer class="sample-footer">
           <button type="button" class="sample-btn" @click="emit('close')">关闭</button>
-          <button type="button" class="sample-btn sample-btn--primary" :disabled="!anim || !previewReady || loading" @click="apply">应用</button>
+          <button type="button" class="sample-btn sample-btn--primary" :disabled="!motion || !previewReady || loading" @click="apply">应用</button>
         </footer>
       </section>
     </div>
@@ -139,9 +124,10 @@ onBeforeUnmount(() => { loadToken++ })
 <style scoped>
 .sample-mask { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .7); }
 .sample-modal { width: min(1000px, 92vw); height: min(740px, 90vh); display: flex; flex-direction: column; background: #242830; color: #e6e6e6; border: 1px solid #3a4150; border-radius: 8px; overflow: hidden; }
-.sample-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #3a4150; }
-.sample-header h2 { margin: 0; font-size: 16px; }
+.sample-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #3a4150; }
+.sample-header h2 { margin: 0 auto 0 0; font-size: 16px; }
 .sample-close { background: none; border: 0; color: #cfd4dc; font-size: 24px; cursor: pointer; }
+.sample-warning { color: #e7c788; font-size: 12px; }
 .sample-body { display: flex; flex: 1; min-height: 0; }
 .sample-list { width: 250px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-right: 1px solid #3a4150; }
 .sample-list__scroll { overflow: auto; min-height: 0; }

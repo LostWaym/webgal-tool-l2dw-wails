@@ -29,7 +29,8 @@ import {
 import { resolveComposerMembers, loadComposerDefsByIds } from '../../utils/motionComposors'
 import { previewLanim } from '../../utils/motionKeyframes'
 import { listParameters, parseMotions } from '../../live2d/coreAdapter'
-import { parseMtn, unbakeKeys } from '../../utils/motionImport'
+import { bakeMotion, unbakeKeys } from '../../utils/motionImport'
+import { loadModelMotion } from '../../utils/loadModelMotion'
 import { filterBySearch } from '../../utils/searchUtils'
 import { useMessage } from '../../composables/useMessage'
 import { useFrameSettingsModal } from '../../composables/useFrameSettingsModal'
@@ -42,7 +43,7 @@ import {
   ReadTextFile,
   EnsureDirAndOpenInExplorer,
 } from '../../../wailsjs/go/main/App'
-import { pathBasename, pathDirname, pathCombine } from '../../path_utils'
+import { pathBasename, pathDirname } from '../../path_utils'
 import type { MotionEntry } from '../../live2d/coreAdapter'
 import type { LanimFile } from '../../stores/motionEditor'
 import type { ParamCalc } from '../../stores/wmdlTypes'
@@ -308,9 +309,6 @@ function onMotionMenuToggle(event: Event) {
   if (!motionModel.value) {
     menu.open = false
     msg.warning('当前没有可加载的模型')
-  } else if (motionModel.value.isMoc3) {
-    menu.open = false
-    msg.warning('当前不支持加载 moc3 模型的动作')
   }
 }
 
@@ -318,24 +316,17 @@ async function onImportMotion(entry: MotionEntry) {
   if (motionMenu.value) motionMenu.value.open = false
   const model = motionModel.value
   if (!model || importing.value) return
-  if (!entry.path || !model.jsonAbsPath) {
-    msg.error(`动作「${entry.name}」没有可用的文件路径`)
-    return
-  }
-  const path = pathCombine(pathDirname(model.jsonAbsPath), entry.path)
-  if (!path.toLowerCase().endsWith('.mtn')) {
-    msg.error(`动作「${entry.name}」不是 MTN 文件，无法加载`)
-    return
-  }
+  const { id, jsonAbsPath } = model
   importing.value = true
   try {
-    const text = await ReadTextFile(path)
-    const lanim = parseMtn(text, entry.name)
-    if (motionModel.value?.id !== model.id || motionModel.value?.jsonAbsPath !== model.jsonAbsPath) {
+    const motion = await loadModelMotion(jsonAbsPath, entry)
+    if (motionModel.value?.id !== id || motionModel.value?.jsonAbsPath !== jsonAbsPath) {
       msg.warning('模型已更换，取消加载动作')
       return
     }
-    if (!window.confirm(`加载动作「${entry.name}」将替换当前动画，未保存的修改会丢失。请先保存，是否继续？`)) return
+    const lanim = bakeMotion(motion)
+    const skipped = motion.skippedTargets.length ? `\n将跳过非参数曲线：${motion.skippedTargets.join('、')}。` : ''
+    if (!window.confirm(`加载动作「${entry.name}」将替换当前动画，未保存的修改会丢失。请先保存，是否继续？${skipped}`)) return
     replaceAnimation(lanim, null)
     msg.success(`已加载动作「${entry.name}」`)
   } catch (err) {

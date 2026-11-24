@@ -228,8 +228,6 @@ function onResetAllParams() {
 function onOpenMotionSample() {
   if (!selectedModel.value) {
     msg.warning('请先选择模型')
-  } else if (selectedModel.value.isMoc3) {
-    msg.warning('当前不支持采样 moc3 模型的动作')
   } else if (!selectedModel.value.initParams.length) {
     msg.warning('模型参数尚未加载完成')
   } else {

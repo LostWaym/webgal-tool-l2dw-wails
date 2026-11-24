@@ -1012,9 +1012,9 @@ function onHeadDrag(dx: number) {
 }
 
 .preset-toggle {
-  background: var(--ui-control);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
+  background: var(--ui-control-fill);
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-compact);
   color: var(--ui-text);
   font-size: 13px;
   padding: 6px 12px;
@@ -1045,12 +1045,12 @@ function onHeadDrag(dx: number) {
   max-height: 240px;
   overflow-y: auto;
   margin: 0;
-  padding: 4px 0;
+  padding: 4px;
   list-style: none;
-  background: var(--ui-control);
+  background: var(--ui-panel);
   border: 1px solid var(--ui-line);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px var(--ui-shadow);
+  border-radius: var(--ui-radius-control);
+  box-shadow: var(--ui-panel-shadow);
 }
 
 .preset-item {
@@ -1058,6 +1058,7 @@ function onHeadDrag(dx: number) {
   font-size: 13px;
   color: var(--ui-text);
   cursor: pointer;
+  border-radius: var(--ui-radius-compact);
   white-space: nowrap;
 }
 
@@ -1066,6 +1067,7 @@ function onHeadDrag(dx: number) {
 }
 
 .preset-item.is-active {
+  background: var(--ui-selected);
   color: var(--ui-link);
 }
 

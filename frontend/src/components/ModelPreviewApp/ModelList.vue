@@ -8,8 +8,7 @@ import { useBackgroundHistoryModal } from '../../composables/useBackgroundHistor
 import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
 import { usePreviewModelReload } from '../../composables/usePreviewModelReload'
-import eyeIcon from '../../assets/icons/eye.png'
-import eyeOffIcon from '../../assets/icons/eye-off.png'
+import UiIcon from '../common/UiIcon.vue'
 
 const store = useModelStore()
 const emit = defineEmits<{ (e: 'project'): void; (e: 'guides'): void; (e: 'settings'): void }>()
@@ -109,14 +108,14 @@ function onDragEnd() {
 <template>
   <aside class="model-list">
     <header class="model-list__header">
-      <button class="add-btn" @click="onAdd">加载模型</button>
-      <button class="add-btn" @click="onAddImage">加载图片</button>
-      <button class="add-btn" @click="onAddFigureGroup">新建立绘组</button>
+      <button class="ui-button add-btn" @click="onAdd"><UiIcon name="model" />加载模型</button>
+      <button class="ui-button add-btn" @click="onAddImage"><UiIcon name="image" />加载图片</button>
+      <button class="ui-button add-btn" @click="onAddFigureGroup"><UiIcon name="group" />新建立绘组</button>
     </header>
     <header class="model-list__header model-list__header--secondary">
-      <button class="add-btn add-btn--secondary" @click="emit('project')">项目</button>
-      <button class="add-btn add-btn--secondary" @click="emit('guides')">游标</button>
-      <button class="add-btn add-btn--secondary" @click="emit('settings')">设置</button>
+      <button class="ui-button add-btn" @click="emit('project')"><UiIcon name="project" />项目</button>
+      <button class="ui-button add-btn" @click="emit('guides')"><UiIcon name="guides" />游标</button>
+      <button class="ui-button add-btn" @click="emit('settings')"><UiIcon name="settings" />设置</button>
     </header>
 
     <ul class="model-list__items model-list__items--special">
@@ -127,6 +126,7 @@ function onDragEnd() {
         :class="{ 'is-selected': store.selectedId === id }"
         @click="onSelect(id)"
       >
+        <UiIcon class="model-row__marker" name="right" />
         <span class="model-row__name">{{ getSpecialName(id) }}</span>
         <button
           v-if="id === SpecialId.Camera"
@@ -137,7 +137,7 @@ function onDragEnd() {
           :aria-pressed="store.cameraFrameVisible"
           @click.stop="store.cameraFrameVisible = !store.cameraFrameVisible"
         >
-          <img class="ui-icon" :src="store.cameraFrameVisible ? eyeIcon : eyeOffIcon" :alt="store.cameraFrameVisible ? '睁眼' : '闭眼'" />
+          <UiIcon :name="store.cameraFrameVisible ? 'eye' : 'eyeOff'" />
         </button>
         <button
           v-if="id !== SpecialId.Camera"
@@ -165,15 +165,17 @@ function onDragEnd() {
         <button
           v-if="id === SpecialId.BgContainer"
           class="model-row__bg-load"
+          aria-label="加载背景"
           title="加载背景"
           @click="onLoadBackground($event)"
-        >🖼️</button>
+        ><UiIcon name="image" /></button>
         <button
           v-if="id === SpecialId.BgContainer"
           class="model-row__bg-load"
+          aria-label="历史背景"
           title="历史背景"
           @click="onOpenBgHistory($event)"
-        >🕘</button>
+        ><UiIcon name="clock" /></button>
       </li>
     </ul>
     <hr v-if="store.models.length" class="model-list__divider" />
@@ -182,7 +184,7 @@ function onDragEnd() {
       <li
         v-for="(m, index) in store.models"
         :key="m.id"
-        class="model-row"
+          class="model-row model-row--figure"
         :class="{ 'is-selected': m.id === store.selectedId, 'is-dragging': dragFromIndex === index }"
         draggable="true"
         @click="onSelect(m.id)"
@@ -195,9 +197,10 @@ function onDragEnd() {
           <button
             class="model-row__visibility"
             :aria-label="m.visible ? '隐藏模型' : '显示模型'"
+            :title="m.visible ? '隐藏模型' : '显示模型'"
             @click="onToggleVisible(m.id, $event)"
           >
-            <img class="ui-icon" :src="m.visible ? eyeIcon : eyeOffIcon" :alt="m.visible ? '眼睛' : '闭眼'" />
+            <UiIcon :name="m.visible ? 'eye' : 'eyeOff'" />
           </button>
           <div class="model-row__quick-menu">
             <button type="button" class="model-row__quick-btn" title="选择滤镜" aria-label="选择滤镜" @click="onOpenFilterPreset(m.id, $event)">
@@ -232,9 +235,10 @@ function onDragEnd() {
         <button
           class="model-row__close"
           aria-label="移除"
+          title="移除"
           @click="onRemove(m.id, $event)"
         >
-          ×
+          <UiIcon name="close" />
         </button>
       </li>
     </ul>
@@ -254,9 +258,10 @@ function onDragEnd() {
         <button
           class="model-row__close"
           aria-label="移除立绘组"
+          title="移除立绘组"
           @click="onRemoveFigureGroup(g.id, $event)"
         >
-          ×
+          <UiIcon name="close" />
         </button>
       </li>
     </ul>
@@ -272,6 +277,8 @@ function onDragEnd() {
   color: var(--ui-text);
   box-sizing: border-box;
   transition: opacity 0.15s ease;
+  overflow: hidden;
+  container-type: inline-size;
 }
 
 .model-list__header {
@@ -283,40 +290,25 @@ function onDragEnd() {
 .add-btn {
   flex: 1;
   min-width: 0;
-  padding: 8px 4px;
-  background: var(--ui-selected);
-  color: var(--ui-text);
-  border: 1px solid var(--ui-link);
-  border-radius: 6px;
-  cursor: pointer;
+  min-height: 44px;
+  padding: 6px 3px;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.add-btn:hover {
-  background: var(--ui-selected);
-  border-color: var(--ui-link);
-}
+.add-btn .ui-symbol { font-size: 18px; color: var(--ui-link); }
 
-.add-btn:active {
-  background: var(--ui-selected);
-}
-
-.model-list__header:not(.model-list__header--secondary) .add-btn {
-  font-size: 12px;
-}
-
-.add-btn:focus-visible {
-  outline: 2px solid var(--ui-link);
-  outline-offset: 2px;
+@container (max-width: 310px) {
+  .add-btn { gap: 3px; padding-inline: 2px; font-size: 12px; }
+  .add-btn .ui-symbol { font-size: 13px; }
+  .model-list__header:not(.model-list__header--secondary) .add-btn:last-child { flex-grow: 1.18; }
 }
 
 .model-list__items {
   list-style: none;
   margin: 0;
-  padding: 8px 0;
+  padding: 8px 10px;
   overflow-y: auto;
   flex: 1;
 }
@@ -324,9 +316,13 @@ function onDragEnd() {
 .model-row {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  gap: 4px;
+  min-height: 42px;
+  margin-bottom: 3px;
+  padding: 7px 8px;
   cursor: pointer;
-  border-left: 3px solid transparent;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 
@@ -335,8 +331,29 @@ function onDragEnd() {
 }
 
 .model-row.is-selected {
-  background: var(--ui-selected);
-  border-left-color: var(--ui-link);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--ui-selected) 94%, var(--ui-accent)), var(--ui-selected));
+  border-color: color-mix(in srgb, var(--ui-selected) 74%, var(--ui-edge));
+}
+
+.model-row--figure,
+.model-row--group {
+  gap: 8px;
+  min-height: 49px;
+  padding-inline: 14px;
+}
+
+.model-row.is-selected:not(.model-row--special) .model-row__name {
+  font-weight: 550;
+}
+
+.model-row--figure .model-row__name,
+.model-row--group .model-row__name {
+  font-size: 16px;
+}
+
+@container (max-width: 310px) {
+  .model-row--figure, .model-row--group { padding-inline: 9px; }
+  .model-row--figure .model-row__name, .model-row--group .model-row__name { font-size: 14px; }
 }
 
 .model-row.is-dragging {
@@ -345,19 +362,22 @@ function onDragEnd() {
 
 .model-row__name {
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .model-row__visibility {
   background: transparent;
+  color: var(--ui-muted);
   border: none;
   padding: 0;
   cursor: pointer;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -369,9 +389,14 @@ function onDragEnd() {
   background: var(--ui-hover);
 }
 
-.model-row__visibility img {
-  width: 16px;
-  height: 16px;
+.model-row--figure .model-row__visibility {
+  width: 28px;
+  height: 28px;
+  font-size: 23px;
+}
+
+.model-row.is-selected .model-row__visibility {
+  color: var(--ui-link);
 }
 
 .model-row__kind-badge {
@@ -390,6 +415,9 @@ function onDragEnd() {
 }
 
 .model-row__close {
+  display: grid;
+  place-items: center;
+  flex: none;
   background: transparent;
   color: var(--ui-muted);
   border: none;
@@ -399,7 +427,6 @@ function onDragEnd() {
   height: 24px;
   border-radius: 4px;
   cursor: pointer;
-  margin-left: 6px;
   padding: 0;
   transition: background 0.12s ease, color 0.12s ease;
 }
@@ -407,13 +434,13 @@ function onDragEnd() {
 .model-row__bg-load {
   background: transparent;
   border: none;
-  font-size: 14px;
+  font-size: 16px;
+  color: var(--ui-muted);
   line-height: 1;
   width: 24px;
   height: 24px;
   border-radius: 4px;
   cursor: pointer;
-  margin-right: 6px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -440,7 +467,7 @@ function onDragEnd() {
   display: flex;
   padding: 2px;
   border: 1px solid var(--ui-line);
-  border-radius: 5px;
+  border-radius: var(--ui-radius-control);
   background: var(--ui-control);
   box-shadow: 0 3px 8px var(--ui-shadow);
   opacity: 0;
@@ -497,7 +524,7 @@ function onDragEnd() {
 
 .model-list__items--special {
   flex: 0 0 auto;
-  padding: 0;
+  padding: 6px 10px 0;
   overflow: visible;
 }
 
@@ -511,9 +538,7 @@ function onDragEnd() {
   background: var(--ui-control);
 }
 
-.model-row--special .model-row__name {
-  padding-left: 12px;
-}
+.model-row__marker { color: var(--ui-muted); margin-right: 4px; }
 
 .model-list__divider {
   margin: 4px 0;
@@ -526,21 +551,6 @@ function onDragEnd() {
   border-bottom: 1px solid var(--ui-line);
 }
 
-.add-btn--secondary {
-  background: var(--ui-control);
-  border-color: var(--ui-edge);
-  color: var(--ui-text);
-}
-
-.add-btn--secondary:hover {
-  background: var(--ui-hover);
-  border-color: var(--ui-edge);
-}
-
-.add-btn--secondary:active {
-  background: var(--ui-panel);
-}
-
 .model-list__items--groups {
   border-top: 1px solid var(--ui-line);
   flex: 0 0 auto;
@@ -548,12 +558,7 @@ function onDragEnd() {
 }
 
 .model-row--group {
-  background: var(--ui-selected);
-}
-
-.model-row--group.is-selected {
-  background: var(--ui-selected);
-  border-left-color: var(--ui-alternate);
+  background: var(--ui-well);
 }
 
 .model-row__group-badge {

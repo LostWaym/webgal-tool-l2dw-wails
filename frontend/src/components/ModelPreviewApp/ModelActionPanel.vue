@@ -26,6 +26,7 @@ import { useMotionExpressionFolders } from '../../composables/useMotionExpressio
 import { extractMotions, extractExpressions, nameSegments as splitName, directoryContents as getDirectoryContents } from '../../utils/motionExpressionList'
 import type { MotionInfo, ExpressionInfo } from '../../utils/motionExpressionList'
 import SearchInput from '../common/SearchInput.vue'
+import UiIcon from '../common/UiIcon.vue'
 import NumberInput from '../common/NumberInput.vue'
 import FocusPicker from '../common/FocusPicker.vue'
 import ColorPicker, { type RGBColor } from '../common/ColorPicker.vue'
@@ -38,7 +39,10 @@ import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 import { ListFilterPresetFiles, SaveFilterPresetFile } from '../../../wailsjs/go/main/App'
 
 const store = useModelStore()
-const emit = defineEmits<{ (e: 'open-motion-expression-settings'): void }>()
+const emit = defineEmits<{
+  (e: 'open-motion-expression-settings'): void
+  (e: 'resize', width: number): void
+}>()
 const snapshotModal = useTransformSnapshotModal()
 const filterPresetModal = useFilterPresetModal()
 const motionScroll = useDraggableScroll()
@@ -75,7 +79,6 @@ const expressionSearch = computed({
 })
 const motionCollapsed = ref(false)
 const expressionCollapsed = ref(false)
-const panelWidth = ref(280)
 const hoveredTab = ref<TabKey | null>(null) // 当前悬停的页签
 const msg = useMessage()
 const { reloadConfig, reloadTextures } = usePreviewModelReload()
@@ -819,7 +822,7 @@ function onTabConfigClick() {
 
 function onDragMove(e: MouseEvent) {
   const newWidth = window.innerWidth - e.clientX
-  panelWidth.value = Math.max(200, Math.min(500, newWidth))
+  emit('resize', Math.max(200, Math.min(500, newWidth)))
 }
 
 function onDragEnd() {
@@ -902,10 +905,7 @@ function onLabelDragEnd() {
 </script>
 
 <template>
-  <aside
-    class="model-action-panel"
-    :style="{ width: panelWidth + 'px' }"
-  >
+  <aside class="model-action-panel">
     <!-- 拖拽手柄 -->
     <div class="panel__drag-handle" @mousedown="onDragStart" />
 
@@ -914,13 +914,17 @@ function onLabelDragEnd() {
       <button
         v-for="tab in visibleTabs"
         :key="tab.key"
-        class="tab-btn"
+        class="ui-tab tab-btn"
         :class="{ 'is-active': activeTab === tab.key }"
+        :aria-pressed="activeTab === tab.key"
         @click="activeTab = tab.key"
         @mouseenter="hoveredTab = tab.key"
         @mouseleave="hoveredTab = null"
       >
-        <span class="tab-btn__label">{{ tab.label }}</span>
+        <span class="tab-btn__label">
+          <UiIcon :name="tab.key === 'motionExpression' ? 'play' : tab.key === 'transform' ? 'transform' : 'info'" />
+          {{ tab.label }}
+        </span>
         <span
           v-if="activeTab === tab.key && hasTabConfig"
           class="tab-settings-overlay"
@@ -946,7 +950,7 @@ function onLabelDragEnd() {
           <span class="list-region-title">动作</span>
           <button
             type="button"
-            class="list-region-shuffle"
+            class="ui-button list-region-shuffle"
             title="滚动到当前播放的动作"
             @click="scrollToCurrent('motion')"
           >
@@ -954,7 +958,7 @@ function onLabelDragEnd() {
           </button>
           <button
             type="button"
-            class="list-region-shuffle"
+            class="ui-button list-region-shuffle"
             title="随机播放动作"
             @click="playRandomMotion"
           >
@@ -962,12 +966,13 @@ function onLabelDragEnd() {
           </button>
           <button
             type="button"
-            class="list-region-toggle"
+            class="ui-button list-region-toggle"
             :aria-expanded="!motionCollapsed"
             :aria-label="motionCollapsed ? '展开动作' : '折叠动作'"
+            :title="motionCollapsed ? '展开动作' : '折叠动作'"
             @click="motionCollapsed = !motionCollapsed"
           >
-            <span aria-hidden="true">{{ motionCollapsed ? '▸' : '▾' }}</span>
+            <UiIcon :name="motionCollapsed ? 'right' : 'down'" />
           </button>
         </div>
         <div v-show="!motionCollapsed" class="list-region-body">
@@ -975,6 +980,7 @@ function onLabelDragEnd() {
             <SearchInput v-model="motionSearch" variant="action" placeholder="搜索动作..." />
           </div>
           <nav v-if="folders.active.value && !motionSearch.trim()" class="list-breadcrumb" aria-label="动作目录">
+            <UiIcon name="down" />
             <button type="button" :disabled="motionPath.length === 0" @click="motionPath = []">root</button>
             <template v-for="(part, index) in motionPath" :key="index">
               <span aria-hidden="true">&gt;</span>
@@ -1006,7 +1012,7 @@ function onLabelDragEnd() {
           <span class="list-region-title">表情</span>
           <button
             type="button"
-            class="list-region-shuffle"
+            class="ui-button list-region-shuffle"
             title="滚动到当前播放的表情"
             @click="scrollToCurrent('expression')"
           >
@@ -1014,7 +1020,7 @@ function onLabelDragEnd() {
           </button>
           <button
             type="button"
-            class="list-region-shuffle"
+            class="ui-button list-region-shuffle"
             title="随机播放表情"
             @click="playRandomExpression"
           >
@@ -1022,12 +1028,13 @@ function onLabelDragEnd() {
           </button>
           <button
             type="button"
-            class="list-region-toggle"
+            class="ui-button list-region-toggle"
             :aria-expanded="!expressionCollapsed"
             :aria-label="expressionCollapsed ? '展开表情' : '折叠表情'"
+            :title="expressionCollapsed ? '展开表情' : '折叠表情'"
             @click="expressionCollapsed = !expressionCollapsed"
           >
-            <span aria-hidden="true">{{ expressionCollapsed ? '▸' : '▾' }}</span>
+            <UiIcon :name="expressionCollapsed ? 'right' : 'down'" />
           </button>
         </div>
         <div v-show="!expressionCollapsed" class="list-region-body">
@@ -1035,6 +1042,7 @@ function onLabelDragEnd() {
             <SearchInput v-model="expressionSearch" variant="action" placeholder="搜索表情..." />
           </div>
           <nav v-if="folders.active.value && !expressionSearch.trim()" class="list-breadcrumb" aria-label="表情目录">
+            <UiIcon name="down" />
             <button type="button" :disabled="expressionPath.length === 0" @click="expressionPath = []">root</button>
             <template v-for="(part, index) in expressionPath" :key="index">
               <span aria-hidden="true">&gt;</span>
@@ -1157,21 +1165,21 @@ function onLabelDragEnd() {
           <span class="list-region-title">滤镜</span>
           <button
             type="button"
-            class="list-region-shuffle"
+            class="ui-button list-region-shuffle"
             @click="resetFilters"
           >
             重置
           </button>
           <button
             type="button"
-            class="list-region-shuffle"
+            class="ui-button list-region-shuffle"
             @click="onSaveFilterPreset"
           >
             保存
           </button>
           <button
             type="button"
-            class="list-region-shuffle"
+            class="ui-button list-region-shuffle"
             @click="onSelectFilterPreset"
           >
             选择
@@ -1664,15 +1672,18 @@ function onLabelDragEnd() {
   right: 0;
   top: 0;
   bottom: 0;
+  width: var(--preview-action-width);
   z-index: 100;
   background: var(--ui-panel);
-  backdrop-filter: blur(8px);
   border-left: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-panel) 0 0 var(--ui-radius-panel);
+  box-shadow: -3px 0 16px var(--ui-shadow);
   display: flex;
   flex-direction: column;
   min-height: 0;
   user-select: none;
   transition: opacity 0.15s ease;
+  container-type: inline-size;
 }
 
 .panel__drag-handle {
@@ -1704,35 +1715,29 @@ function onLabelDragEnd() {
 .panel__tabs {
   display: flex;
   border-bottom: 1px solid var(--ui-line);
-  padding: 0 12px;
+  padding: 4px 10px 0;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 12px 8px;
-  background: transparent;
-  border: none;
-  color: var(--ui-muted);
-  font-size: 13px;
-  cursor: pointer;
-  transition: color 0.15s, border-bottom 0.15s;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  position: relative;
-}
-
-.tab-btn:hover {
-  color: var(--ui-text);
-}
-
-.tab-btn.is-active {
-  color: var(--ui-text);
-  border-bottom-color: var(--ui-link);
+  min-width: 0;
+  min-height: 46px;
+  padding: 7px 2px;
+  font-size: 14px;
 }
 
 .tab-btn__label {
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-btn__label .ui-symbol { font-size: 15px; }
+
+@container (max-width: 245px) {
+  .tab-btn__label .ui-symbol { display: none; }
 }
 
 .tab-settings-overlay {
@@ -1815,8 +1820,9 @@ function onLabelDragEnd() {
 
 .panel__list-region.is-collapsed {
   flex: 0 0 auto;
-  height: 56px;
 }
+
+.panel__list-region + .panel__list-region { border-top: 1px solid var(--ui-line); }
 
 .list-region-header {
   flex: 0 0 auto;
@@ -1824,15 +1830,13 @@ function onLabelDragEnd() {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--ui-line);
-  background: var(--ui-panel);
 }
 
 .list-region-title {
   flex: 1;
   color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 650;
 }
 
 .list-region-settings {
@@ -1852,42 +1856,19 @@ function onLabelDragEnd() {
 }
 
 .list-region-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 29px;
   padding: 0;
-  background: transparent;
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  color: var(--ui-muted);
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  transition: background 0.15s, color 0.15s;
 }
 
-.list-region-toggle:hover {
-  background: var(--ui-selected);
-  color: var(--ui-text);
+.list-region-toggle,
+.list-region-shuffle {
+  min-height: 29px;
+  border-radius: var(--ui-radius-compact);
 }
 
 .list-region-shuffle {
-  padding: 2px 6px;
-  background: transparent;
-  border: 1px solid var(--ui-line);
-  border-radius: 4px;
-  color: var(--ui-muted);
-  cursor: pointer;
+  padding: 2px 8px;
   font-size: 12px;
-  font-weight: 600;
-  transition: background 0.15s, color 0.15s;
-}
-
-.list-region-shuffle:hover {
-  background: var(--ui-selected);
-  color: var(--ui-text);
 }
 
 .list-region-body {
@@ -1903,14 +1884,13 @@ function onLabelDragEnd() {
 }
 
 .panel__search {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--ui-edge);
+  padding: 2px 12px 8px;
 }
 
 .panel__list {
   list-style: none;
   margin: 0;
-  padding: 8px 0;
+  padding: 4px 8px;
   overflow-y: auto;
   min-height: 0;
   cursor: grab;
@@ -1924,11 +1904,12 @@ function onLabelDragEnd() {
 .list-item {
   display: flex;
   align-items: center;
-  padding: 8px 16px;
+  padding: 7px 10px;
   cursor: pointer;
   border-left: 3px solid transparent;
+  border-radius: var(--ui-radius-compact);
   transition: background 0.12s ease, border-color 0.12s ease;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ui-text);
 }
 
@@ -1994,12 +1975,15 @@ function onLabelDragEnd() {
 
 .list-breadcrumb {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
+  gap: 6px;
+  margin: 0 8px;
+  padding: 5px 8px;
   overflow-x: auto;
   white-space: nowrap;
-  border-bottom: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-compact);
+  background: var(--ui-control);
   color: var(--ui-muted);
   font-size: 12px;
 }
@@ -2015,10 +1999,6 @@ function onLabelDragEnd() {
 .list-breadcrumb button:disabled {
   color: var(--ui-text);
   cursor: default;
-}
-
-.list-item--folder {
-  color: var(--ui-link);
 }
 
 .filter-drag-label {

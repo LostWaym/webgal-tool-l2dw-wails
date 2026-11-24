@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiIcon from '../common/UiIcon.vue'
 import { ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import eyeIcon from '../../assets/icons/eye.png'
@@ -70,7 +71,7 @@ function onDragEnd() {
 <template>
   <aside class="edit-model-list">
     <header class="edit-model-list__header">
-      <button class="add-btn" @click="onAdd">加载模型</button>
+      <button class="ui-button add-btn" @click="onAdd"><UiIcon name="model" />加载模型</button>
     </header>
 
     <ul v-if="store.currentWmdl.models.length" class="edit-model-list__items">
@@ -133,28 +134,16 @@ function onDragEnd() {
 .add-btn {
   flex: 1;
   padding: 10px 12px;
-  background: var(--ui-accent);
-  color: var(--ui-on-accent);
-  border: 1px solid var(--ui-link);
-  border-radius: 6px;
-  cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: background 0.15s ease;
 }
 
-.add-btn:hover {
-  background: var(--ui-accent-hover); color: var(--ui-on-accent);
-}
-
-.add-btn:active {
-  background: var(--ui-accent); color: var(--ui-on-accent);
-}
+.add-btn .ui-symbol { font-size: 17px; color: var(--ui-link); }
 
 .edit-model-list__items {
   list-style: none;
   margin: 0;
-  padding: 8px 0;
+  padding: 8px;
   overflow-y: auto;
   flex: 1;
 }
@@ -165,6 +154,7 @@ function onDragEnd() {
   padding: 8px 12px;
   cursor: pointer;
   border-left: 3px solid transparent;
+  border-radius: var(--ui-radius-control);
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 

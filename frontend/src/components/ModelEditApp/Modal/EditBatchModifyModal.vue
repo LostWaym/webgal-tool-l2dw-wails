@@ -446,12 +446,12 @@ function onClose() {
   color: var(--ui-text);
   width: min(720px, 90vw);
   height: min(640px, 90vh);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-panel);
   border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px var(--ui-shadow);
+  box-shadow: var(--ui-panel-shadow);
 }
 
 .batch-modal__header {

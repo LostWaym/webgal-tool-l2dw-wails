@@ -78,7 +78,7 @@ function onSeparatorInput(event: Event) {
 <template>
   <Teleport to="body">
     <div v-if="visible" class="settings-mask" @click.self="emit('close')">
-      <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="preview-settings-title">
+      <section class="ui-dialog settings-modal" role="dialog" aria-modal="true" aria-labelledby="preview-settings-title">
         <header>
           <h2 id="preview-settings-title">预览设置</h2>
           <button class="close" aria-label="关闭" @click="emit('close')">×</button>
@@ -154,7 +154,7 @@ function onSeparatorInput(event: Event) {
 
 <style scoped>
 .settings-mask { position: fixed; inset: 0; z-index: 9999; box-sizing: border-box; padding: 10vh 10vw; background: var(--ui-scrim); display: flex; align-items: center; justify-content: center; }
-.settings-modal { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 9px; color: var(--ui-text); box-shadow: 0 12px 40px var(--ui-shadow); }
+.settings-modal { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
 header, footer { display: flex; flex-shrink: 0; align-items: center; padding: 14px 18px; }
 header { border-bottom: 1px solid var(--ui-line); }
 h2 { flex: 1; margin: 0; font-size: 16px; }
@@ -168,16 +168,18 @@ h2 { flex: 1; margin: 0; font-size: 16px; }
 .viewport-section h3 { margin: 0 0 12px; font-size: 15px; }
 .viewport-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .viewport-fields label { flex: 1; min-width: 160px; }
-.separator-input, .frame-rate-select { box-sizing: border-box; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid var(--ui-edge); border-radius: 5px; color: inherit; background: var(--ui-well); }
+.separator-input, .frame-rate-select { width: 100%; margin-top: 8px; padding: 8px; border: 1px solid var(--ui-edge); border-radius: var(--ui-radius-compact); color: inherit; background: var(--ui-well); }
 label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 p { margin: 10px 0 0; color: var(--ui-muted); font-size: 13px; line-height: 1.6; }
-button { border: 1px solid var(--ui-edge); border-radius: 5px; padding: 8px 13px; color: inherit; background: var(--ui-control); cursor: pointer; }
+button { border: 1px solid var(--ui-control-line); border-radius: var(--ui-radius-control); padding: 8px 13px; color: inherit; background: var(--ui-control-fill); cursor: pointer; }
+button:hover { background: var(--ui-hover); }
 .close { border: 0; background: transparent; font-size: 22px; padding: 0 5px; }
 footer { justify-content: flex-end; border-top: 1px solid var(--ui-line); }
 .theme-picker { border: 0; margin: 0; padding: 0; min-width: 0; }
 .theme-picker legend { font-size: 16px; font-weight: 600; padding: 0; }
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr)); gap: 10px; margin-top: 16px; }
-.theme-card { padding: 12px; border: 1px solid var(--ui-edge); border-radius: 6px; background: var(--ui-panel); }
+.theme-card { padding: 12px; border: 1px solid var(--ui-control-line); border-radius: var(--ui-radius-control); background: var(--ui-control); }
+.theme-card:hover { background: var(--ui-hover); }
 .theme-card.chosen { outline: 2px solid var(--ui-link); outline-offset: -2px; background: var(--ui-selected); }
 .theme-card:focus-within { outline: 2px solid var(--ui-link); outline-offset: 2px; }
 .theme-card small { display: block; margin-top: 4px; color: var(--ui-muted); }

@@ -25,6 +25,7 @@ import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../
 import { usePreviewGuideOverflow } from '../../composables/usePreviewGuideOverflow'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 import { GUIDE_SNAP_PX, PREVIEW_FRAME, hitPreviewGuide, placePreviewGuide, previewGuideEnds, previewGuideKey, snapPreviewGuide, type GuideAxis, type PreviewGuide } from '../../utils/previewGuides'
+import UiIcon from '../common/UiIcon.vue'
 
 const store = useModelStore()
 const props = defineProps<{ interactionDisabled?: boolean; guideManagerVisible?: boolean }>()
@@ -2285,16 +2286,16 @@ function dispose() {
       点击左上角 “加载模型” 按钮选择 Live2D 模型文件 (.model.json 或 .model3.json)
     </p> -->
     <div v-if="!isTransforming && guideMode === 'none'" class="stage__bottom-blocks">
-      <div class="stage__hints" :class="{ 'is-collapsed': !hintsExpanded }">
+      <div class="stage__hints">
         <button
           type="button"
-          class="stage__hints-toggle"
+          class="ui-button stage__hints-toggle"
           :aria-expanded="hintsExpanded"
           :aria-label="hintsExpanded ? '收起操作提示' : '展开操作提示'"
           @click="toggleHints"
         >
           <span class="stage__hints-toggle-text">{{ hints.title }}</span>
-          <span class="stage__hints-toggle-icon" aria-hidden="true">{{ hintsExpanded ? '▾' : '▸' }}</span>
+          <UiIcon :name="hintsExpanded ? 'down' : 'right'" />
         </button>
         <div v-show="hintsExpanded" class="stage__hints-body">
           <section v-if="hints.mouse.length" class="stage__hints-group">
@@ -2307,7 +2308,7 @@ function dispose() {
             </ul>
           </section>
           <section v-if="hints.shortcuts.length" class="stage__hints-group">
-            <h4 class="stage__hints-heading">快捷键  - 可点击触发</h4>
+            <h4 class="stage__hints-heading">快捷键 · 可点击触发</h4>
             <ul class="stage__hints-list">
               <li v-for="item in hints.shortcuts" :key="item.entry.handlerKey + '-' + item.keys">
                 <button
@@ -2316,7 +2317,7 @@ function dispose() {
                   :title="`点击触发 ${item.keys}`"
                   @click="onShortcutClick($event, item.entry)"
                 >
-                  <span class="stage__hints-keys">{{ item.keys }}</span>
+                  <kbd class="stage__hints-keys">{{ item.keys }}</kbd>
                   <span class="stage__hints-desc">{{ item.description }}</span>
                 </button>
               </li>
@@ -2372,8 +2373,9 @@ function dispose() {
   bottom: 16px;
   padding: 12px 16px;
   background: var(--ui-floating);
-  border: 1px solid var(--ui-edge);
-  border-radius: 8px;
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-panel);
+  box-shadow: var(--ui-panel-shadow);
   color: var(--ui-text);
   font-size: 13px;
   line-height: 1.6;
@@ -2418,12 +2420,13 @@ function dispose() {
   z-index: 10;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 8px;
+  padding: 5px 8px 5px 12px;
   background: var(--ui-floating);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  font-size: 12px;
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-control);
+  box-shadow: var(--ui-control-shadow);
+  font-size: 13px;
   line-height: 1.5;
   color: var(--ui-text);
   text-shadow: none;
@@ -2440,13 +2443,12 @@ function dispose() {
   color: var(--ui-text);
   background: var(--ui-control);
   border: 1px solid var(--ui-edge);
-  border-radius: 3px;
-  padding: 2px 6px;
+  border-radius: var(--ui-radius-compact);
+  padding: 4px 7px;
   cursor: pointer;
 }
 
 .stage__next-mode-select:focus-visible {
-  outline: none;
   border-color: var(--ui-link);
 }
 
@@ -2459,7 +2461,7 @@ function dispose() {
   position: absolute;
   left: 16px;
   bottom: 16px;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 32px - var(--preview-action-width, 0px));
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -2469,7 +2471,8 @@ function dispose() {
 }
 
 .stage__hints {
-  font-size: 12px;
+  max-width: 100%;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--ui-text);
   text-shadow: none;
@@ -2478,48 +2481,35 @@ function dispose() {
 
 .stage__hints-toggle {
   pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--ui-floating);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  color: inherit;
+  padding: 7px 10px;
   font: inherit;
-  cursor: pointer;
-  text-shadow: none;
-}
-
-.stage__hints-toggle:hover {
-  background: var(--ui-floating);
 }
 
 .stage__hints-toggle-text {
   font-weight: 600;
 }
 
-.stage__hints-toggle-icon {
-  font-size: 12px;
-}
-
 .stage__hints-body {
   margin-top: 6px;
-  padding: 8px 10px;
-  background: var(--ui-floating);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  width: max-content;
-  max-width: calc(100vw - 32px);
+  padding: 12px 15px;
+  background: var(--ui-stage-glass);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-panel);
+  box-shadow: 0 5px 18px var(--ui-shadow);
+  width: 424px;
+  max-width: 100%;
 }
 
 .stage__hints-group + .stage__hints-group {
   margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--ui-control-line);
 }
 
 .stage__hints-heading {
   margin: 0 0 4px 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ui-warning);
   letter-spacing: 0.5px;
@@ -2531,26 +2521,24 @@ function dispose() {
   padding: 0;
 }
 
-.stage__hints-list li {
-  display: flex;
-  gap: 8px;
+.stage__hints-list li:has(> .stage__hints-keys),
+.stage__hints-item {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
   align-items: baseline;
-  white-space: nowrap;
 }
 
 .stage__hints-item {
   pointer-events: auto;
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
   width: 100%;
-  padding: 2px 6px;
+  padding: 3px 0;
   background: transparent;
   border: none;
   color: inherit;
   font: inherit;
   text-align: left;
-  border-radius: 3px;
+  border-radius: var(--ui-radius-compact);
   cursor: pointer;
   text-shadow: none;
 }
@@ -2558,21 +2546,20 @@ function dispose() {
 .stage__hints-item:hover,
 .stage__hints-item:focus-visible {
   background: var(--ui-hover);
-  outline: none;
 }
 
 .stage__hints-keys {
-  flex: 0 0 auto;
-  min-width: 96px;
   font-weight: 600;
   color: var(--ui-link);
 }
 
-.stage__hints-desc {
-  flex: 1 1 auto;
-}
-
-.stage__hints.is-collapsed .stage__hints-toggle {
-  background: var(--ui-floating);
+.stage__hints-item kbd {
+  justify-self: start;
+  min-width: 38px;
+  padding: 0 8px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-selected);
+  color: var(--ui-shortcut-ink);
+  font-family: inherit;
 }
 </style>

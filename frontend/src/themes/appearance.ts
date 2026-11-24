@@ -24,6 +24,8 @@ function apply(theme: Theme) {
   }
   root.style.colorScheme = theme.scheme
   root.dataset.scheme = theme.scheme
+  if (theme.profile) root.dataset.profile = theme.profile
+  else delete root.dataset.profile
   root.dataset.theme = theme.id
   currentTheme.value = theme
   if ('runtime' in window) {

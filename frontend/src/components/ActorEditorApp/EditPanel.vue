@@ -357,9 +357,9 @@ async function onOpenOutputDir() {
         编辑面板
         <span class="actor-panel__subtitle" v-if="selectedModel">（{{ selectedModel.name }}）</span>
       </h2>
-      <button class="toolbar-btn" :disabled="!hasSelection" @click="onOpenMotionSample">动作采样</button>
+      <button class="ui-button toolbar-btn" :disabled="!hasSelection" @click="onOpenMotionSample">动作采样</button>
       <button
-        class="toolbar-btn toolbar-btn--primary"
+        class="ui-button ui-button--primary toolbar-btn"
         :disabled="!hasSelection || !exportableSnapshot.length"
         @click="onOpenExport"
       >导出</button>
@@ -369,7 +369,7 @@ async function onOpenOutputDir() {
       <button
         v-for="t in rightTabs"
         :key="t.id"
-        class="tab-btn"
+        class="ui-tab tab-btn"
         :class="{ 'is-active': activeTab === t.id }"
         @click="activeTab = t.id"
       >{{ t.label }}</button>
@@ -423,7 +423,7 @@ async function onOpenOutputDir() {
               <span>显示物理参数</span>
             </label>
             <button
-              class="toolbar-btn"
+              class="ui-button toolbar-btn"
               :disabled="!paramsView.length"
               @click="onResetAllParams"
             >重置所有参数</button>
@@ -462,7 +462,7 @@ async function onOpenOutputDir() {
     <!-- 导出覆盖层 -->
     <Transition name="fade-fast">
       <div v-if="editorState.state.exportMode" class="actor-export-mask" @click.self="editorState.cancelExport()">
-        <div class="actor-export-modal">
+        <div class="ui-dialog actor-export-modal">
           <header class="actor-export-modal__header">
             <h3 class="actor-export-modal__title">导出表情</h3>
             <button class="icon-btn" aria-label="关闭" @click="editorState.cancelExport()">×</button>
@@ -528,10 +528,10 @@ async function onOpenOutputDir() {
             </p>
           </section>
           <footer class="actor-export-modal__footer">
-            <button class="card-btn" @click="onOpenOutputDir">打开输出目录</button>
-            <button class="card-btn" @click="editorState.cancelExport()">取消</button>
-            <button class="card-btn" @click="onCopyToClipboard">复制到剪贴板</button>
-            <button class="card-btn card-btn--primary" @click="onConfirmExport">确认导出</button>
+            <button class="ui-button toolbar-btn" @click="onOpenOutputDir">打开输出目录</button>
+            <button class="ui-button toolbar-btn" @click="editorState.cancelExport()">取消</button>
+            <button class="ui-button toolbar-btn" @click="onCopyToClipboard">复制到剪贴板</button>
+            <button class="ui-button ui-button--primary toolbar-btn" @click="onConfirmExport">确认导出</button>
           </footer>
         </div>
       </div>
@@ -576,30 +576,14 @@ async function onOpenOutputDir() {
 .actor-panel__tabs {
   display: flex;
   border-bottom: 1px solid var(--ui-line);
-  padding: 0 12px;
+  padding: 4px 12px 0;
   flex-shrink: 0;
 }
 
 .tab-btn {
   flex: 1;
   padding: 10px 8px;
-  background: transparent;
-  border: none;
-  color: var(--ui-muted);
   font-size: 13px;
-  cursor: pointer;
-  transition: color 0.15s, border-bottom 0.15s;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-
-.tab-btn:hover {
-  color: var(--ui-text);
-}
-
-.tab-btn.is-active {
-  color: var(--ui-text);
-  border-bottom-color: var(--ui-link);
 }
 
 .actor-panel__body {
@@ -612,7 +596,7 @@ async function onOpenOutputDir() {
 .expr-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 8px;
 }
 
 .expr-list__item {
@@ -623,6 +607,7 @@ async function onOpenOutputDir() {
   font-size: 13px;
   color: var(--ui-text);
   border-left: 3px solid transparent;
+  border-radius: var(--ui-radius-control);
   cursor: pointer;
   user-select: text;
   transition: background 0.12s ease, border-color 0.12s ease;
@@ -634,7 +619,7 @@ async function onOpenOutputDir() {
 
 .expr-list__item.is-active {
   border-left-color: var(--ui-link);
-  background: var(--ui-control);
+  background: var(--ui-selected);
 }
 
 .expr-list__name {
@@ -750,13 +735,9 @@ async function onOpenOutputDir() {
 }
 
 .actor-export-modal {
-  background-color: var(--ui-dialog);
-  border: 1px solid var(--ui-edge);
-  border-radius: 8px;
   width: min(440px, 92%);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 40px var(--ui-shadow);
 }
 
 .actor-export-modal__header {
@@ -905,58 +886,9 @@ async function onOpenOutputDir() {
   cursor: pointer;
 }
 
-.card-btn {
-  padding: 6px 14px;
-  background-color: var(--ui-control);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  color: var(--ui-text);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color 0.12s;
-}
-
-.card-btn:hover {
-  background-color: var(--ui-hover);
-}
-
-.card-btn--primary {
-  background-color: var(--ui-accent);
-  border-color: var(--ui-link); color: var(--ui-on-accent);
-}
-
-.card-btn--primary:hover {
-  background-color: var(--ui-accent-hover); color: var(--ui-on-accent);
-}
-
 .toolbar-btn {
   padding: 6px 14px;
-  background: var(--ui-control);
-  color: var(--ui-text);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  cursor: pointer;
   font-size: 12px;
-  transition: background 0.12s ease;
-}
-
-.toolbar-btn:hover:not(:disabled) {
-  background: var(--ui-hover);
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.toolbar-btn--primary {
-  background: var(--ui-accent);
-  border-color: var(--ui-link);
-  color: var(--ui-on-accent);
-}
-
-.toolbar-btn--primary:hover:not(:disabled) {
-  background: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .icon-btn {

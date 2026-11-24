@@ -43,8 +43,9 @@ onMounted(() => {
       <button
         v-for="t in tabs"
         :key="t.id"
-        class="tab-btn"
+        class="ui-tab tab-btn"
         :class="{ 'is-active': activeTab === t.id }"
+        :aria-pressed="activeTab === t.id"
         @click="activeTab = t.id"
       >
         {{ t.label }}
@@ -74,30 +75,14 @@ onMounted(() => {
 .panel__tabs {
   display: flex;
   border-bottom: 1px solid var(--ui-line);
-  padding: 0 12px;
+  padding: 4px 12px 0;
   flex-shrink: 0;
 }
 
 .tab-btn {
   flex: 1;
   padding: 12px 8px;
-  background: transparent;
-  border: none;
-  color: var(--ui-muted);
   font-size: 13px;
-  cursor: pointer;
-  transition: color 0.15s, border-bottom 0.15s;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-
-.tab-btn:hover {
-  color: var(--ui-text);
-}
-
-.tab-btn.is-active {
-  color: var(--ui-text);
-  border-bottom-color: var(--ui-link);
 }
 
 .panel__body {

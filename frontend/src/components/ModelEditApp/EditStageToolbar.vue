@@ -32,7 +32,7 @@ function onWatchChange(checked: boolean) {
 <template>
   <div class="stage-toolbar">
     <button
-      class="toolbar-btn"
+      class="ui-button toolbar-btn"
       :disabled="modelsEmpty"
       @click="onReloadAllClick"
     >
@@ -64,21 +64,7 @@ function onWatchChange(checked: boolean) {
 .toolbar-btn {
   padding: 4px 10px;
   font-size: 12px;
-  background: var(--ui-control);
-  color: var(--ui-text);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.toolbar-btn:hover:not(:disabled) {
-  background: var(--ui-hover);
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  border-radius: var(--ui-radius-compact);
 }
 
 .toolbar-toggle {

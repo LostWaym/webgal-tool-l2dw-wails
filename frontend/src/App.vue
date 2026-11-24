@@ -33,6 +33,7 @@ const guideManagerVisible = ref(false)
 const settingsVisible = ref(false)
 const settingsTab = ref<'motionExpression' | undefined>()
 const stageVisible = ref(true)
+const actionPanelWidth = ref<number>()
 const focusVisible = ref(false)
 const focusMode = ref<InstanceType<typeof FocusMode> | null>(null)
 
@@ -114,10 +115,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app" :class="{ 'is-transforming': isTransforming }">
+  <div
+    class="app"
+    :class="{ 'is-transforming': isTransforming, 'has-action-panel': store.selectedId }"
+    :style="{ '--preview-action-preferred-width': actionPanelWidth === undefined ? undefined : `${actionPanelWidth}px` }"
+  >
     <ModelList class="app__left" @project="projectVisible = true" @guides="guideManagerVisible = true" @settings="settingsVisible = true" />
     <Stage v-if="stageVisible" class="app__right" :interaction-disabled="focusVisible || guideManagerVisible" :guide-manager-visible="guideManagerVisible" />
-    <ModelActionPanel v-if="store.selectedId" @open-motion-expression-settings="openMotionExpressionSettings" />
+    <ModelActionPanel v-if="store.selectedId" @resize="actionPanelWidth = $event" @open-motion-expression-settings="openMotionExpressionSettings" />
     <TransformSnapshotModal />
     <FilterPresetModal />
     <BackgroundHistoryModal />
@@ -141,15 +146,22 @@ onBeforeUnmount(() => {
 }
 
 .app__left {
-  width: 260px;
-  min-width: 220px;
+  width: clamp(270px, 23.2vw, 376px);
   flex-shrink: 0;
   border-right: 1px solid var(--ui-line);
+  border-radius: 0 var(--ui-radius-panel) var(--ui-radius-panel) 0;
 }
 
 .app__right {
   flex: 1;
   min-width: 0;
+}
+
+.app.has-action-panel {
+  --preview-action-width: min(
+    var(--preview-action-preferred-width, clamp(280px, 25.2vw, 408px)),
+    max(200px, calc(100vw - 560px))
+  );
 }
 
 .app.is-transforming .app__left,

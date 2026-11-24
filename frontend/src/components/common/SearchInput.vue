@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import searchIcon from '../../assets/icons/search.png'
-import clearIcon from '../../assets/icons/x.png'
+import UiIcon from './UiIcon.vue'
 
 type SearchVariant = 'action' | 'edit'
 
@@ -35,21 +34,23 @@ function onClear() {
 
 <template>
   <div class="search-box" :class="[`is-${variant}`, $attrs.class]" :style="$attrs.style">
-    <img :src="searchIcon" alt="" class="search-box__icon ui-icon" aria-hidden="true" />
+    <UiIcon name="search" class="search-box__icon" />
     <input
       v-model="inputValue"
       type="text"
       class="search-box__input"
       :placeholder="placeholder"
+      :aria-label="placeholder"
     />
     <button
       v-if="inputValue"
       type="button"
       class="search-box__clear"
       aria-label="清空搜索"
+      title="清空搜索"
       @click="onClear"
     >
-      <img :src="clearIcon" alt="" class="ui-icon" aria-hidden="true" />
+      <UiIcon name="close" />
     </button>
   </div>
 </template>
@@ -63,7 +64,7 @@ function onClear() {
   flex-shrink: 0;
   background: var(--ui-control);
   border: 1px solid var(--ui-edge);
-  border-radius: 6px;
+  border-radius: var(--ui-radius-search);
   color: var(--ui-text);
   font-size: 13px;
   transition: border-color 0.15s;
@@ -71,24 +72,14 @@ function onClear() {
 
 .search-box:focus-within {
   border-color: var(--ui-link);
-}
-
-.search-box.is-edit {
-  background: var(--ui-control);
-  border-color: var(--ui-edge);
-  border-radius: 4px;
-}
-
-.search-box.is-edit:focus-within {
-  border-color: var(--ui-link);
+  box-shadow: 0 0 0 1px var(--ui-link);
 }
 
 .search-box__icon {
-  width: 14px;
-  height: 14px;
+  font-size: 16px;
   flex-shrink: 0;
   margin-left: 10px;
-  opacity: 0.7;
+  color: var(--ui-muted);
 }
 
 .search-box__input {
@@ -103,7 +94,8 @@ function onClear() {
 }
 
 .search-box.is-action .search-box__input {
-  padding: 8px 12px;
+  padding: 9px 10px;
+  font-size: 14px;
 }
 
 .search-box.is-edit .search-box__input {
@@ -125,7 +117,7 @@ function onClear() {
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--ui-radius-pill);
   cursor: pointer;
   transition: background 0.12s ease;
 }
@@ -134,9 +126,4 @@ function onClear() {
   background: var(--ui-hover);
 }
 
-.search-box__clear img {
-  width: 12px;
-  height: 12px;
-  display: block;
-}
 </style>

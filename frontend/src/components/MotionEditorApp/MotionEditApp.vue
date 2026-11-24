@@ -592,9 +592,10 @@ async function onLoad() {
 
 .he-btn {
   padding: 4px 10px;
-  background: var(--ui-control);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
+  background: var(--ui-control-fill);
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-compact);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
   font-size: 12px;
   cursor: pointer;
@@ -607,7 +608,9 @@ async function onLoad() {
 }
 
 .he-btn:disabled {
-  opacity: 0.4;
+  color: var(--ui-muted);
+  background: var(--ui-panel);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -617,7 +620,8 @@ async function onLoad() {
 .motion-menu__panel {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
   width: 220px;
-  padding: 4px; background: var(--ui-control); border: 1px solid var(--ui-line); border-radius: 4px;
+  padding: 6px; background: var(--ui-panel); border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-control); box-shadow: var(--ui-panel-shadow);
 }
 .motion-menu__items { max-height: 55vh; overflow-y: auto; }
 .motion-menu__items button, .motion-menu__items span {

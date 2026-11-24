@@ -228,7 +228,7 @@ function cancelEdit() {
   position: relative;
   background: var(--ui-well);
   border: 1px solid var(--ui-line);
-  border-radius: 4px;
+  border-radius: var(--ui-radius-compact);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;

@@ -1,56 +1,74 @@
 [
   {
-    "id": "classic", "name": "经典深色", "scheme": "dark", "description": "石墨灰与工作台蓝",
+    "id": "classic", "name": "深夜紫", "scheme": "dark", "description": "蓝灰夜色与柔和的鸢尾紫",
     "colors": {
-      "window": "#181a20", "panel": "#1d2026", "well": "#171a20", "control": "#282e38", "hover": "#343d4a",
-      "line": "#39414f", "edge": "#818b9c", "text": "#e6e6e6", "muted": "#b0bac9",
-      "accent": "#2f80ed", "on-accent": "#071222", "link": "#99c6ff", "selected": "#303b4d",
-      "success": "#89dda9", "warning": "#f0c277", "danger": "#ffa09a", "alternate": "#c9b4ff"
+      "window": "#242633", "panel": "#292a38", "well": "#252634", "control": "#343546", "hover": "#414258",
+      "line": "#45465a", "edge": "#9996ae", "text": "#f4f2fa", "muted": "#ccc8da",
+      "accent": "#bba6f2", "on-accent": "#221b35", "link": "#dacbff", "selected": "#4c4565",
+      "success": "#a3dfbf", "warning": "#f4cc91", "danger": "#ffb4bf", "alternate": "#c7bcfc"
     }
   },
   {
-    "id": "paper", "name": "暖纸浅色", "scheme": "light", "description": "象牙纸与胡桃棕",
+    "id": "paper", "name": "浅雾紫", "scheme": "light", "description": "柔白底与浅薰衣草选中层",
     "colors": {
-      "window": "#f4f0e7", "panel": "#fffcf5", "well": "#fffefa", "control": "#f0e9dc", "hover": "#e8dfce",
-      "line": "#d4cab7", "edge": "#87765e", "text": "#28251f", "muted": "#615749",
-      "accent": "#765018", "on-accent": "#ffffff", "link": "#69430d", "selected": "#ebdec6",
-      "success": "#205c38", "warning": "#724807", "danger": "#962c30", "alternate": "#75417e"
+      "window": "#efedf9", "panel": "#f8f6fd", "well": "#fdfbff", "control": "#f0ecfa", "hover": "#e9e2f8",
+      "line": "#ded6ed", "edge": "#7e7494", "text": "#28243c", "muted": "#59526b",
+      "accent": "#7556b6", "on-accent": "#ffffff", "link": "#543787", "selected": "#e3d9f7",
+      "success": "#285e48", "warning": "#783f13", "danger": "#8c3150", "alternate": "#604885"
     }
   },
   {
     "id": "ocean", "name": "深海青", "scheme": "dark", "description": "深海蓝与薄荷青",
     "colors": {
-      "window": "#0d2028", "panel": "#142d37", "well": "#102731", "control": "#1d3641", "hover": "#25434d",
-      "line": "#34545d", "edge": "#779da3", "text": "#e5f4f3", "muted": "#adcdd0",
-      "accent": "#59d8c4", "on-accent": "#0d252a", "link": "#83ead8", "selected": "#1c4148",
-      "success": "#a4e596", "warning": "#f2cc84", "danger": "#ffa09a", "alternate": "#dec1ff"
+      "window": "#1d2a32", "panel": "#22333c", "well": "#1f2e36", "control": "#2b404a", "hover": "#334c56",
+      "line": "#405762", "edge": "#92adb2", "text": "#edf6f7", "muted": "#bed1d4",
+      "accent": "#8bd7cd", "on-accent": "#162f33", "link": "#ace9e2", "selected": "#365660",
+      "success": "#a4e596", "warning": "#f2cc84", "danger": "#ffb5b0", "alternate": "#dec1ff"
     }
   },
   {
     "id": "iris", "name": "鸢尾夜", "scheme": "dark", "description": "墨紫与鸢尾花",
     "colors": {
-      "window": "#1c1827", "panel": "#252033", "well": "#1e192b", "control": "#312b40", "hover": "#41354f",
-      "line": "#493e58", "edge": "#9987ab", "text": "#f4edf9", "muted": "#cbbbd6",
-      "accent": "#c6a3ef", "on-accent": "#271935", "link": "#e1c5ff", "selected": "#44344f",
-      "success": "#a9dcb5", "warning": "#ffd293", "danger": "#ffa4aa", "alternate": "#99e0e8"
+      "window": "#292337", "panel": "#30283e", "well": "#2b2439", "control": "#3c304c", "hover": "#483a59",
+      "line": "#514260", "edge": "#a792b8", "text": "#f5effa", "muted": "#d5c6e1",
+      "accent": "#d1acec", "on-accent": "#2f2040", "link": "#efd3fa", "selected": "#52405f",
+      "success": "#a9dcb5", "warning": "#ffd293", "danger": "#ffb0ba", "alternate": "#99e0e8"
     }
   },
   {
     "id": "celadon", "name": "雨后青瓷", "scheme": "light", "description": "浅瓷白与松针绿",
     "colors": {
-      "window": "#eaf1ed", "panel": "#f8fcf9", "well": "#fdfffd", "control": "#e5eee8", "hover": "#d6e5dc",
-      "line": "#c0d1c6", "edge": "#607e6e", "text": "#192e24", "muted": "#455e50",
-      "accent": "#24664c", "on-accent": "#ffffff", "link": "#155338", "selected": "#d4e8db",
+      "window": "#eaf1ee", "panel": "#f4faf7", "well": "#fbfffd", "control": "#eaf3ee", "hover": "#e0eee6",
+      "line": "#cbded3", "edge": "#658373", "text": "#22362d", "muted": "#455e50",
+      "accent": "#346d55", "on-accent": "#ffffff", "link": "#235841", "selected": "#d8eae0",
       "success": "#285b21", "warning": "#714909", "danger": "#923139", "alternate": "#604a92"
     }
   },
   {
-    "id": "signal", "name": "信号高对比", "scheme": "dark", "description": "近黑底、亮黄焦点与清晰边界",
+    "id": "neon", "name": "赛博霓虹", "scheme": "dark", "profile": "tech", "description": "蓝黑底、冷青高亮与品红点缀",
     "colors": {
-      "window": "#08090b", "panel": "#101114", "well": "#050607", "control": "#1c1e22", "hover": "#303238",
-      "line": "#878b94", "edge": "#c7cbd3", "text": "#ffffff", "muted": "#dbdee5",
-      "accent": "#ffe051", "on-accent": "#181400", "link": "#fff192", "selected": "#39341c",
-      "success": "#9af1b2", "warning": "#ffbb80", "danger": "#ff9aaf", "alternate": "#94e3ff"
+      "window": "#101521", "panel": "#171d2b", "well": "#131926", "control": "#222c3d", "hover": "#303c50",
+      "line": "#354358", "edge": "#8197b1", "text": "#edf4ff", "muted": "#b6c6d9",
+      "accent": "#62e7ef", "on-accent": "#0c2830", "link": "#90f1f8", "selected": "#294454",
+      "success": "#8ce4ad", "warning": "#ffcf88", "danger": "#ffb2c4", "alternate": "#f39edb"
+    }
+  },
+  {
+    "id": "frontier", "name": "边境工业", "scheme": "light", "profile": "industrial", "description": "暖白面板、石墨文字与安全黄标记",
+    "colors": {
+      "window": "#e8e6df", "panel": "#f8f7f1", "well": "#fffdf6", "control": "#e8e7e0", "hover": "#deddd5",
+      "line": "#c9c7bf", "edge": "#727169", "text": "#272923", "muted": "#55564d",
+      "accent": "#efcc4e", "on-accent": "#27261e", "link": "#5c471b", "selected": "#eee3b8",
+      "success": "#305b3d", "warning": "#704506", "danger": "#872f36", "alternate": "#4f5463"
+    }
+  },
+  {
+    "id": "sandstone", "name": "暖砂工坊", "scheme": "light", "profile": "warm", "description": "米白、暖灰与陶土橙选中层",
+    "colors": {
+      "window": "#eee5d9", "panel": "#fcf6ed", "well": "#fffbf5", "control": "#f2e7da", "hover": "#ecdece",
+      "line": "#dccbbb", "edge": "#876e5d", "text": "#382a23", "muted": "#634f44",
+      "accent": "#a04f35", "on-accent": "#fff9f0", "link": "#7a3d29", "selected": "#f2d8c6",
+      "success": "#386044", "warning": "#754618", "danger": "#882f3d", "alternate": "#654568"
     }
   }
 ]

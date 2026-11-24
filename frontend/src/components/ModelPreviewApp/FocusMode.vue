@@ -284,7 +284,7 @@ function onListWheel(e: WheelEvent, type: Kind) {
         {{ rate.toFixed(1) }}×
         <small v-if="!rateSupported">（当前模型不支持）</small>
       </label>
-      <button type="button" @click="emit('close')">关闭 <small>Ctrl + Q</small></button>
+      <button class="ui-button" type="button" @click="emit('close')">关闭 <small>Ctrl + Q</small></button>
     </header>
     <div class="focus-content">
       <div class="focus-preview">
@@ -297,8 +297,8 @@ function onListWheel(e: WheelEvent, type: Kind) {
             <button class="section-title" type="button" :aria-expanded="!section.collapsed" @click="toggle(section.type)">
               {{ section.collapsed ? '▸' : '▾' }} {{ section.title }}
             </button>
-            <button type="button" @click="showCurrent(section.type)">当前</button>
-            <button type="button" :disabled="!ready" @click="playRandom(section.type)">随机</button>
+            <button class="ui-button" type="button" @click="showCurrent(section.type)">当前</button>
+            <button class="ui-button" type="button" :disabled="!ready" @click="playRandom(section.type)">随机</button>
           </div>
           <div v-show="!section.collapsed" class="section-body">
             <SearchInput v-if="section.type === 'motion'" v-model="motionSearch" placeholder="搜索动作..." />
@@ -334,25 +334,26 @@ function onListWheel(e: WheelEvent, type: Kind) {
 .focus-header { height: 50px; flex-shrink: 0; display: flex; align-items: center; gap: 18px; padding: 0 16px; border-bottom: 1px solid var(--ui-line); }
 .focus-header strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-header label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-button { color: inherit; background: var(--ui-control); border: 1px solid var(--ui-edge); border-radius: 4px; cursor: pointer; }
-button:hover:not(:disabled) { background: var(--ui-hover); }
-button:disabled { opacity: .55; cursor: default; }
 .focus-header button { padding: 6px 12px; }
 .focus-content { display: flex; flex: 1; min-height: 0; gap: 8px; padding: 8px; }
 .focus-preview { position: relative; flex: 1; min-width: 200px; }
 .preview-status { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .focus-lists { width: 55%; min-width: 300px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.list-section { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 5px; overflow: hidden; }
+.list-section { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: var(--ui-radius-panel); overflow: hidden; }
 .list-section.collapsed { flex: 0 0 auto; }
-.section-header { display: flex; gap: 4px; align-items: center; padding-right: 6px; background: var(--ui-control); }
+.section-header { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--ui-line); }
 .section-header > button:not(.section-title) { padding: 3px 7px; font-size: 12px; }
-.section-title { flex: 1; border: 0; border-radius: 0; text-align: left; padding: 8px; font-weight: bold; }
+.section-title { flex: 1; border: 0; background: transparent; text-align: left; padding: 8px; font-weight: bold; cursor: pointer; }
+.section-title:hover { background: var(--ui-hover); }
 .section-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
-.breadcrumbs { flex: 0 0 auto; overflow-x: auto; white-space: nowrap; font-size: 12px; }
-.breadcrumbs button { border: 0; background: none; padding: 2px; }
+.breadcrumbs { flex: 0 0 auto; overflow-x: auto; white-space: nowrap; padding: 3px 6px; font-size: 12px; background: var(--ui-control); border-radius: var(--ui-radius-compact); }
+.breadcrumbs button { border: 0; background: none; padding: 2px; cursor: pointer; }
+.breadcrumbs button:disabled { cursor: default; }
 .item-scroll { flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; user-select: none; }
 .item-grid { height: 100%; width: max-content; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 32px); grid-auto-columns: 145px; gap: 4px; align-content: start; }
-.item { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 8px; font-size: 12px; }
+.item { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 8px; font-size: 12px; background: var(--ui-control); border: 1px solid var(--ui-control-line); cursor: pointer; }
+.item:hover:not(:disabled) { background: var(--ui-hover); }
+.item:disabled { color: var(--ui-muted); cursor: not-allowed; }
 .item.selected { border-color: var(--ui-link); background: var(--ui-selected); }
 .folder { color: var(--ui-warning); }
 .empty { color: var(--ui-muted); font-size: 13px; }

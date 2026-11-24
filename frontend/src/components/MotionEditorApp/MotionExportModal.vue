@@ -190,12 +190,12 @@ async function onConfirm() {
   background-color: var(--ui-dialog);
   color: var(--ui-text);
   width: min(440px, 92vw);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-panel);
   border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px var(--ui-shadow);
+  box-shadow: var(--ui-panel-shadow);
 }
 
 .mex-modal__header {

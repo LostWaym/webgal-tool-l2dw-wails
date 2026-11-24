@@ -46,7 +46,7 @@ function close() { if (!busy.value) { selected.value = null; emit('close') } }
 <template>
   <Teleport to="body">
     <div v-if="props.visible" class="project-mask" @click.self="close">
-      <section class="project-modal">
+      <section class="ui-dialog project-modal">
         <header><h2>预览项目</h2><button class="close" @click="close">×</button></header>
         <div class="body">
           <div class="actions">
@@ -74,7 +74,7 @@ function close() { if (!busy.value) { selected.value = null; emit('close') } }
 
 <style scoped>
 .project-mask { position: fixed; inset: 0; z-index: 9999; background: var(--ui-scrim); display: flex; align-items: center; justify-content: center; }
-.project-modal { width: min(760px, 94vw); max-height: 85vh; display: flex; flex-direction: column; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 9px; color: var(--ui-text); box-shadow: 0 12px 40px var(--ui-shadow); }
+.project-modal { width: min(760px, 94vw); max-height: 85vh; display: flex; flex-direction: column; }
 header, footer { display: flex; align-items: center; gap: 10px; padding: 14px 18px; }
 header { border-bottom: 1px solid var(--ui-line); } h2 { flex: 1; margin: 0; font-size: 16px; } h3 { font-size: 14px; margin: 18px 0 6px; }
 .body { overflow: auto; padding: 16px 18px; } .actions { display: flex; gap: 10px; } button { border: 1px solid var(--ui-edge); border-radius: 5px; padding: 8px 13px; color: inherit; background: var(--ui-control); cursor: pointer; } button:disabled { opacity: .45; cursor: default; } .primary { background: var(--ui-accent); border-color: var(--ui-link); color: var(--ui-on-accent); } .close { border: 0; background: transparent; font-size: 22px; padding: 0 5px; }

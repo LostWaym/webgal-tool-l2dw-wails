@@ -144,7 +144,7 @@ async function importFile() {
 <template>
   <Teleport to="body">
     <div v-if="visible" class="guide-mask" @click.self="close">
-      <section ref="modal" class="guide-modal" role="dialog" aria-modal="true" aria-labelledby="guide-title"
+      <section ref="modal" class="ui-dialog guide-modal" role="dialog" aria-modal="true" aria-labelledby="guide-title"
         tabindex="-1" @keydown.esc.stop.prevent="close">
         <header>
           <h2 id="guide-title">游标管理 <span>（{{ store.guides.length }} 条）</span></h2>
@@ -198,7 +198,7 @@ async function importFile() {
 
 <style scoped>
 .guide-mask { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--ui-shadow); }
-.guide-modal { box-sizing: border-box; width: min(660px, 92vw); height: min(480px, 85vh); display: flex; flex-direction: column; color: var(--ui-text); background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 9px; box-shadow: 0 12px 40px var(--ui-shadow); }
+.guide-modal { width: min(660px, 92vw); height: min(480px, 85vh); display: flex; flex-direction: column; }
 .guide-modal:focus { outline: none; }
 header, footer { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 12px 18px; }
 header { border-bottom: 1px solid var(--ui-line); }

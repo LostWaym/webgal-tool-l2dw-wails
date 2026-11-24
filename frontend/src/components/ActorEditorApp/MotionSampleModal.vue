@@ -83,7 +83,7 @@ onBeforeUnmount(() => { loadToken++ })
 <template>
   <Teleport to="body">
     <div class="sample-mask" @click.self="emit('close')">
-      <section class="sample-modal" role="dialog" aria-modal="true" aria-labelledby="motion-sample-title">
+      <section class="ui-dialog sample-modal" role="dialog" aria-modal="true" aria-labelledby="motion-sample-title">
         <header class="sample-header">
           <h2 id="motion-sample-title">从动作采样表情</h2>
           <span v-if="motion?.skippedTargets.length" class="sample-warning" role="status">
@@ -123,7 +123,7 @@ onBeforeUnmount(() => { loadToken++ })
 
 <style scoped>
 .sample-mask { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: var(--ui-scrim); }
-.sample-modal { width: min(1000px, 92vw); height: min(740px, 90vh); display: flex; flex-direction: column; background: var(--ui-panel); color: var(--ui-text); border: 1px solid var(--ui-line); border-radius: 8px; overflow: hidden; }
+.sample-modal { width: min(1000px, 92vw); height: min(740px, 90vh); display: flex; flex-direction: column; overflow: hidden; }
 .sample-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--ui-line); }
 .sample-header h2 { margin: 0 auto 0 0; font-size: 16px; }
 .sample-close { background: none; border: 0; color: var(--ui-text); font-size: 24px; cursor: pointer; }

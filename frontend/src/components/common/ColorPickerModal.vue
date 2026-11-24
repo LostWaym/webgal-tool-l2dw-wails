@@ -182,8 +182,8 @@ function onMaskClick(e: MouseEvent) {
   padding: 16px;
   background-color: var(--ui-dialog);
   border: 1px solid var(--ui-edge);
-  border-radius: 8px;
-  box-shadow: 0 10px 30px var(--ui-shadow);
+  border-radius: var(--ui-radius-panel);
+  box-shadow: var(--ui-panel-shadow);
   color: var(--ui-text);
 }
 

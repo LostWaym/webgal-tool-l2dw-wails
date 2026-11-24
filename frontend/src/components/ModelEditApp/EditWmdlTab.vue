@@ -252,18 +252,18 @@ const fileName = computed(() => {
     <!-- 顶部操作区 -->
     <div class="file-name" :title="store.currentWmdl.wmdlFilePath">{{ fileName }}</div>
     <header class="wmdl-tab__header">
-      <button class="op-btn op-btn--primary" :disabled="busy" @click="onLoad">加载 wmdl</button>
-      <button class="op-btn" :disabled="busy" @click="onSave">保存 wmdl</button>
+      <button class="ui-button ui-button--primary op-btn" :disabled="busy" @click="onLoad">加载 wmdl</button>
+      <button class="ui-button op-btn" :disabled="busy" @click="onSave">保存 wmdl</button>
     </header>
 
     <!-- 模型 json 保存 -->
     <section class="model-json-save">
       <h3 class="section-title model-json-save__title">模型json保存</h3>
       <div class="model-json-save__row">
-        <button class="op-btn" :disabled="busy || !store.selectedModelId" @click="onSaveSelectedModelJson">
+        <button class="ui-button op-btn" :disabled="busy || !store.selectedModelId" @click="onSaveSelectedModelJson">
           保存当前选中
         </button>
-        <button class="op-btn" :disabled="busy || store.currentWmdl.models.length === 0" @click="onSaveAllModelJsons">
+        <button class="ui-button op-btn" :disabled="busy || store.currentWmdl.models.length === 0" @click="onSaveAllModelJsons">
           保存所有
         </button>
         <!-- 暂时不支持另存为 -->
@@ -401,32 +401,7 @@ const fileName = computed(() => {
 
 .op-btn {
   padding: 8px 14px;
-  background: var(--ui-control);
-  color: var(--ui-text);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  cursor: pointer;
   font-size: 13px;
-  transition: background 0.12s ease;
-}
-
-.op-btn:hover:not(:disabled) {
-  background: var(--ui-hover);
-}
-
-.op-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.op-btn--primary {
-  background: var(--ui-accent);
-  border-color: var(--ui-link);
-  color: var(--ui-on-accent);
-}
-
-.op-btn--primary:hover:not(:disabled) {
-  background: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .file-name {
@@ -506,7 +481,7 @@ const fileName = computed(() => {
   padding: 6px 8px;
   background: var(--ui-well);
   border: 1px solid var(--ui-edge);
-  border-radius: 4px;
+  border-radius: var(--ui-radius-compact);
   color: var(--ui-text);
   font-size: 13px;
   font-family: inherit;
@@ -515,7 +490,6 @@ const fileName = computed(() => {
 
 .field__input:focus,
 .field__textarea:focus {
-  outline: none;
   border-color: var(--ui-link);
 }
 

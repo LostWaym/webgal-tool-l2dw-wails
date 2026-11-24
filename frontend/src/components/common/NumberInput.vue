@@ -152,10 +152,9 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
   background: var(--ui-control);
   border: 1px solid var(--ui-edge);
-  border-radius: 6px;
+  border-radius: var(--ui-radius-compact);
   color: var(--ui-text);
   font-size: 13px;
-  outline: none;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
   font-family: inherit;

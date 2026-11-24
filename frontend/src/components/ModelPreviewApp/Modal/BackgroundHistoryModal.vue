@@ -72,12 +72,12 @@ function onRemove(path: string) {
   color: var(--ui-text);
   width: min(900px, 94vw);
   height: min(640px, 86vh);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-panel);
   border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px var(--ui-shadow);
+  box-shadow: var(--ui-panel-shadow);
 }
 
 .bg-history-modal__header {

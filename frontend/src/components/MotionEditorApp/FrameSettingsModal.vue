@@ -114,8 +114,8 @@ function onApply() {
           </section>
 
           <footer class="frame-modal__footer">
-            <button type="button" class="frame-btn" @click="close">取消</button>
-            <button type="button" class="frame-btn frame-btn--primary" @click="onApply">应用</button>
+            <button type="button" class="ui-button frame-btn" @click="close">取消</button>
+            <button type="button" class="ui-button ui-button--primary frame-btn" @click="onApply">应用</button>
           </footer>
         </div>
       </div>
@@ -138,12 +138,12 @@ function onApply() {
   background-color: var(--ui-dialog);
   color: var(--ui-text);
   width: min(420px, 92vw);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-panel);
   border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px var(--ui-shadow);
+  box-shadow: var(--ui-panel-shadow);
 }
 
 .frame-modal__header {
@@ -204,10 +204,9 @@ function onApply() {
   padding: 6px 10px;
   background: var(--ui-panel);
   border: 1px solid var(--ui-edge);
-  border-radius: 4px;
+  border-radius: var(--ui-radius-compact);
   color: var(--ui-text);
   font-size: 13px;
-  outline: none;
 }
 
 .frame-field__input:focus {
@@ -239,25 +238,6 @@ function onApply() {
 
 .frame-btn {
   padding: 6px 16px;
-  background: var(--ui-control);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  color: var(--ui-text);
   font-size: 13px;
-  cursor: pointer;
-}
-
-.frame-btn:hover {
-  background: var(--ui-hover);
-}
-
-.frame-btn--primary {
-  background: var(--ui-accent);
-  border-color: var(--ui-link);
-  color: var(--ui-on-accent);
-}
-
-.frame-btn--primary:hover {
-  background: var(--ui-accent); color: var(--ui-on-accent);
 }
 </style>

@@ -329,22 +329,22 @@ function onListWheel(e: WheelEvent, type: Kind) {
 </template>
 
 <style scoped>
-.focus-mode { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; color: #e6e6e6; background: #181a20; }
-.gesture-hint { position: fixed; z-index: 20; box-sizing: border-box; width: min(240px, calc(100vw - 16px)); height: 32px; padding: 7px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; border: 1px solid #56739a; border-radius: 5px; background: rgba(32, 42, 56, .95); color: #f3f6fa; font-size: 12px; box-shadow: 0 3px 10px #0006; }
-.focus-header { height: 50px; flex-shrink: 0; display: flex; align-items: center; gap: 18px; padding: 0 16px; border-bottom: 1px solid #3a4150; }
+.focus-mode { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; color: var(--ui-text); background: var(--ui-window); }
+.gesture-hint { position: fixed; z-index: 20; box-sizing: border-box; width: min(240px, calc(100vw - 16px)); height: 32px; padding: 7px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; border: 1px solid var(--ui-link); border-radius: 5px; background: var(--ui-control); color: var(--ui-text); font-size: 12px; box-shadow: 0 3px 10px var(--ui-shadow); }
+.focus-header { height: 50px; flex-shrink: 0; display: flex; align-items: center; gap: 18px; padding: 0 16px; border-bottom: 1px solid var(--ui-line); }
 .focus-header strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-header label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-button { color: inherit; background: #2c313a; border: 1px solid #414958; border-radius: 4px; cursor: pointer; }
-button:hover:not(:disabled) { background: #3a4658; }
+button { color: inherit; background: var(--ui-control); border: 1px solid var(--ui-edge); border-radius: 4px; cursor: pointer; }
+button:hover:not(:disabled) { background: var(--ui-hover); }
 button:disabled { opacity: .55; cursor: default; }
 .focus-header button { padding: 6px 12px; }
 .focus-content { display: flex; flex: 1; min-height: 0; gap: 8px; padding: 8px; }
 .focus-preview { position: relative; flex: 1; min-width: 200px; }
 .preview-status { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .focus-lists { width: 55%; min-width: 300px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.list-section { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; background: #22262e; border: 1px solid #343b46; border-radius: 5px; overflow: hidden; }
+.list-section { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 5px; overflow: hidden; }
 .list-section.collapsed { flex: 0 0 auto; }
-.section-header { display: flex; gap: 4px; align-items: center; padding-right: 6px; background: #2c313a; }
+.section-header { display: flex; gap: 4px; align-items: center; padding-right: 6px; background: var(--ui-control); }
 .section-header > button:not(.section-title) { padding: 3px 7px; font-size: 12px; }
 .section-title { flex: 1; border: 0; border-radius: 0; text-align: left; padding: 8px; font-weight: bold; }
 .section-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
@@ -353,7 +353,7 @@ button:disabled { opacity: .55; cursor: default; }
 .item-scroll { flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; user-select: none; }
 .item-grid { height: 100%; width: max-content; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 32px); grid-auto-columns: 145px; gap: 4px; align-content: start; }
 .item { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 8px; font-size: 12px; }
-.item.selected { border-color: #4c9aff; background: #285180; }
-.folder { color: #e9c77a; }
-.empty { color: #999; font-size: 13px; }
+.item.selected { border-color: var(--ui-link); background: var(--ui-selected); }
+.folder { color: var(--ui-warning); }
+.empty { color: var(--ui-muted); font-size: 13px; }
 </style>

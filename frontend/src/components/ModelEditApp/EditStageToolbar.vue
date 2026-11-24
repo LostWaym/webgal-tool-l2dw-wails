@@ -56,24 +56,24 @@ function onWatchChange(checked: boolean) {
   align-items: center;
   gap: 12px;
   padding: 6px 12px;
-  background: #1d2026;
-  border-bottom: 1px solid #2c313a;
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
 .toolbar-btn {
   padding: 4px 10px;
   font-size: 12px;
-  background: #2c313a;
-  color: #e6e6e6;
-  border: 1px solid #3a414c;
+  background: var(--ui-control);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.12s ease;
 }
 
 .toolbar-btn:hover:not(:disabled) {
-  background: #353c47;
+  background: var(--ui-hover);
 }
 
 .toolbar-btn:disabled {
@@ -86,7 +86,7 @@ function onWatchChange(checked: boolean) {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   user-select: none;
   cursor: pointer;
 }

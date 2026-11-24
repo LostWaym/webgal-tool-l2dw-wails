@@ -150,10 +150,10 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   padding: 8px 12px;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 6px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
@@ -170,19 +170,19 @@ onBeforeUnmount(() => {
 }
 
 .number-input--display:hover {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .number-input--display:focus {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .number-input--editing {
   width: 100%;
-  border-color: #2f80ed;
-  background: #1c2028;
-  color: #f0f0f0;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+  border-color: var(--ui-link);
+  background: var(--ui-well);
+  color: var(--ui-text);
+  box-shadow: inset 0 1px 3px var(--ui-shadow);
   text-align: left;
   font-variant-numeric: tabular-nums;
 }

@@ -367,7 +367,7 @@ function onApplyToModel() {
 .filter-preset-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--ui-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -375,23 +375,23 @@ function onApplyToModel() {
 }
 
 .filter-preset-modal {
-  background-color: rgba(29, 32, 38, 0.92);
-  color: #e6e6e6;
+  background-color: var(--ui-dialog);
+  color: var(--ui-text);
   width: min(900px, 94vw);
   height: min(640px, 86vh);
   border-radius: 8px;
-  border: 1px solid rgba(60, 68, 80, 0.35);
+  border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 40px var(--ui-shadow);
 }
 
 .filter-preset-modal__header {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
@@ -400,13 +400,13 @@ function onApplyToModel() {
   font-size: 15px;
   font-weight: 600;
   flex: 1;
-  color: #ffffff;
+  color: var(--ui-text);
 }
 
 .icon-btn {
   background-color: transparent;
   border: none;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 22px;
   line-height: 1;
   width: 28px;
@@ -417,8 +417,8 @@ function onApplyToModel() {
 }
 
 .icon-btn:hover {
-  background-color: rgba(53, 60, 71, 0.42);
-  color: #ffffff;
+  background-color: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .filter-preset-modal__body {
@@ -434,16 +434,16 @@ function onApplyToModel() {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid rgba(60, 68, 80, 0.35);
-  background-color: rgba(20, 23, 28, 0.42);
+  border-right: 1px solid var(--ui-line);
+  background-color: var(--ui-well);
 }
 
 .preset-list__header {
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 500;
-  color: #b0b8c4;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  color: var(--ui-muted);
+  border-bottom: 1px solid var(--ui-line);
 }
 
 .preset-list__items {
@@ -460,7 +460,7 @@ function onApplyToModel() {
   justify-content: space-between;
   padding: 6px 12px;
   font-size: 13px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   cursor: pointer;
   border-left: 3px solid transparent;
   transition: background-color 0.12s ease, border-color 0.12s ease;
@@ -477,10 +477,10 @@ function onApplyToModel() {
   flex-shrink: 0;
   width: 24px;
   height: 24px;
-  background-color: rgba(47, 128, 237, 0.7);
-  border: 1px solid rgba(47, 128, 237, 0.85);
+  background-color: var(--ui-accent);
+  border: 1px solid var(--ui-link);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--ui-on-accent);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -497,7 +497,7 @@ function onApplyToModel() {
 }
 
 .preset-list__apply-btn:hover {
-  background-color: rgba(63, 144, 255, 0.95);
+  background-color: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .preset-list__apply-btn:active {
@@ -505,19 +505,19 @@ function onApplyToModel() {
 }
 
 .preset-list__item:hover {
-  background-color: rgba(53, 60, 71, 0.42);
+  background-color: var(--ui-hover);
 }
 
 .preset-list__item.is-active {
-  background-color: rgba(47, 128, 237, 0.18);
-  border-left-color: #2f80ed;
-  color: #ffffff;
+  background-color: var(--ui-selected);
+  border-left-color: var(--ui-link);
+  color: var(--ui-text);
 }
 
 .preset-list__empty {
   padding: 12px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--ui-muted);
   text-align: center;
 }
 
@@ -532,7 +532,7 @@ function onApplyToModel() {
 
 .preset-editor__empty {
   margin: auto;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
   padding: 24px;
 }
@@ -540,8 +540,8 @@ function onApplyToModel() {
 .preset-editor__name {
   padding: 10px 16px;
   font-size: 13px;
-  color: #b0b8c4;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  color: var(--ui-muted);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
@@ -559,7 +559,7 @@ function onApplyToModel() {
 }
 
 .filter-group__title {
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.4px;
@@ -574,7 +574,7 @@ function onApplyToModel() {
 
 .form-row label {
   width: 56px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   flex-shrink: 0;
   padding: 4px 6px;
@@ -583,17 +583,17 @@ function onApplyToModel() {
 .form-input {
   flex: 1;
   padding: 6px 10px;
-  background-color: rgba(38, 43, 52, 0.6);
-  border: 1px solid rgba(60, 68, 80, 0.7);
+  background-color: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 6px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
 }
 
 .form-input:focus {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .form-row--check label {
@@ -605,7 +605,7 @@ function onApplyToModel() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
 }
@@ -614,12 +614,12 @@ function onApplyToModel() {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #2f80ed;
+  accent-color: var(--ui-link);
 }
 
 .form-row__color-label {
   width: 56px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   flex-shrink: 0;
   padding: 4px 6px;
@@ -632,16 +632,16 @@ function onApplyToModel() {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid rgba(60, 68, 80, 0.35);
-  background-color: rgba(20, 23, 28, 0.42);
+  border-left: 1px solid var(--ui-line);
+  background-color: var(--ui-well);
 }
 
 .preset-preview__header {
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 500;
-  color: #b0b8c4;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  color: var(--ui-muted);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
@@ -662,7 +662,7 @@ function onApplyToModel() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
   padding: 24px;
   text-align: center;
@@ -673,25 +673,25 @@ function onApplyToModel() {
   display: flex;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(60, 68, 80, 0.35);
-  background-color: rgba(35, 40, 48, 0.62);
+  border-top: 1px solid var(--ui-line);
+  background-color: var(--ui-control);
   flex-shrink: 0;
 }
 
 .footer-btn {
   flex: 1;
   padding: 8px 12px;
-  background-color: rgba(44, 49, 58, 0.7);
-  border: 1px solid rgba(60, 68, 80, 0.7);
+  background-color: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
   transition: background-color 0.12s ease;
 }
 
 .footer-btn:hover:not(:disabled) {
-  background-color: rgba(53, 60, 71, 0.9);
+  background-color: var(--ui-hover);
 }
 
 .footer-btn:disabled {
@@ -700,13 +700,13 @@ function onApplyToModel() {
 }
 
 .footer-btn--primary {
-  background-color: rgba(47, 128, 237, 0.85);
-  border-color: rgba(47, 128, 237, 0.85);
-  color: #ffffff;
+  background-color: var(--ui-accent);
+  border-color: var(--ui-link);
+  color: var(--ui-on-accent);
 }
 
 .footer-btn--primary:hover:not(:disabled) {
-  background-color: rgba(63, 144, 255, 0.95);
+  background-color: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .fade-enter-active,

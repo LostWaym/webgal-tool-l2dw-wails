@@ -60,7 +60,7 @@ function onRemove(path: string) {
 .bg-history-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--ui-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -68,23 +68,23 @@ function onRemove(path: string) {
 }
 
 .bg-history-modal {
-  background-color: rgba(29, 32, 38, 0.92);
-  color: #e6e6e6;
+  background-color: var(--ui-dialog);
+  color: var(--ui-text);
   width: min(900px, 94vw);
   height: min(640px, 86vh);
   border-radius: 8px;
-  border: 1px solid rgba(60, 68, 80, 0.35);
+  border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 40px var(--ui-shadow);
 }
 
 .bg-history-modal__header {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
@@ -93,13 +93,13 @@ function onRemove(path: string) {
   font-size: 15px;
   font-weight: 600;
   flex: 1;
-  color: #ffffff;
+  color: var(--ui-text);
 }
 
 .icon-btn {
   background-color: transparent;
   border: none;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 22px;
   line-height: 1;
   width: 28px;
@@ -110,8 +110,8 @@ function onRemove(path: string) {
 }
 
 .icon-btn:hover {
-  background-color: rgba(53, 60, 71, 0.42);
-  color: #ffffff;
+  background-color: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .bg-history-modal__body {
@@ -134,20 +134,20 @@ function onRemove(path: string) {
   height: 256px;
   border-radius: 6px;
   overflow: hidden;
-  border: 2px solid rgba(60, 68, 80, 0.5);
+  border: 2px solid var(--ui-edge);
   cursor: pointer;
-  background: rgba(20, 23, 28, 0.6);
+  background: var(--ui-well);
   display: flex;
   flex-direction: column;
   transition: border-color 0.12s ease;
 }
 
 .history-card:hover {
-  border-color: rgba(47, 128, 237, 0.8);
+  border-color: var(--ui-link);
 }
 
 .history-card.is-current {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .history-card__thumb {
@@ -164,8 +164,8 @@ function onRemove(path: string) {
   line-height: 26px;
   padding: 0 8px;
   font-size: 12px;
-  color: #e6e6e6;
-  background: rgba(20, 23, 28, 0.85);
+  color: var(--ui-text);
+  background: var(--ui-well);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -179,8 +179,8 @@ function onRemove(path: string) {
   height: 20px;
   border: none;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--ui-floating);
+  color: var(--ui-text);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -197,7 +197,7 @@ function onRemove(path: string) {
 }
 
 .history-card__remove:hover {
-  background: #b03a3a;
+  background: var(--ui-danger); color: var(--ui-on-status);
 }
 
 .history-empty {
@@ -205,7 +205,7 @@ function onRemove(path: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
 }
 

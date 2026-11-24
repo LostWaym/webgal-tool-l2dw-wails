@@ -80,14 +80,15 @@ func main() {
 	// 根据启动模式选择窗口标题、尺寸与窗口选项
 	title := "L2DW-Wails - 预览编辑器"
 	width, height := 1280, 800
-	var winOpts *windows.Options
+	startTheme := &palettes[0]
+	if id, err := app.GetAppTheme(); err == nil {
+		startTheme = findPalette(id)
+	}
+	bg, theme := startTheme.nativeWindow()
+	winOpts := &windows.Options{Theme: theme}
 	if editorFlag {
 		title = "L2DW-Wails - 模型编辑器"
 		width, height = 1400, 900
-		winOpts = &windows.Options{
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
-		}
 	} else if actorFlag {
 		title = "L2DW-Wails - 演出编辑器"
 		width, height = 1200, 800
@@ -102,7 +103,7 @@ func main() {
 		Height:           height,
 		MinWidth:         900,
 		MinHeight:        600,
-		BackgroundColour: &options.RGBA{R: 24, G: 26, B: 32, A: 1},
+		BackgroundColour: bg,
 		AssetServer: &assetserver.Options{
 			Assets:     assets,
 			Handler:    http.HandlerFunc(app.ServeFile),

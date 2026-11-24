@@ -1665,9 +1665,9 @@ function onLabelDragEnd() {
   top: 0;
   bottom: 0;
   z-index: 100;
-  background: rgba(29, 32, 38, 0.92);
+  background: var(--ui-panel);
   backdrop-filter: blur(8px);
-  border-left: 1px solid #2c313a;
+  border-left: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1688,14 +1688,14 @@ function onLabelDragEnd() {
 }
 
 .panel__drag-handle:hover {
-  background: #2f80ed;
+  background: var(--ui-accent); color: var(--ui-on-accent);
 }
 
 .panel__model-name {
   padding: 10px 12px;
   font-size: 13px;
-  color: #e6e6e6;
-  border-bottom: 1px solid #2c313a;
+  color: var(--ui-text);
+  border-bottom: 1px solid var(--ui-line);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1703,7 +1703,7 @@ function onLabelDragEnd() {
 
 .panel__tabs {
   display: flex;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
   padding: 0 12px;
 }
 
@@ -1712,7 +1712,7 @@ function onLabelDragEnd() {
   padding: 12px 8px;
   background: transparent;
   border: none;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   cursor: pointer;
   transition: color 0.15s, border-bottom 0.15s;
@@ -1722,12 +1722,12 @@ function onLabelDragEnd() {
 }
 
 .tab-btn:hover {
-  color: #e6e6e6;
+  color: var(--ui-text);
 }
 
 .tab-btn.is-active {
-  color: #e6e6e6;
-  border-bottom-color: #2f80ed;
+  color: var(--ui-text);
+  border-bottom-color: var(--ui-link);
 }
 
 .tab-btn__label {
@@ -1738,7 +1738,7 @@ function onLabelDragEnd() {
 .tab-settings-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--ui-scrim);
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
@@ -1756,7 +1756,7 @@ function onLabelDragEnd() {
   opacity: 0;
   transition: opacity 0.2s ease;
   z-index: 2;
-  filter: brightness(0) invert(1);
+  filter: var(--ui-icon-filter);
   pointer-events: none;
 }
 
@@ -1780,7 +1780,7 @@ function onLabelDragEnd() {
   flex: 0 0 auto;
   padding: 6px 8px;
   gap: 4px;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
 }
 
 .transform-toolbar button {
@@ -1790,19 +1790,19 @@ function onLabelDragEnd() {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   cursor: pointer;
 }
 
 .transform-toolbar button:hover {
-  background: #2a3140;
-  color: #e6e6e6;
+  background: var(--ui-selected);
+  color: var(--ui-text);
 }
 
 .transform-toolbar button.is-active {
-  background: #2f80ed;
-  color: #fff;
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
 }
 
 .panel__list-region {
@@ -1824,13 +1824,13 @@ function onLabelDragEnd() {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid #2c313a;
-  background: #232830;
+  border-bottom: 1px solid var(--ui-line);
+  background: var(--ui-panel);
 }
 
 .list-region-title {
   flex: 1;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   font-weight: 500;
 }
@@ -1843,7 +1843,7 @@ function onLabelDragEnd() {
   opacity: 0.6;
   cursor: pointer;
   transition: opacity 0.15s ease;
-  filter: brightness(0) invert(1);
+  filter: var(--ui-icon-filter);
   pointer-events: auto;
 }
 
@@ -1859,9 +1859,9 @@ function onLabelDragEnd() {
   height: 22px;
   padding: 0;
   background: transparent;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
@@ -1869,16 +1869,16 @@ function onLabelDragEnd() {
 }
 
 .list-region-toggle:hover {
-  background: #2a3140;
-  color: #e6e6e6;
+  background: var(--ui-selected);
+  color: var(--ui-text);
 }
 
 .list-region-shuffle {
   padding: 2px 6px;
   background: transparent;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
@@ -1886,8 +1886,8 @@ function onLabelDragEnd() {
 }
 
 .list-region-shuffle:hover {
-  background: #2a3140;
-  color: #e6e6e6;
+  background: var(--ui-selected);
+  color: var(--ui-text);
 }
 
 .list-region-body {
@@ -1904,7 +1904,7 @@ function onLabelDragEnd() {
 
 .panel__search {
   padding: 8px 12px;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-edge);
 }
 
 .panel__list {
@@ -1929,21 +1929,21 @@ function onLabelDragEnd() {
   border-left: 3px solid transparent;
   transition: background 0.12s ease, border-color 0.12s ease;
   font-size: 13px;
-  color: #e6e6e6;
+  color: var(--ui-text);
 }
 
 .list-item:hover {
-  background: #262b34;
+  background: var(--ui-control);
 }
 
 .list-item.is-playing {
-  background: #2a3140;
-  border-left-color: #2f80ed;
+  background: var(--ui-selected);
+  border-left-color: var(--ui-link);
   font-weight: 500;
 }
 
 .list-item--empty {
-  color: #6b7280;
+  color: var(--ui-muted);
   cursor: default;
   justify-content: center;
 }
@@ -1979,7 +1979,7 @@ function onLabelDragEnd() {
 
 .form-row label {
   width: 40px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   flex-shrink: 0;
   cursor: ew-resize;
@@ -1989,7 +1989,7 @@ function onLabelDragEnd() {
 }
 
 .form-row label:hover {
-  background: #2a3140;
+  background: var(--ui-selected);
 }
 
 .list-breadcrumb {
@@ -1999,8 +1999,8 @@ function onLabelDragEnd() {
   padding: 6px 12px;
   overflow-x: auto;
   white-space: nowrap;
-  border-bottom: 1px solid #2c313a;
-  color: #8d99aa;
+  border-bottom: 1px solid var(--ui-line);
+  color: var(--ui-muted);
   font-size: 12px;
 }
 
@@ -2008,17 +2008,17 @@ function onLabelDragEnd() {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #8fb9ef;
+  color: var(--ui-link);
   cursor: pointer;
 }
 
 .list-breadcrumb button:disabled {
-  color: #d1d5db;
+  color: var(--ui-text);
   cursor: default;
 }
 
 .list-item--folder {
-  color: #a9c8ed;
+  color: var(--ui-link);
 }
 
 .filter-drag-label {
@@ -2033,17 +2033,17 @@ function onLabelDragEnd() {
 .form-input {
   flex: 1;
   padding: 8px 12px;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 6px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
 }
 
 .form-input:focus {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .form-row--btn {
@@ -2057,34 +2057,34 @@ function onLabelDragEnd() {
 
 .reset-btn {
   padding: 8px 24px;
-  background: #2f80ed;
+  background: var(--ui-accent);
   border: none;
   border-radius: 6px;
-  color: #fff;
+  color: var(--ui-on-accent);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .reset-btn:hover {
-  background: #3d8ef0;
+  background: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .snapshot-btn {
   flex: 1;
   padding: 8px 12px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 6px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .snapshot-btn:hover {
-  background: #353c47;
-  border-color: #2f80ed;
+  background: var(--ui-hover);
+  border-color: var(--ui-link);
 }
 
 /* ───────── 信息页签 ───────── */
@@ -2146,7 +2146,7 @@ function onLabelDragEnd() {
 }
 
 .bounds-row__name {
-  color: #9ca3af;
+  color: var(--ui-muted);
   font-size: 12px;
   width: 18px;
   flex-shrink: 0;
@@ -2154,7 +2154,7 @@ function onLabelDragEnd() {
 }
 
 .info-empty {
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 12px;
 }
 
@@ -2162,7 +2162,7 @@ function onLabelDragEnd() {
   list-style: none;
   margin: 4px 0 0;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--ui-control);
   border-radius: 4px;
   max-height: 160px;
   overflow-y: auto;
@@ -2181,7 +2181,7 @@ function onLabelDragEnd() {
 }
 
 .info-label {
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
 }
 
@@ -2191,7 +2191,7 @@ function onLabelDragEnd() {
 }
 
 .list-item.is-current {
-  border-left-color: #2f80ed;
+  border-left-color: var(--ui-link);
 }
 
 /* ───────── 滤镜 ───────── */
@@ -2201,7 +2201,7 @@ function onLabelDragEnd() {
 }
 
 .panel__filter-region .list-region-header {
-  background: #232830;
+  background: var(--ui-panel);
 }
 
 .filter-group {
@@ -2211,7 +2211,7 @@ function onLabelDragEnd() {
 }
 
 .filter-group-title {
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.4px;
@@ -2231,7 +2231,7 @@ function onLabelDragEnd() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
 }
@@ -2240,12 +2240,12 @@ function onLabelDragEnd() {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #2f80ed;
+  accent-color: var(--ui-link);
 }
 
 .form-row__color-label {
   width: 40px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   flex-shrink: 0;
   padding: 4px 6px;

@@ -35,7 +35,7 @@ function onClear() {
 
 <template>
   <div class="search-box" :class="[`is-${variant}`, $attrs.class]" :style="$attrs.style">
-    <img :src="searchIcon" alt="" class="search-box__icon" aria-hidden="true" />
+    <img :src="searchIcon" alt="" class="search-box__icon ui-icon" aria-hidden="true" />
     <input
       v-model="inputValue"
       type="text"
@@ -49,7 +49,7 @@ function onClear() {
       aria-label="清空搜索"
       @click="onClear"
     >
-      <img :src="clearIcon" alt="" aria-hidden="true" />
+      <img :src="clearIcon" alt="" class="ui-icon" aria-hidden="true" />
     </button>
   </div>
 </template>
@@ -61,26 +61,26 @@ function onClear() {
   width: 100%;
   box-sizing: border-box;
   flex-shrink: 0;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 6px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   transition: border-color 0.15s;
 }
 
 .search-box:focus-within {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .search-box.is-edit {
-  background: #2c313a;
-  border-color: #3a404b;
+  background: var(--ui-control);
+  border-color: var(--ui-edge);
   border-radius: 4px;
 }
 
 .search-box.is-edit:focus-within {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .search-box__icon {
@@ -97,7 +97,7 @@ function onClear() {
   padding: 8px 10px;
   background: transparent;
   border: none;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   outline: none;
 }
@@ -111,7 +111,7 @@ function onClear() {
 }
 
 .search-box__input::placeholder {
-  color: #6b7280;
+  color: var(--ui-muted);
 }
 
 .search-box__clear {
@@ -131,7 +131,7 @@ function onClear() {
 }
 
 .search-box__clear:hover {
-  background: #3a3f4b;
+  background: var(--ui-hover);
 }
 
 .search-box__clear img {

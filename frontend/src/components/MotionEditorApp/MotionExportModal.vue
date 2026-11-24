@@ -179,7 +179,7 @@ async function onConfirm() {
 .mex-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.32);
+  background: var(--ui-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -187,22 +187,22 @@ async function onConfirm() {
 }
 
 .mex-modal {
-  background-color: rgba(29, 32, 38, 0.96);
-  color: #e6e6e6;
+  background-color: var(--ui-dialog);
+  color: var(--ui-text);
   width: min(440px, 92vw);
   border-radius: 8px;
-  border: 1px solid rgba(60, 68, 80, 0.35);
+  border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 40px var(--ui-shadow);
 }
 
 .mex-modal__header {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
@@ -211,13 +211,13 @@ async function onConfirm() {
   font-size: 15px;
   font-weight: 600;
   flex: 1;
-  color: #ffffff;
+  color: var(--ui-text);
 }
 
 .mex-icon-btn {
   background-color: transparent;
   border: none;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 22px;
   line-height: 1;
   width: 28px;
@@ -227,8 +227,8 @@ async function onConfirm() {
 }
 
 .mex-icon-btn:hover {
-  background-color: rgba(53, 60, 71, 0.42);
-  color: #ffffff;
+  background-color: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .mex-modal__body {
@@ -247,23 +247,23 @@ async function onConfirm() {
 .mex-field__label {
   width: 80px;
   font-size: 13px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   flex-shrink: 0;
 }
 
 .mex-field__input {
   flex: 1;
   padding: 6px 10px;
-  background: #1e222a;
-  border: 1px solid #3a4150;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   outline: none;
 }
 
 .mex-field__input:focus {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .mex-format-list {
@@ -279,20 +279,20 @@ async function onConfirm() {
   align-items: center;
   gap: 2px;
   padding: 8px 6px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 6px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   cursor: pointer;
 }
 
 .mex-format-card:hover {
-  border-color: #5fa8ff;
+  border-color: var(--ui-link);
 }
 
 .mex-format-card--active {
-  background: #1f3a5f;
-  border-color: #2f80ed;
+  background: var(--ui-selected);
+  border-color: var(--ui-link);
 }
 
 .mex-format-card__label {
@@ -302,7 +302,7 @@ async function onConfirm() {
 
 .mex-format-card__hint {
   font-size: 11px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .mex-check {
@@ -310,23 +310,23 @@ async function onConfirm() {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #cfd4dc;
+  color: var(--ui-text);
   cursor: pointer;
 }
 
 .mex-preview {
   font-size: 13px;
-  color: #cfd4dc;
+  color: var(--ui-text);
   word-break: break-all;
 }
 
 .mex-preview b {
-  color: #5fa8ff;
+  color: var(--ui-link);
 }
 
 .mex-preview__meta {
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .mex-modal__footer {
@@ -334,31 +334,31 @@ async function onConfirm() {
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(60, 68, 80, 0.35);
+  border-top: 1px solid var(--ui-line);
 }
 
 .mex-btn {
   padding: 6px 16px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
 }
 
 .mex-btn:hover {
-  background: #343b49;
+  background: var(--ui-hover);
 }
 
 .mex-btn--primary {
-  background: #2f80ed;
-  border-color: #2f80ed;
-  color: #ffffff;
+  background: var(--ui-accent);
+  border-color: var(--ui-link);
+  color: var(--ui-on-accent);
 }
 
 .mex-btn--primary:hover {
-  background: #1a5bb8;
+  background: var(--ui-accent); color: var(--ui-on-accent);
 }
 
 .mex-btn:disabled {

@@ -63,7 +63,7 @@ function onMouseUp() {
 }
 
 .resize-handle:hover {
-  background: #2f80ed;
+  background: var(--ui-accent); color: var(--ui-on-accent);
 }
 
 .resize-handle--left {

@@ -137,14 +137,14 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #181a20;
+  background: var(--ui-window);
 }
 
 .app__left {
   width: 260px;
   min-width: 220px;
   flex-shrink: 0;
-  border-right: 1px solid #2c313a;
+  border-right: 1px solid var(--ui-line);
 }
 
 .app__right {

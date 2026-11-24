@@ -188,11 +188,11 @@ function onReset(id: string) {
   cursor: pointer;
   user-select: none;
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .apply-all-toggle.is-on {
-  color: #e6e6e6;
+  color: var(--ui-text);
 }
 
 .apply-all-toggle input {
@@ -208,8 +208,8 @@ function onReset(id: string) {
   display: inline-block;
   width: 28px;
   height: 14px;
-  background: #2c313a;
-  border: 1px solid #3a404b;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 999px;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -220,43 +220,43 @@ function onReset(id: string) {
   left: 1px;
   width: 10px;
   height: 10px;
-  background: #8a93a3;
+  background: var(--ui-muted);
   border-radius: 50%;
   transition: transform 0.15s, background 0.15s;
 }
 
 .apply-all-toggle.is-on .apply-all-toggle__track {
-  background: #2f80ed;
-  border-color: #2f80ed;
+  background: var(--ui-accent);
+  border-color: var(--ui-link);
 }
 
 .apply-all-toggle.is-on .apply-all-toggle__thumb {
   transform: translateX(14px);
-  background: #fff;
+  background: var(--ui-on-accent);
 }
 
 .apply-all-toggle input:focus-visible + .apply-all-toggle__track {
-  outline: 2px solid #2f80ed;
+  outline: 2px solid var(--ui-link);
   outline-offset: 2px;
 }
 
 .empty-hint {
   margin: auto;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
   text-align: center;
   padding: 16px;
 }
 
 .moc3-warning {
-  color: #ef4444;
+  color: var(--ui-danger);
   font-weight: bold;
   font-size: 13px;
   text-align: center;
   padding: 12px;
   margin-bottom: 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid #ef4444;
+  background: var(--ui-panel-tint-danger);
+  border: 1px solid var(--ui-danger);
   border-radius: 4px;
   flex-shrink: 0;
 }

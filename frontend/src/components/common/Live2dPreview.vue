@@ -622,7 +622,7 @@ defineExpose({
   position: relative;
   width: 100%;
   height: 100%;
-  background-color: rgba(20, 23, 28, 0.6);
+  background-color: var(--ui-well);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -638,10 +638,10 @@ defineExpose({
   z-index: 10;
   width: 28px;
   height: 28px;
-  background-color: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: var(--ui-floating);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #fff;
+  color: var(--ui-text);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
@@ -653,7 +653,7 @@ defineExpose({
 }
 
 .reset-view-btn:hover {
-  background-color: rgba(47, 128, 237, 0.6);
+  background-color: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .reset-view-btn:active {

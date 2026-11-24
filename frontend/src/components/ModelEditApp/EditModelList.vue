@@ -94,7 +94,7 @@ function onDragEnd() {
           :aria-label="m.state.visible ? '隐藏模型' : '显示模型'"
           @click="onToggleVisible(m.id, $event)"
         >
-          <img :src="m.state.visible ? eyeIcon : eyeOffIcon" :alt="m.state.visible ? '眼睛' : '闭眼'" />
+          <img class="ui-icon" :src="m.state.visible ? eyeIcon : eyeOffIcon" :alt="m.state.visible ? '眼睛' : '闭眼'" />
         </button>
         <span class="model-row__name" :title="m.modelRelativePath">{{ m.name }}</span>
         <button
@@ -116,8 +116,8 @@ function onDragEnd() {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1d2026;
-  color: #e6e6e6;
+  background: var(--ui-panel);
+  color: var(--ui-text);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -126,16 +126,16 @@ function onDragEnd() {
   display: flex;
   gap: 8px;
   padding: 12px;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
 .add-btn {
   flex: 1;
   padding: 10px 12px;
-  background: #2f80ed;
-  color: #fff;
-  border: 1px solid #2f80ed;
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  border: 1px solid var(--ui-link);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -144,11 +144,11 @@ function onDragEnd() {
 }
 
 .add-btn:hover {
-  background: #3f90ff;
+  background: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .add-btn:active {
-  background: #1f6fd8;
+  background: var(--ui-accent); color: var(--ui-on-accent);
 }
 
 .edit-model-list__items {
@@ -169,12 +169,12 @@ function onDragEnd() {
 }
 
 .model-row:hover {
-  background: #262b34;
+  background: var(--ui-control);
 }
 
 .model-row.is-selected {
-  background: #2a3140;
-  border-left-color: #2f80ed;
+  background: var(--ui-selected);
+  border-left-color: var(--ui-link);
 }
 
 .model-row.is-dragging {
@@ -191,7 +191,7 @@ function onDragEnd() {
 
 .model-row__close {
   background: transparent;
-  color: #9aa3af;
+  color: var(--ui-muted);
   border: none;
   font-size: 16px;
   line-height: 1;
@@ -205,8 +205,8 @@ function onDragEnd() {
 }
 
 .model-row__close:hover {
-  background: #b03a3a;
-  color: #fff;
+  background: var(--ui-danger);
+  color: var(--ui-on-status);
 }
 
 .model-row__visibility {
@@ -225,7 +225,7 @@ function onDragEnd() {
 }
 
 .model-row__visibility:hover {
-  background: #3a3f4b;
+  background: var(--ui-hover);
 }
 
 .model-row__visibility img {
@@ -237,7 +237,7 @@ function onDragEnd() {
   flex: 1;
   margin: 0;
   padding: 24px 16px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   text-align: center;
 }

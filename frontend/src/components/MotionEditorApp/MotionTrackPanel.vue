@@ -973,7 +973,7 @@ function onHeadDrag(dx: number) {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #20242c;
+  background: var(--ui-panel);
 }
 
 .track-panel__search {
@@ -996,7 +996,7 @@ function onHeadDrag(dx: number) {
   gap: 4px;
   flex-shrink: 0;
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
@@ -1012,10 +1012,10 @@ function onHeadDrag(dx: number) {
 }
 
 .preset-toggle {
-  background: #2c313a;
-  border: 1px solid #3a404b;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   padding: 6px 12px;
   cursor: pointer;
@@ -1028,12 +1028,12 @@ function onHeadDrag(dx: number) {
 
 .preset-toggle:hover,
 .preset-toggle.is-open {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .caret {
   font-size: 10px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .preset-menu {
@@ -1047,32 +1047,32 @@ function onHeadDrag(dx: number) {
   margin: 0;
   padding: 4px 0;
   list-style: none;
-  background: #2c313a;
-  border: 1px solid #3a404b;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--ui-shadow);
 }
 
 .preset-item {
   padding: 6px 12px;
   font-size: 13px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .preset-item:hover {
-  background: #3a404b;
+  background: var(--ui-hover);
 }
 
 .preset-item.is-active {
-  color: #5fa8ff;
+  color: var(--ui-link);
 }
 
 .preset-empty {
   padding: 6px 12px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--ui-muted);
   cursor: default;
 }
 
@@ -1090,8 +1090,8 @@ function onHeadDrag(dx: number) {
   z-index: 4;
   flex-shrink: 0;
   overflow: hidden;
-  border-right: 1px solid #3a4150;
-  background: #242830;
+  border-right: 1px solid var(--ui-line);
+  background: var(--ui-panel);
 }
 
 .track-panel__heads-inner {
@@ -1102,7 +1102,7 @@ function onHeadDrag(dx: number) {
   position: relative;
   box-sizing: border-box;
   padding: 3px 26px 3px 4px;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
   display: flex;
   align-items: center;
 }
@@ -1120,11 +1120,11 @@ function onHeadDrag(dx: number) {
 .head-row--ruler {
   padding: 0 8px;
   font-size: 11px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #242830;
+  background: var(--ui-panel);
   box-sizing: border-box;
 }
 
@@ -1139,23 +1139,23 @@ function onHeadDrag(dx: number) {
   width: 18px;
   height: 18px;
   padding: 0;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--ui-edge);
   border-radius: 3px;
-  background: #1d2026;
-  color: #cfd4dc;
+  background: var(--ui-panel);
+  color: var(--ui-text);
   cursor: pointer;
   line-height: 1;
   font-size: 12px;
 }
 
 .head-row__btn:hover {
-  border-color: #2f80ed;
-  color: #2f80ed;
+  border-color: var(--ui-link);
+  color: var(--ui-link);
 }
 
 .head-row__btn.is-tracked {
-  border-color: rgba(47, 128, 237, 0.6);
-  color: #5fa8ff;
+  border-color: var(--ui-link);
+  color: var(--ui-link);
 }
 
 /* 物理参数遮罩：盖住卡片，黑底红字提示；pointer-events 穿透（卡片本身已禁用） */
@@ -1165,14 +1165,14 @@ function onHeadDrag(dx: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--ui-floating);
   border-radius: 4px;
   pointer-events: none;
   z-index: 1;
 }
 
 .head-row__physics-mask span {
-  color: #ff5c5c;
+  color: var(--ui-danger);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -1181,14 +1181,14 @@ function onHeadDrag(dx: number) {
 /* 删帧按钮：由 v-if 控制显隐，出现本身即提示"已对准帧" */
 .head-row__btn--del {
   right: 28px;
-  color: #e0524f;
-  border-color: rgba(224, 82, 79, 0.5);
+  color: var(--ui-danger);
+  border-color: var(--ui-danger);
 }
 
 .head-row__btn--del:hover {
-  border-color: #e0524f;
-  color: #ff7b78;
-  background: rgba(224, 82, 79, 0.12);
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+  background: var(--ui-panel-tint-danger);
 }
 
 /* 右列：标尺 + 车道 */
@@ -1202,12 +1202,12 @@ function onHeadDrag(dx: number) {
   position: relative;
 }
 
-.track-panel__selection { color: #b7c9e8; font-size: 12px; white-space: nowrap; }
-.track-panel__selection-box { position: absolute; z-index: 3; border: 1px solid #75b7ff; background: rgba(70, 145, 240, 0.18); pointer-events: none; box-sizing: border-box; }
+.track-panel__selection { color: var(--ui-link); font-size: 12px; white-space: nowrap; }
+.track-panel__selection-box { position: absolute; z-index: 3; border: 1px solid var(--ui-link); background: color-mix(in srgb, var(--ui-link) 18%, transparent); pointer-events: none; box-sizing: border-box; }
 
 .lane-row {
   position: relative;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
   box-sizing: border-box;
 }
 
@@ -1215,7 +1215,7 @@ function onHeadDrag(dx: number) {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #20242c;
+  background: var(--ui-panel);
   cursor: ew-resize;
 }
 
@@ -1224,7 +1224,7 @@ function onHeadDrag(dx: number) {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #3a4150;
+  background: var(--ui-edge);
 }
 
 .lane-row__tick-label {
@@ -1232,7 +1232,7 @@ function onHeadDrag(dx: number) {
   top: 4px;
   left: 3px;
   font-size: 10px;
-  color: #6b7280;
+  color: var(--ui-muted);
   white-space: nowrap;
 }
 
@@ -1247,7 +1247,7 @@ function onHeadDrag(dx: number) {
 
 .lane-row__curve polyline {
   fill: none;
-  stroke: rgba(47, 128, 237, 0.4);
+  stroke: var(--ui-link);
   stroke-width: 1.5;
 }
 
@@ -1257,31 +1257,32 @@ function onHeadDrag(dx: number) {
   height: 10px;
   box-sizing: border-box;
   border-radius: 50%;
-  background: #2f80ed;
-  border: 1px solid #1a5bb8;
+  background: var(--ui-accent);
+  border: 1px solid var(--ui-link);
   cursor: ew-resize;
   transform: translate(-50%, -50%);
 }
 
 .lane-row__key:hover {
-  background: #56a0ff;
+  background: var(--ui-link);
 }
 
-.lane-row__key.is-key-selected { outline: 2px solid #fff2a6; outline-offset: 2px; z-index: 1; }
+.lane-row__key.is-key-selected { outline: 2px solid var(--ui-warning); outline-offset: 2px; z-index: 1; }
 
 /* 组合器帧点：绿色系以示区分；定义缺失时灰显 */
 .lane-row__key--composer {
-  background: #2ea043;
-  border-color: #1a6b2c;
+  border-radius: 2px;
+  background: var(--ui-success);
+  border-color: var(--ui-success);
 }
 
 .lane-row__key--composer:hover {
-  background: #4bcc64;
+  background: var(--ui-success);
 }
 
 .lane-row__key--composer.is-missing {
-  background: #4a5160;
-  border-color: #33383f;
+  background: var(--ui-edge);
+  border-color: var(--ui-line);
   cursor: not-allowed;
 }
 
@@ -1293,14 +1294,14 @@ function onHeadDrag(dx: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #14171c;
-  border: 1px solid #2c313a;
+  background: var(--ui-well);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .head-row__missing span {
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -1313,7 +1314,7 @@ function onHeadDrag(dx: number) {
   bottom: 0;
   width: 2px;
   margin-left: -1px;
-  background: #e0524f;
+  background: var(--ui-danger);
   pointer-events: none;
   z-index: 2;
 }
@@ -1321,7 +1322,7 @@ function onHeadDrag(dx: number) {
 .track-panel__empty {
   flex-shrink: 0;
   padding: 24px 16px;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 12px;
   text-align: center;
 }

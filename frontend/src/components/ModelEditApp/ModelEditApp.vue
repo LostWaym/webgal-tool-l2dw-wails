@@ -70,12 +70,12 @@ function onRightDrag(dx: number) {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #181a20;
+  background: var(--ui-window);
 }
 
 .edit-app__left {
   flex-shrink: 0;
-  border-right: 1px solid #2c313a;
+  border-right: 1px solid var(--ui-line);
   min-width: 0;
 }
 
@@ -87,7 +87,7 @@ function onRightDrag(dx: number) {
 
 .edit-app__right {
   flex-shrink: 0;
-  border-left: 1px solid #2c313a;
+  border-left: 1px solid var(--ui-line);
   min-width: 0;
 }
 </style>

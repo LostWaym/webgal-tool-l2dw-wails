@@ -7,6 +7,7 @@ import MotionEditApp from './components/MotionEditorApp/MotionEditApp.vue'
 import { AppMode, EditorWmdlPath, ActorWmdlPath, MotionWmdlPath, ReadWmdlFile } from '../wailsjs/go/main/App'
 import { useWmdlModelEditorStore } from './stores/wmdlModelEditor'
 import './style.css'
+import { initializeAppearance } from './themes/appearance'
 import './live2d/loader'
 
 // 根据 Go 暴露的 AppMode 选择根组件：
@@ -16,6 +17,7 @@ import './live2d/loader'
 //   - "motion"  → 动作编辑器（MotionEditApp.vue）
 // AppMode 是异步绑定（wails runtime 初始化后才可用），所以包一层 async IIFE。
 async function bootstrap() {
+  const appearanceReady = initializeAppearance()
   let mode = 'main'
   try {
     mode = await AppMode()
@@ -39,6 +41,7 @@ async function bootstrap() {
     void loadStartupWmdl(MotionWmdlPath)
   }
 
+  await appearanceReady
   app.mount('#app')
 }
 

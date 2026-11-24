@@ -197,22 +197,22 @@ async function importFile() {
 </template>
 
 <style scoped>
-.guide-mask { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: #0007; }
-.guide-modal { box-sizing: border-box; width: min(660px, 92vw); height: min(480px, 85vh); display: flex; flex-direction: column; color: #e6e6e6; background: #1d2026; border: 1px solid #454d5a; border-radius: 9px; box-shadow: 0 12px 40px #0008; }
+.guide-mask { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--ui-shadow); }
+.guide-modal { box-sizing: border-box; width: min(660px, 92vw); height: min(480px, 85vh); display: flex; flex-direction: column; color: var(--ui-text); background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 9px; box-shadow: 0 12px 40px var(--ui-shadow); }
 .guide-modal:focus { outline: none; }
 header, footer { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 12px 18px; }
-header { border-bottom: 1px solid #373d48; }
-footer { justify-content: flex-end; border-top: 1px solid #373d48; }
+header { border-bottom: 1px solid var(--ui-line); }
+footer { justify-content: flex-end; border-top: 1px solid var(--ui-line); }
 h2 { flex: 1; margin: 0; font-size: 16px; }
 h3 { margin: 0; font-size: 14px; }
-h2 span, .muted { color: #aeb7c5; font-weight: normal; }
+h2 span, .muted { color: var(--ui-muted); font-weight: normal; }
 .guide-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 16px 18px; }
 .toolbar, .group-title, label { display: flex; align-items: center; gap: 8px; }
 .toolbar, .group-title, .guide-help { flex-shrink: 0; }
 .toolbar { flex-wrap: wrap; }
 .clear { margin-left: auto; }
 .guide-help { margin-bottom: 10px; }
-.group { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px; border: 1px solid #383f4c; border-radius: 6px; background: #22262e; }
+.group { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px; border: 1px solid var(--ui-line); border-radius: 6px; background: var(--ui-panel); }
 .group-title { justify-content: space-between; }
 .groups { flex: 1; min-height: 120px; display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
 .group-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding: 0; margin: 8px 0 0; list-style: none; }
@@ -220,16 +220,16 @@ h2 span, .muted { color: #aeb7c5; font-weight: normal; }
   .groups { min-height: 250px; grid-template-columns: minmax(0, 1fr); }
 }
 li { display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 4px; }
-li + li { border-top: 1px solid #343b48; }
+li + li { border-top: 1px solid var(--ui-line); }
 .coordinate { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
-button, input, select { padding: 6px 9px; border: 1px solid #495464; border-radius: 5px; color: inherit; background: #303743; }
-input { box-sizing: border-box; background: #191d24; }
+button, input, select { padding: 6px 9px; border: 1px solid var(--ui-edge); border-radius: 5px; color: inherit; background: var(--ui-control); }
+input { box-sizing: border-box; background: var(--ui-well); }
 button { cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
-.add { min-width: 30px; padding: 2px 7px; background: #245da2; border-color: #417abf; font-size: 18px; line-height: 24px; }
-.danger { color: #ffab9d; }
+.add { min-width: 30px; padding: 2px 7px; background: var(--ui-selected); border-color: var(--ui-link); font-size: 18px; line-height: 24px; }
+.danger { color: var(--ui-danger); }
 .delete-guide { align-self: stretch; display: grid; place-items: center; }
-.delete-guide:hover:not(:disabled) { background: #51353a; border-color: #85504f; }
+.delete-guide:hover:not(:disabled) { background: var(--ui-panel-tint-danger); border-color: var(--ui-danger); }
 .close { border: 0; background: transparent; font-size: 22px; padding: 0 5px; }
 p { margin-top: 8px; font-size: 13px; }
 </style>

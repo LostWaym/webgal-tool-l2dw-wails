@@ -132,8 +132,8 @@ function onPointerUp() {
   max-height: 180px;
   margin: 0 auto;
   aspect-ratio: 1 / 1;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 8px;
   cursor: crosshair;
   touch-action: none;
@@ -144,7 +144,7 @@ function onPointerUp() {
 .focus-picker__box::after {
   content: '';
   position: absolute;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--ui-edge);
   pointer-events: none;
 }
 
@@ -169,8 +169,8 @@ function onPointerUp() {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #2f80ed;
-  box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0, 0, 0, 0.4);
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-text), 0 2px 6px var(--ui-shadow);
   pointer-events: none;
 }
 
@@ -180,9 +180,9 @@ function onPointerUp() {
   right: 8px;
   z-index: 1;
   padding: 2px 5px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--ui-floating);
   border-radius: 4px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 11px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   pointer-events: none;

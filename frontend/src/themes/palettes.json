@@ -1,0 +1,56 @@
+[
+  {
+    "id": "classic", "name": "经典深色", "scheme": "dark", "description": "石墨灰与工作台蓝",
+    "colors": {
+      "window": "#181a20", "panel": "#1d2026", "well": "#171a20", "control": "#282e38", "hover": "#343d4a",
+      "line": "#39414f", "edge": "#818b9c", "text": "#e6e6e6", "muted": "#b0bac9",
+      "accent": "#2f80ed", "on-accent": "#071222", "link": "#99c6ff", "selected": "#303b4d",
+      "success": "#89dda9", "warning": "#f0c277", "danger": "#ffa09a", "alternate": "#c9b4ff"
+    }
+  },
+  {
+    "id": "paper", "name": "暖纸浅色", "scheme": "light", "description": "象牙纸与胡桃棕",
+    "colors": {
+      "window": "#f4f0e7", "panel": "#fffcf5", "well": "#fffefa", "control": "#f0e9dc", "hover": "#e8dfce",
+      "line": "#d4cab7", "edge": "#87765e", "text": "#28251f", "muted": "#615749",
+      "accent": "#765018", "on-accent": "#ffffff", "link": "#69430d", "selected": "#ebdec6",
+      "success": "#205c38", "warning": "#724807", "danger": "#962c30", "alternate": "#75417e"
+    }
+  },
+  {
+    "id": "ocean", "name": "深海青", "scheme": "dark", "description": "深海蓝与薄荷青",
+    "colors": {
+      "window": "#0d2028", "panel": "#142d37", "well": "#102731", "control": "#1d3641", "hover": "#25434d",
+      "line": "#34545d", "edge": "#779da3", "text": "#e5f4f3", "muted": "#adcdd0",
+      "accent": "#59d8c4", "on-accent": "#0d252a", "link": "#83ead8", "selected": "#1c4148",
+      "success": "#a4e596", "warning": "#f2cc84", "danger": "#ffa09a", "alternate": "#dec1ff"
+    }
+  },
+  {
+    "id": "iris", "name": "鸢尾夜", "scheme": "dark", "description": "墨紫与鸢尾花",
+    "colors": {
+      "window": "#1c1827", "panel": "#252033", "well": "#1e192b", "control": "#312b40", "hover": "#41354f",
+      "line": "#493e58", "edge": "#9987ab", "text": "#f4edf9", "muted": "#cbbbd6",
+      "accent": "#c6a3ef", "on-accent": "#271935", "link": "#e1c5ff", "selected": "#44344f",
+      "success": "#a9dcb5", "warning": "#ffd293", "danger": "#ffa4aa", "alternate": "#99e0e8"
+    }
+  },
+  {
+    "id": "celadon", "name": "雨后青瓷", "scheme": "light", "description": "浅瓷白与松针绿",
+    "colors": {
+      "window": "#eaf1ed", "panel": "#f8fcf9", "well": "#fdfffd", "control": "#e5eee8", "hover": "#d6e5dc",
+      "line": "#c0d1c6", "edge": "#607e6e", "text": "#192e24", "muted": "#455e50",
+      "accent": "#24664c", "on-accent": "#ffffff", "link": "#155338", "selected": "#d4e8db",
+      "success": "#285b21", "warning": "#714909", "danger": "#923139", "alternate": "#604a92"
+    }
+  },
+  {
+    "id": "signal", "name": "信号高对比", "scheme": "dark", "description": "近黑底、亮黄焦点与清晰边界",
+    "colors": {
+      "window": "#08090b", "panel": "#101114", "well": "#050607", "control": "#1c1e22", "hover": "#303238",
+      "line": "#878b94", "edge": "#c7cbd3", "text": "#ffffff", "muted": "#dbdee5",
+      "accent": "#ffe051", "on-accent": "#181400", "link": "#fff192", "selected": "#39341c",
+      "success": "#9af1b2", "warning": "#ffbb80", "danger": "#ff9aaf", "alternate": "#94e3ff"
+    }
+  }
+]

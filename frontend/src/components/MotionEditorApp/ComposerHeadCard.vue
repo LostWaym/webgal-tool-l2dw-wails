@@ -156,9 +156,9 @@ onBeforeUnmount(() => {
 .composer-card__tag {
   flex: 0 0 auto;
   font-size: 10px;
-  color: #8a93a3;
-  background: #1d2026;
-  border: 1px solid #2c313a;
+  color: var(--ui-muted);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line);
   border-radius: 3px;
   padding: 1px 4px;
   line-height: 1.2;
@@ -168,8 +168,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: #1d2026;
-  border: 1px solid #2c313a;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-edge);
   border-radius: 3px;
   padding: 3px 6px;
   cursor: pointer;
@@ -178,7 +178,7 @@ onBeforeUnmount(() => {
 
 .composer-card__select:hover,
 .composer-card__select.is-open {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .composer-card__value {
@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   font-size: 11px;
   font-family: ui-monospace, SFMono-Regular, monospace;
-  color: #e6e6e6;
+  color: var(--ui-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,7 +195,7 @@ onBeforeUnmount(() => {
 .composer-card__caret {
   flex: 0 0 auto;
   font-size: 10px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .composer-card__menu {
@@ -204,10 +204,10 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 4px 0;
   list-style: none;
-  background: #2c313a;
-  border: 1px solid #3a404b;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--ui-shadow);
   max-height: 200px;
   overflow-y: auto;
 }
@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
   padding: 4px 10px;
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, monospace;
-  color: #e6e6e6;
+  color: var(--ui-text);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -224,15 +224,15 @@ onBeforeUnmount(() => {
 }
 
 .composer-card__item:hover {
-  background: #3a404b;
+  background: var(--ui-hover);
 }
 
 .composer-card__item.is-active {
-  color: #5fa8ff;
+  color: var(--ui-link);
 }
 
 .composer-card__item.is-invalid {
-  color: #6b7280;
+  color: var(--ui-muted);
   text-decoration: line-through;
   cursor: not-allowed;
 }

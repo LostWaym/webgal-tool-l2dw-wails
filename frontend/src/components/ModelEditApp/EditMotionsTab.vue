@@ -116,14 +116,14 @@ function onRemove(item: { name: string; path: string }) {
   gap: 8px;
   padding: 8px 16px;
   font-size: 13px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   border-left: 3px solid transparent;
   user-select: text;
   transition: background 0.12s ease;
 }
 
 .list-item:hover {
-  background: #2a2e37;
+  background: var(--ui-control);
 }
 
 .list-item__name {
@@ -137,7 +137,7 @@ function onRemove(item: { name: string; path: string }) {
 .item-remove {
   background: transparent;
   border: none;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 16px;
   line-height: 1;
   width: 22px;
@@ -149,13 +149,13 @@ function onRemove(item: { name: string; path: string }) {
 }
 
 .item-remove:hover {
-  background: #b03a3a;
-  color: #fff;
+  background: var(--ui-danger);
+  color: var(--ui-on-status);
 }
 
 .empty-hint {
   margin: auto;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
   text-align: center;
   padding: 16px;

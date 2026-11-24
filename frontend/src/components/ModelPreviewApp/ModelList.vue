@@ -137,7 +137,7 @@ function onDragEnd() {
           :aria-pressed="store.cameraFrameVisible"
           @click.stop="store.cameraFrameVisible = !store.cameraFrameVisible"
         >
-          <img :src="store.cameraFrameVisible ? eyeIcon : eyeOffIcon" :alt="store.cameraFrameVisible ? '睁眼' : '闭眼'" />
+          <img class="ui-icon" :src="store.cameraFrameVisible ? eyeIcon : eyeOffIcon" :alt="store.cameraFrameVisible ? '睁眼' : '闭眼'" />
         </button>
         <button
           v-if="id !== SpecialId.Camera"
@@ -197,7 +197,7 @@ function onDragEnd() {
             :aria-label="m.visible ? '隐藏模型' : '显示模型'"
             @click="onToggleVisible(m.id, $event)"
           >
-            <img :src="m.visible ? eyeIcon : eyeOffIcon" :alt="m.visible ? '眼睛' : '闭眼'" />
+            <img class="ui-icon" :src="m.visible ? eyeIcon : eyeOffIcon" :alt="m.visible ? '眼睛' : '闭眼'" />
           </button>
           <div class="model-row__quick-menu">
             <button type="button" class="model-row__quick-btn" title="选择滤镜" aria-label="选择滤镜" @click="onOpenFilterPreset(m.id, $event)">
@@ -268,8 +268,8 @@ function onDragEnd() {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1d2026;
-  color: #e6e6e6;
+  background: var(--ui-panel);
+  color: var(--ui-text);
   box-sizing: border-box;
   transition: opacity 0.15s ease;
 }
@@ -284,9 +284,9 @@ function onDragEnd() {
   flex: 1;
   min-width: 0;
   padding: 8px 4px;
-  background: #293c55;
-  color: #dceaff;
-  border: 1px solid #3b5879;
+  background: var(--ui-selected);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-link);
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -296,12 +296,12 @@ function onDragEnd() {
 }
 
 .add-btn:hover {
-  background: #344c6b;
-  border-color: #5682b3;
+  background: var(--ui-selected);
+  border-color: var(--ui-link);
 }
 
 .add-btn:active {
-  background: #22344c;
+  background: var(--ui-selected);
 }
 
 .model-list__header:not(.model-list__header--secondary) .add-btn {
@@ -309,7 +309,7 @@ function onDragEnd() {
 }
 
 .add-btn:focus-visible {
-  outline: 2px solid #6ca8f5;
+  outline: 2px solid var(--ui-link);
   outline-offset: 2px;
 }
 
@@ -331,12 +331,12 @@ function onDragEnd() {
 }
 
 .model-row:hover {
-  background: #262b34;
+  background: var(--ui-control);
 }
 
 .model-row.is-selected {
-  background: #2a3140;
-  border-left-color: #2f80ed;
+  background: var(--ui-selected);
+  border-left-color: var(--ui-link);
 }
 
 .model-row.is-dragging {
@@ -366,7 +366,7 @@ function onDragEnd() {
 }
 
 .model-row__visibility:hover {
-  background: #3a3f4b;
+  background: var(--ui-hover);
 }
 
 .model-row__visibility img {
@@ -381,8 +381,8 @@ function onDragEnd() {
   width: 18px;
   height: 18px;
   margin-right: 6px;
-  background: #5a8f3b;
-  color: #fff;
+  background: var(--ui-success);
+  color: var(--ui-on-status);
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -391,7 +391,7 @@ function onDragEnd() {
 
 .model-row__close {
   background: transparent;
-  color: #9aa3af;
+  color: var(--ui-muted);
   border: none;
   font-size: 16px;
   line-height: 1;
@@ -422,7 +422,7 @@ function onDragEnd() {
 }
 
 .model-row__bg-load:hover {
-  background: #3a3f4b;
+  background: var(--ui-hover);
 }
 
 .model-row__quick-actions {
@@ -439,10 +439,10 @@ function onDragEnd() {
   transform: translateY(-50%);
   display: flex;
   padding: 2px;
-  border: 1px solid #465264;
+  border: 1px solid var(--ui-line);
   border-radius: 5px;
-  background: #29313d;
-  box-shadow: 0 3px 8px #0006;
+  background: var(--ui-control);
+  box-shadow: 0 3px 8px var(--ui-shadow);
   opacity: 0;
   pointer-events: none;
 }
@@ -463,34 +463,34 @@ function onDragEnd() {
   border: 0;
   border-radius: 3px;
   background: transparent;
-  color: #c4cfdf;
+  color: var(--ui-text);
   cursor: pointer;
 }
 
 .model-row__quick-btn:hover,
 .model-row__quick-btn:focus-visible {
-  background: #43546b;
-  color: #fff;
+  background: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .model-row__filter {
-  color: #aebbd0;
+  color: var(--ui-muted);
 }
 
 .model-row__filter:hover {
-  color: #fff;
+  color: var(--ui-text);
 }
 
 .model-row__close:hover {
-  background: #b03a3a;
-  color: #fff;
+  background: var(--ui-danger);
+  color: var(--ui-on-status);
 }
 
 .model-list__empty {
   flex: 1;
   margin: 0;
   padding: 24px 16px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   text-align: center;
 }
@@ -502,13 +502,13 @@ function onDragEnd() {
 }
 
 .model-row--special {
-  color: #b8c0cc;
+  color: var(--ui-text);
   font-weight: 500;
   cursor: pointer;
 }
 
 .model-row--special:hover {
-  background: #262b34;
+  background: var(--ui-control);
 }
 
 .model-row--special .model-row__name {
@@ -518,42 +518,42 @@ function onDragEnd() {
 .model-list__divider {
   margin: 4px 0;
   border: none;
-  border-top: 1px solid #2c313a;
+  border-top: 1px solid var(--ui-line);
 }
 
 .model-list__header--secondary {
   padding: 8px 12px 12px;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
 }
 
 .add-btn--secondary {
-  background: #292f39;
-  border-color: #3a4351;
-  color: #cbd2dc;
+  background: var(--ui-control);
+  border-color: var(--ui-edge);
+  color: var(--ui-text);
 }
 
 .add-btn--secondary:hover {
-  background: #343d4a;
-  border-color: #56667c;
+  background: var(--ui-hover);
+  border-color: var(--ui-edge);
 }
 
 .add-btn--secondary:active {
-  background: #242a33;
+  background: var(--ui-panel);
 }
 
 .model-list__items--groups {
-  border-top: 1px solid #2c313a;
+  border-top: 1px solid var(--ui-line);
   flex: 0 0 auto;
   max-height: 35%;
 }
 
 .model-row--group {
-  background: #23273a;
+  background: var(--ui-selected);
 }
 
 .model-row--group.is-selected {
-  background: #353c5a;
-  border-left-color: #b39bff;
+  background: var(--ui-selected);
+  border-left-color: var(--ui-alternate);
 }
 
 .model-row__group-badge {
@@ -563,8 +563,8 @@ function onDragEnd() {
   width: 18px;
   height: 18px;
   margin-right: 6px;
-  background: #7d6cff;
-  color: #fff;
+  background: var(--ui-alternate);
+  color: var(--ui-on-status);
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;

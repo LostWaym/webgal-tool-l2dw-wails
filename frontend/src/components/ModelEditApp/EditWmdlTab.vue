@@ -401,9 +401,9 @@ const fileName = computed(() => {
 
 .op-btn {
   padding: 8px 14px;
-  background: #2c313a;
-  color: #e6e6e6;
-  border: 1px solid #2c313a;
+  background: var(--ui-control);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
@@ -411,7 +411,7 @@ const fileName = computed(() => {
 }
 
 .op-btn:hover:not(:disabled) {
-  background: #353c47;
+  background: var(--ui-hover);
 }
 
 .op-btn:disabled {
@@ -420,18 +420,18 @@ const fileName = computed(() => {
 }
 
 .op-btn--primary {
-  background: #2f80ed;
-  border-color: #2f80ed;
-  color: #fff;
+  background: var(--ui-accent);
+  border-color: var(--ui-link);
+  color: var(--ui-on-accent);
 }
 
 .op-btn--primary:hover:not(:disabled) {
-  background: #3f90ff;
+  background: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .file-name {
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -461,8 +461,8 @@ const fileName = computed(() => {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #c0c5cd;
-  border-bottom: 1px solid #2c313a;
+  color: var(--ui-text);
+  border-bottom: 1px solid var(--ui-line);
   padding-bottom: 6px;
 }
 
@@ -471,12 +471,12 @@ const fileName = computed(() => {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .field__label {
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .field__label-row {
@@ -487,9 +487,9 @@ const fileName = computed(() => {
 
 .gen-btn {
   padding: 3px 8px;
-  background: #2c313a;
-  color: #8a93a3;
-  border: 1px solid #3c424a;
+  background: var(--ui-control);
+  color: var(--ui-muted);
+  border: 1px solid var(--ui-edge);
   border-radius: 3px;
   cursor: pointer;
   font-size: 11px;
@@ -497,17 +497,17 @@ const fileName = computed(() => {
 }
 
 .gen-btn:hover {
-  background: #353c47;
-  color: #e6e6e6;
+  background: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .field__input,
 .field__textarea {
   padding: 6px 8px;
-  background: #14171c;
-  border: 1px solid #2c313a;
+  background: var(--ui-well);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   font-family: inherit;
   resize: vertical;
@@ -516,7 +516,7 @@ const fileName = computed(() => {
 .field__input:focus,
 .field__textarea:focus {
   outline: none;
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .field__input--num {
@@ -544,8 +544,8 @@ const fileName = computed(() => {
 }
 
 .model-item {
-  background: #14171c;
-  border: 1px solid #2c313a;
+  background: var(--ui-well);
+  border: 1px solid var(--ui-line);
   border-left: 3px solid transparent;
   border-radius: 4px;
   padding: 8px 10px;
@@ -557,18 +557,18 @@ const fileName = computed(() => {
 }
 
 .model-item:hover {
-  background: #1a1e25;
+  background: var(--ui-panel);
 }
 
 .model-item.is-selected {
-  background: #1f2733;
-  border-left-color: #2f80ed;
+  background: var(--ui-selected);
+  border-left-color: var(--ui-link);
 }
 
 .model-item__name {
   font-size: 13px;
   font-weight: 500;
-  color: #e6e6e6;
+  color: var(--ui-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -579,7 +579,7 @@ const fileName = computed(() => {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .path-text {
@@ -600,7 +600,7 @@ const fileName = computed(() => {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   min-width: 0;
   flex: 1;
 }
@@ -622,9 +622,9 @@ const fileName = computed(() => {
 
 .mini-btn {
   padding: 4px 10px;
-  background: #2c313a;
-  color: #e6e6e6;
-  border: 1px solid #2c313a;
+  background: var(--ui-control);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-edge);
   border-radius: 3px;
   cursor: pointer;
   font-size: 11px;
@@ -632,18 +632,18 @@ const fileName = computed(() => {
 }
 
 .mini-btn:hover {
-  background: #353c47;
+  background: var(--ui-hover);
 }
 
 .mini-btn--danger:hover {
-  background: #b03a3a;
-  border-color: #b03a3a;
+  background: var(--ui-danger);
+  border-color: var(--ui-danger); color: var(--ui-on-status);
 }
 
 .models-empty {
   margin: 0;
   padding: 16px;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
   text-align: center;
 }

@@ -147,17 +147,17 @@ void pathDirname
   display: flex;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
-  background: #1d2026;
+  background: var(--ui-panel);
 }
 
 .toolbar-btn {
   flex: 1;
   padding: 6px 8px;
-  background: #2c313a;
-  color: #e6e6e6;
-  border: 1px solid #2c313a;
+  background: var(--ui-control);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -165,7 +165,7 @@ void pathDirname
 }
 
 .toolbar-btn:hover:not(:disabled) {
-  background: #353c47;
+  background: var(--ui-hover);
 }
 
 .toolbar-btn:disabled {
@@ -174,39 +174,39 @@ void pathDirname
 }
 
 .toolbar-btn--primary {
-  background: #2f80ed;
-  border-color: #2f80ed;
-  color: #fff;
+  background: var(--ui-accent);
+  border-color: var(--ui-link);
+  color: var(--ui-on-accent);
 }
 
 .toolbar-btn--primary:hover:not(:disabled) {
-  background: #3f90ff;
+  background: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .toolbar-btn--sync {
-  background: #1f6f43;
-  border-color: #1f6f43;
-  color: #fff;
+  background: var(--ui-success);
+  border-color: var(--ui-success);
+  color: var(--ui-on-status);
 }
 
 .toolbar-btn--sync:hover:not(:disabled) {
-  background: #258a52;
-  border-color: #258a52;
+  background: var(--ui-success);
+  border-color: var(--ui-success); color: var(--ui-on-status);
 }
 
 .toolbar-btn--modify {
-  background: #b37800;
-  border-color: #b37800;
-  color: #fff;
+  background: var(--ui-warning);
+  border-color: var(--ui-warning);
+  color: var(--ui-on-status);
 }
 
 .toolbar-btn--modify:hover:not(:disabled) {
-  background: #cc8a00;
-  border-color: #cc8a00;
+  background: var(--ui-warning);
+  border-color: var(--ui-warning); color: var(--ui-on-status);
 }
 
 .toolbar-btn--danger:hover:not(:disabled) {
-  background: #b03a3a;
-  border-color: #b03a3a;
+  background: var(--ui-danger);
+  border-color: var(--ui-danger); color: var(--ui-on-status);
 }
 </style>

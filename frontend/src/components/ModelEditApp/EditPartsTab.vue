@@ -274,10 +274,10 @@ onBeforeUnmount(() => {
 }
 
 .preset-toggle {
-  background: #2c313a;
-  border: 1px solid #3a404b;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   padding: 6px 12px;
   cursor: pointer;
@@ -288,16 +288,16 @@ onBeforeUnmount(() => {
 }
 
 .preset-toggle:hover {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .preset-toggle.is-open {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .caret {
   font-size: 10px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .preset-menu {
@@ -311,48 +311,48 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 4px 0;
   list-style: none;
-  background: #2c313a;
-  border: 1px solid #3a404b;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--ui-shadow);
 }
 
 .preset-item {
   padding: 6px 12px;
   font-size: 13px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .preset-item:hover {
-  background: #3a404b;
+  background: var(--ui-hover);
 }
 
 .preset-empty {
   padding: 6px 12px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--ui-muted);
   cursor: default;
 }
 
 .empty-hint {
   margin: auto;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
   text-align: center;
   padding: 16px;
 }
 
 .moc3-warning {
-  color: #ef4444;
+  color: var(--ui-danger);
   font-weight: bold;
   font-size: 13px;
   text-align: center;
   padding: 12px;
   margin-bottom: 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid #ef4444;
+  background: var(--ui-panel-tint-danger);
+  border: 1px solid var(--ui-danger);
   border-radius: 4px;
   flex-shrink: 0;
 }

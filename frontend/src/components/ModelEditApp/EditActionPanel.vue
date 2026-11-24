@@ -64,8 +64,8 @@ onMounted(() => {
 <style scoped>
 .edit-action-panel {
   height: 100%;
-  background: #1d2026;
-  color: #e6e6e6;
+  background: var(--ui-panel);
+  color: var(--ui-text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -73,7 +73,7 @@ onMounted(() => {
 
 .panel__tabs {
   display: flex;
-  border-bottom: 1px solid #2c313a;
+  border-bottom: 1px solid var(--ui-line);
   padding: 0 12px;
   flex-shrink: 0;
 }
@@ -83,7 +83,7 @@ onMounted(() => {
   padding: 12px 8px;
   background: transparent;
   border: none;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 13px;
   cursor: pointer;
   transition: color 0.15s, border-bottom 0.15s;
@@ -92,12 +92,12 @@ onMounted(() => {
 }
 
 .tab-btn:hover {
-  color: #e6e6e6;
+  color: var(--ui-text);
 }
 
 .tab-btn.is-active {
-  color: #e6e6e6;
-  border-bottom-color: #2f80ed;
+  color: var(--ui-text);
+  border-bottom-color: var(--ui-link);
 }
 
 .panel__body {
@@ -110,7 +110,7 @@ onMounted(() => {
 
 .panel__placeholder {
   margin: auto;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 13px;
   text-align: center;
   padding: 16px;

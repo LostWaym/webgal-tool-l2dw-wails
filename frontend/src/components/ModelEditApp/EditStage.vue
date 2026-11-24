@@ -10,6 +10,7 @@ import EditStageToolbar from './EditStageToolbar.vue'
 import { editRuntime } from '../../utils/runtimeRegistry'
 import { STAGE_WIDTH, STAGE_HEIGHT } from '../../utils/consts'
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
+import { currentTheme, themeColor } from '../../themes/appearance'
 
 /**
  * 编辑器窗口的 Pixi 预览画布。
@@ -48,6 +49,8 @@ let rootContainer: PIXI.Container | null = null
 let stageMain: PIXI.Container | null = null
 let figureContainer: PIXI.Container | null = null
 let frameContainer: PIXI.Container | null = null
+let frameLines: PIXI.Graphics | null = null
+watch(currentTheme, () => { if (frameLines) frameLines.tint = themeColor('success') })
 
 let isMiddleDown = false
 let lastMouseX = 0
@@ -106,8 +109,9 @@ async function init() {
   
   // 创建边框容器（rootContainer 的子节点，渲染层级最高）
   frameContainer = new PIXI.Container()
-  const frame = new PIXI.Graphics()
-  frame.lineStyle(2, 0x00FF00)
+  const frame = frameLines = new PIXI.Graphics()
+  frame.tint = themeColor('success')
+  frame.lineStyle(2, 0xffffff)
   frame.drawRect(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2, STAGE_WIDTH, STAGE_HEIGHT)
   frameContainer.addChild(frame)
   rootContainer.addChild(frameContainer)
@@ -326,6 +330,7 @@ function attachDomHandlers() {
 }
 
 function dispose() {
+  frameLines = null
   textureWatcher?.disable()
   textureWatcher = null
 
@@ -372,7 +377,7 @@ function dispose() {
 .edit-stage {
   position: relative;
   height: 100%;
-  background: #181a20;
+  background: var(--ui-window);
   overflow: hidden;
 }
 
@@ -395,7 +400,7 @@ function dispose() {
   align-items: center;
   justify-content: center;
   margin: 0;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 14px;
   pointer-events: none;
   text-align: center;

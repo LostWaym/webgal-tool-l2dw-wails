@@ -12,10 +12,11 @@ import { usePreviewViewportSettings } from '../../../composables/usePreviewViewp
 import { usePreviewRotationSnap } from '../../../composables/usePreviewRotationSnap'
 import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../composables/usePreviewViewportSettings'
 import NumberInput from '../../common/NumberInput.vue'
+import { currentTheme, selectTheme, themes } from '../../../themes/appearance'
 
 const props = defineProps<{ visible: boolean; initialTab?: 'motionExpression' }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
-const activeTab = ref<'misc' | 'motionExpression' | 'viewport'>('misc')
+const activeTab = ref<'misc' | 'motionExpression' | 'viewport' | 'appearance'>('misc')
 watch(() => props.visible, (visible) => {
   if (visible && props.initialTab) activeTab.value = props.initialTab
 })
@@ -85,6 +86,7 @@ function onSeparatorInput(event: Event) {
         <div class="body">
           <nav class="settings-tabs" aria-label="设置分类">
             <button type="button" :class="{ active: activeTab === 'misc' }" :aria-current="activeTab === 'misc' ? 'page' : undefined" @click="activeTab = 'misc'">杂项</button>
+            <button type="button" :class="{ active: activeTab === 'appearance' }" :aria-current="activeTab === 'appearance' ? 'page' : undefined" @click="activeTab = 'appearance'">外观</button>
             <button type="button" :class="{ active: activeTab === 'motionExpression' }" :aria-current="activeTab === 'motionExpression' ? 'page' : undefined" @click="activeTab = 'motionExpression'">动作/表情</button>
             <button type="button" :class="{ active: activeTab === 'viewport' }" :aria-current="activeTab === 'viewport' ? 'page' : undefined" @click="activeTab = 'viewport'">预览视口</button>
           </nav>
@@ -116,6 +118,19 @@ function onSeparatorInput(event: Event) {
               <input id="folder-separator" class="separator-input" type="text" :value="folders.settings.separator" @input="onSeparatorInput">
               <p>留空时不划分文件夹；分隔符按完整文本匹配。</p>
             </template>
+            <fieldset v-else-if="activeTab === 'appearance'" class="theme-picker">
+              <legend>编辑器主题</legend>
+              <p>选择后自动保存，所有已打开的编辑器同步切换。</p>
+              <div class="theme-grid">
+                <label v-for="theme in themes" :key="theme.id" class="theme-card" :class="{ chosen: currentTheme.id === theme.id }">
+                  <input type="radio" name="app-theme" :value="theme.id" :checked="theme.id === currentTheme.id" @change="selectTheme(theme)">
+                  <span><strong>{{ theme.name }}</strong><small>{{ theme.description }}</small></span>
+                  <span class="swatch" aria-hidden="true" :style="{ background: theme.colors.panel, color: theme.colors.text, borderColor: theme.colors.edge }">
+                    Aa<i :style="{ background: theme.colors.accent }" />
+                  </span>
+                </label>
+              </div>
+            </fieldset>
             <template v-else>
               <p>在自适应视口基础上调整，修改后自动保存。偏移单位为画布逻辑像素，正值向右或向下；缩放 1 为原始适配大小。已手动调整的视口可通过重置按钮应用新设置。</p>
               <section v-for="version in viewportVersions" :key="version.key" class="viewport-section">
@@ -138,25 +153,34 @@ function onSeparatorInput(event: Event) {
 </template>
 
 <style scoped>
-.settings-mask { position: fixed; inset: 0; z-index: 9999; box-sizing: border-box; padding: 10vh 10vw; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
-.settings-modal { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: #1d2026; border: 1px solid #454d5a; border-radius: 9px; color: #e6e6e6; box-shadow: 0 12px 40px #0008; }
+.settings-mask { position: fixed; inset: 0; z-index: 9999; box-sizing: border-box; padding: 10vh 10vw; background: var(--ui-scrim); display: flex; align-items: center; justify-content: center; }
+.settings-modal { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 9px; color: var(--ui-text); box-shadow: 0 12px 40px var(--ui-shadow); }
 header, footer { display: flex; flex-shrink: 0; align-items: center; padding: 14px 18px; }
-header { border-bottom: 1px solid #373d48; }
+header { border-bottom: 1px solid var(--ui-line); }
 h2 { flex: 1; margin: 0; font-size: 16px; }
 .body { display: flex; flex: 1; min-height: 0; }
-.settings-tabs { width: 140px; flex-shrink: 0; overflow-y: auto; padding: 12px 8px; border-right: 1px solid #373d48; }
+.settings-tabs { width: 140px; flex-shrink: 0; overflow-y: auto; padding: 12px 8px; border-right: 1px solid var(--ui-line); }
 .settings-tabs button { display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; }
-.settings-tabs button.active { background: #303b4d; color: #a9c8ed; }
+.settings-tabs button.active { background: var(--ui-selected); color: var(--ui-link); }
 .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 18px; }
 .separator-label, .frame-rate-label, .focus-offset-label, .guide-visibility-label { margin-top: 20px; }
 .viewport-section { margin-top: 24px; }
 .viewport-section h3 { margin: 0 0 12px; font-size: 15px; }
 .viewport-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .viewport-fields label { flex: 1; min-width: 160px; }
-.separator-input, .frame-rate-select { box-sizing: border-box; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #495464; border-radius: 5px; color: inherit; background: #171a20; }
+.separator-input, .frame-rate-select { box-sizing: border-box; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid var(--ui-edge); border-radius: 5px; color: inherit; background: var(--ui-well); }
 label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-p { margin: 10px 0 0; color: #aeb7c5; font-size: 13px; line-height: 1.6; }
-button { border: 1px solid #495464; border-radius: 5px; padding: 8px 13px; color: inherit; background: #303743; cursor: pointer; }
+p { margin: 10px 0 0; color: var(--ui-muted); font-size: 13px; line-height: 1.6; }
+button { border: 1px solid var(--ui-edge); border-radius: 5px; padding: 8px 13px; color: inherit; background: var(--ui-control); cursor: pointer; }
 .close { border: 0; background: transparent; font-size: 22px; padding: 0 5px; }
-footer { justify-content: flex-end; border-top: 1px solid #373d48; }
+footer { justify-content: flex-end; border-top: 1px solid var(--ui-line); }
+.theme-picker { border: 0; margin: 0; padding: 0; min-width: 0; }
+.theme-picker legend { font-size: 16px; font-weight: 600; padding: 0; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr)); gap: 10px; margin-top: 16px; }
+.theme-card { padding: 12px; border: 1px solid var(--ui-edge); border-radius: 6px; background: var(--ui-panel); }
+.theme-card.chosen { outline: 2px solid var(--ui-link); outline-offset: -2px; background: var(--ui-selected); }
+.theme-card:focus-within { outline: 2px solid var(--ui-link); outline-offset: 2px; }
+.theme-card small { display: block; margin-top: 4px; color: var(--ui-muted); }
+.swatch { margin-left: auto; min-width: 42px; overflow: hidden; text-align: center; font-weight: bold; border: 1px solid; border-radius: 4px; }
+.swatch i { display: block; height: 5px; }
 </style>

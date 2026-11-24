@@ -69,8 +69,8 @@ function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc 
   flex-direction: column;
   width: 100vw;
   height: 100vh;
-  background: #181a20;
-  color: #e6e6e6;
+  background: var(--ui-window);
+  color: var(--ui-text);
   overflow: hidden;
 }
 
@@ -78,8 +78,8 @@ function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc 
   display: flex;
   align-items: center;
   padding: 8px 16px;
-  border-bottom: 1px solid #2c313a;
-  background: #1d2026;
+  border-bottom: 1px solid var(--ui-line);
+  background: var(--ui-panel);
   flex-shrink: 0;
   gap: 16px;
 }
@@ -88,7 +88,7 @@ function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc 
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--ui-text);
 }
 
 .actor-app__meta {
@@ -101,7 +101,7 @@ function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc 
 
 .actor-app__wmdl-name {
   font-size: 12px;
-  color: #b0b8c4;
+  color: var(--ui-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -128,8 +128,8 @@ function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc 
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #2c313a;
-  background: #1d2026;
+  border-left: 1px solid var(--ui-line);
+  background: var(--ui-panel);
   min-width: 0;
 }
 </style>

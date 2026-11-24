@@ -210,7 +210,7 @@ function onClearAll() {
 .snapshot-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--ui-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,16 +219,16 @@ function onClearAll() {
 
 .snapshot-modal {
   /* 半透明面板，但内部文字不受影响 */
-  background-color: rgba(29, 32, 38, 0.36);
-  color: #e6e6e6;
+  background-color: color-mix(in srgb, var(--ui-panel) 72%, transparent);
+  color: var(--ui-text);
   width: min(720px, 92vw);
   max-height: 80vh;
   border-radius: 8px;
-  border: 1px solid rgba(60, 68, 80, 0.35);
+  border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 40px var(--ui-shadow);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
@@ -237,7 +237,7 @@ function onClearAll() {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
@@ -247,13 +247,13 @@ function onClearAll() {
   font-weight: 600;
   flex: 1;
   /* 文字完全不透明（覆盖父级 rgba 背景的视觉效果） */
-  color: #ffffff;
+  color: var(--ui-text);
 }
 
 .snapshot-modal__subtitle {
   font-size: 13px;
   font-weight: 400;
-  color: #b0b8c4;
+  color: var(--ui-muted);
   margin-left: 4px;
 }
 
@@ -265,26 +265,26 @@ function onClearAll() {
 
 .toolbar-btn {
   padding: 4px 12px;
-  background-color: rgba(44, 49, 58, 0.7);
-  border: 1px solid rgba(60, 68, 80, 0.7);
+  background-color: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--ui-text);
   font-size: 12px;
   cursor: pointer;
   transition: background-color 0.12s ease;
 }
 
 .toolbar-btn:hover {
-  background-color: rgba(53, 60, 71, 0.9);
+  background-color: var(--ui-hover);
 }
 
 .toolbar-btn--danger {
-  border-color: rgba(90, 48, 48, 0.8);
-  color: #ffd9d9;
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
 }
 
 .toolbar-btn--danger:hover {
-  background-color: rgba(74, 31, 31, 0.85);
+  background-color: var(--ui-panel-tint-danger);
 }
 
 .toolbar-btn:disabled {
@@ -295,7 +295,7 @@ function onClearAll() {
 .icon-btn {
   background-color: transparent;
   border: none;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 22px;
   line-height: 1;
   width: 28px;
@@ -306,8 +306,8 @@ function onClearAll() {
 }
 
 .icon-btn:hover {
-  background-color: rgba(53, 60, 71, 0.42);
-  color: #ffffff;
+  background-color: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .snapshot-modal__body {
@@ -319,7 +319,7 @@ function onClearAll() {
 .snapshot-empty {
   padding: 48px 16px;
   text-align: center;
-  color: #c8ceda;
+  color: var(--ui-text);
   font-size: 13px;
 }
 
@@ -335,15 +335,15 @@ function onClearAll() {
   gap: 8px;
   padding: 10px 12px;
   /* 卡片背景半透明（rgba），但文字颜色保持完全不透明 */
-  background-color: rgba(35, 40, 48, 0.35);
-  border: 1px solid rgba(60, 68, 80, 0.35);
+  background-color: color-mix(in srgb, var(--ui-control) 75%, transparent);
+  border: 1px solid var(--ui-line);
   border-radius: 6px;
   transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 
 .snapshot-card:hover {
-  border-color: rgba(47, 128, 237, 0.45);
-  background-color: rgba(38, 43, 52, 0.39);
+  border-color: var(--ui-link);
+  background-color: var(--ui-hover);
 }
 
 .snapshot-card__title-row {
@@ -356,7 +356,7 @@ function onClearAll() {
   flex: 1;
   font-size: 13px;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--ui-text);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -366,23 +366,23 @@ function onClearAll() {
 }
 
 .snapshot-card__name:hover {
-  background-color: rgba(60, 68, 80, 0.35);
+  background-color: var(--ui-hover);
 }
 
 .snapshot-card__name-input {
   flex: 1;
   padding: 2px 6px;
-  background-color: rgba(20, 23, 28, 0.42);
-  border: 1px solid rgba(47, 128, 237, 0.45);
+  background-color: var(--ui-well);
+  border: 1px solid var(--ui-link);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--ui-text);
   font-size: 13px;
   outline: none;
 }
 
 .snapshot-card__info {
   font-size: 11px;
-  color: #c8ceda;
+  color: var(--ui-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* 单行显示 */
   white-space: nowrap;
@@ -399,38 +399,38 @@ function onClearAll() {
 .card-btn {
   flex: 1;
   padding: 5px 10px;
-  background-color: rgba(44, 49, 58, 0.7);
-  border: 1px solid rgba(60, 68, 80, 0.7);
+  background-color: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--ui-text);
   font-size: 12px;
   cursor: pointer;
   transition: background-color 0.12s ease;
 }
 
 .card-btn:hover {
-  background-color: rgba(53, 60, 71, 0.9);
+  background-color: var(--ui-hover);
 }
 
 .card-btn--primary {
-  background-color: rgba(47, 128, 237, 0.85);
-  border-color: rgba(47, 128, 237, 0.85);
-  color: #ffffff;
+  background-color: var(--ui-accent);
+  border-color: var(--ui-link);
+  color: var(--ui-on-accent);
 }
 
 .card-btn--primary:hover {
-  background-color: rgba(63, 144, 255, 0.95);
+  background-color: var(--ui-accent-hover); color: var(--ui-on-accent);
 }
 
 .card-btn--danger {
   background-color: transparent;
-  border-color: rgba(90, 48, 48, 0.8);
-  color: #ffd9d9;
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
 }
 
 .card-btn--danger:hover {
-  background-color: rgba(74, 31, 31, 0.85);
-  border-color: rgba(176, 58, 58, 0.9);
+  background-color: var(--ui-panel-tint-danger);
+  border-color: var(--ui-danger);
 }
 
 .fade-enter-active,

@@ -13,6 +13,8 @@
 
 ## 基础与工具
 
+- **主题 / 外观 / 编辑器换肤**：所有编辑器共享的本机偏好。外观入口在预览设置，色板在 `frontend/src/themes/palettes.json`；规范和同步入口见 `docs/THEMES.md`。
+
 - **文件浏览器 / 文件对话框**：原生文件选择入口在 `app.go`，搜索 `runPicker`、`FileDialog`。
 - **Live2D / 部件 / 动作 / 表情**：`frontend/src/live2d/coreAdapter.ts` 统一 Cubism 2 与 Cubism 4 的数据访问；代码关键词为 part、motion、expr、expression。
 - **wmdl**：模型配置与数据结构分别在 `frontend/src/utils/wmdlUtils.ts`、`frontend/src/stores/wmdlTypes.ts`。

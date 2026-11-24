@@ -226,8 +226,8 @@ function cancelEdit() {
 <style scoped>
 .range-card {
   position: relative;
-  background: #14171c;
-  border: 1px solid #2c313a;
+  background: var(--ui-well);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
   padding: 8px 10px;
   display: flex;
@@ -237,11 +237,11 @@ function cancelEdit() {
 }
 
 .range-card.is-dragging {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .range-card.is-highlight {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .range-card.is-disabled {
@@ -255,16 +255,16 @@ function cancelEdit() {
 
 /* 未高亮时（即无 override）整体降饱和，让"未改 vs 已改"一眼可辨 */
 .range-card:not(.is-highlight) .range-card__track {
-  background: #232830;
+  background: var(--ui-panel);
 }
 
 .range-card:not(.is-highlight) .range-card__fill {
-  background: #4a5160;
+  background: var(--ui-edge);
 }
 
 .range-card:not(.is-highlight) .range-card__thumb {
-  background: #8a93a3;
-  border-color: #4a5160;
+  background: var(--ui-muted);
+  border-color: var(--ui-edge);
 }
 
 .range-card__header {
@@ -280,7 +280,7 @@ function cancelEdit() {
   padding-right: 22px;
   font-size: 12px;
   font-weight: 500;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-family: ui-monospace, SFMono-Regular, monospace;
   white-space: nowrap;
   overflow: hidden;
@@ -302,10 +302,10 @@ function cancelEdit() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #1d2026;
-  border: 1px solid #2c313a;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line);
   border-radius: 3px;
-  color: #ffffff;
+  color: var(--ui-text);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
@@ -316,7 +316,7 @@ function cancelEdit() {
 }
 
 .range-card__calc:hover {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 /* 启用 calc 按钮时给名称预留左侧空间，避免遮挡 */
@@ -325,21 +325,21 @@ function cancelEdit() {
 }
 
 .range-card__calc--set {
-  background: rgba(47, 128, 237, 0.25);
-  border-color: rgba(47, 128, 237, 0.6);
-  color: #5fa8ff;
+  background: var(--ui-selected);
+  border-color: var(--ui-link);
+  color: var(--ui-link);
 }
 
 .range-card__calc--add {
-  background: rgba(46, 160, 67, 0.25);
-  border-color: rgba(46, 160, 67, 0.6);
-  color: #5fcc7f;
+  background: var(--ui-panel-tint-success);
+  border-color: var(--ui-success);
+  color: var(--ui-success);
 }
 
 .range-card__calc--mult {
-  background: rgba(224, 144, 41, 0.25);
-  border-color: rgba(224, 144, 41, 0.6);
-  color: #f0a050;
+  background: var(--ui-panel-tint-warning);
+  border-color: var(--ui-warning);
+  color: var(--ui-warning);
 }
 
 .range-card__reset {
@@ -351,10 +351,10 @@ function cancelEdit() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #1d2026;
-  border: 1px solid #2c313a;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line);
   border-radius: 3px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
@@ -364,15 +364,15 @@ function cancelEdit() {
 }
 
 .range-card__reset:hover {
-  border-color: #2f80ed;
-  color: #2f80ed;
-  background: #14171c;
+  border-color: var(--ui-link);
+  color: var(--ui-link);
+  background: var(--ui-well);
 }
 
 .range-card__track {
   position: relative;
   height: 8px;
-  background: #2c313a;
+  background: var(--ui-control);
   border-radius: 4px;
   cursor: ew-resize;
   touch-action: none;
@@ -383,7 +383,7 @@ function cancelEdit() {
   left: 0;
   top: 0;
   bottom: 0;
-  background: #2f80ed;
+  background: var(--ui-accent);
   border-radius: 4px;
   pointer-events: none;
 }
@@ -393,12 +393,12 @@ function cancelEdit() {
   top: 50%;
   width: 12px;
   height: 12px;
-  background: #e6e6e6;
-  border: 1px solid #2f80ed;
+  background: var(--ui-text);
+  border: 1px solid var(--ui-link);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 2px var(--ui-shadow);
 }
 
 .range-card__values {
@@ -411,7 +411,7 @@ function cancelEdit() {
 }
 
 .value-label {
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .value-label--min {
@@ -425,9 +425,9 @@ function cancelEdit() {
 .value-label--cur {
   flex: 1 1 auto;
   text-align: center;
-  color: #e6e6e6;
-  background: #1d2026;
-  border: 1px solid #2c313a;
+  color: var(--ui-text);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line);
   border-radius: 3px;
   padding: 2px 4px;
   cursor: text;
@@ -435,14 +435,14 @@ function cancelEdit() {
 }
 
 .value-label--cur:hover {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .value-input {
   flex: 1 1 auto;
-  background: #14171c;
-  color: #e6e6e6;
-  border: 1px solid #2f80ed;
+  background: var(--ui-well);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-link);
   border-radius: 3px;
   padding: 2px 4px;
   font-size: 11px;

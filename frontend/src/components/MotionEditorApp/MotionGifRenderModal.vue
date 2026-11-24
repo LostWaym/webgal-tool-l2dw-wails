@@ -304,7 +304,7 @@ function onAbort() {
 .mgr-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.32);
+  background: var(--ui-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -312,22 +312,22 @@ function onAbort() {
 }
 
 .mgr-modal {
-  background-color: rgba(29, 32, 38, 0.96);
-  color: #e6e6e6;
+  background-color: var(--ui-dialog);
+  color: var(--ui-text);
   width: min(480px, 92vw);
   border-radius: 8px;
-  border: 1px solid rgba(60, 68, 80, 0.35);
+  border: 1px solid var(--ui-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 40px var(--ui-shadow);
 }
 
 .mgr-modal__header {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(60, 68, 80, 0.35);
+  border-bottom: 1px solid var(--ui-line);
   flex-shrink: 0;
 }
 
@@ -336,13 +336,13 @@ function onAbort() {
   font-size: 15px;
   font-weight: 600;
   flex: 1;
-  color: #ffffff;
+  color: var(--ui-text);
 }
 
 .mgr-icon-btn {
   background-color: transparent;
   border: none;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 22px;
   line-height: 1;
   width: 28px;
@@ -352,8 +352,8 @@ function onAbort() {
 }
 
 .mgr-icon-btn:hover {
-  background-color: rgba(53, 60, 71, 0.42);
-  color: #ffffff;
+  background-color: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .mgr-icon-btn:disabled {
@@ -377,23 +377,23 @@ function onAbort() {
 .mgr-field__label {
   width: 72px;
   font-size: 13px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   flex-shrink: 0;
 }
 
 .mgr-field__input {
   padding: 6px 10px;
-  background: #1e222a;
-  border: 1px solid #3a4150;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   outline: none;
   width: 90px;
 }
 
 .mgr-field__input:focus {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .mgr-field__input:disabled {
@@ -405,12 +405,12 @@ function onAbort() {
 }
 
 .mgr-field__dash {
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .mgr-field__hint {
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .mgr-seg-list {
@@ -420,9 +420,9 @@ function onAbort() {
 
 .mgr-seg-btn {
   padding: 5px 12px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
-  color: #8a93a3;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
+  color: var(--ui-muted);
   font-size: 12px;
   cursor: pointer;
 }
@@ -437,9 +437,9 @@ function onAbort() {
 }
 
 .mgr-seg-btn--active {
-  background: #1f3a5f;
-  border-color: #2f80ed;
-  color: #ffffff;
+  background: var(--ui-selected);
+  border-color: var(--ui-link);
+  color: var(--ui-text);
 }
 
 .mgr-seg-btn:disabled {
@@ -451,9 +451,9 @@ function onAbort() {
   width: 40px;
   height: 28px;
   padding: 0;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
-  background: #1e222a;
+  background: var(--ui-panel);
   cursor: pointer;
 }
 
@@ -462,7 +462,7 @@ function onAbort() {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #cfd4dc;
+  color: var(--ui-text);
   cursor: pointer;
 }
 
@@ -472,11 +472,11 @@ function onAbort() {
 
 .mgr-preview {
   font-size: 13px;
-  color: #cfd4dc;
+  color: var(--ui-text);
 }
 
 .mgr-preview b {
-  color: #5fa8ff;
+  color: var(--ui-link);
 }
 
 .mgr-progress {
@@ -488,24 +488,24 @@ function onAbort() {
 .mgr-progress__bar {
   flex: 1;
   height: 8px;
-  background: #1e222a;
+  background: var(--ui-panel);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .mgr-progress__fill {
   height: 100%;
-  background: #2f80ed;
+  background: var(--ui-accent);
   transition: width 0.1s linear;
 }
 
 .mgr-progress__fill--encode {
-  background: #27ae60;
+  background: var(--ui-success);
 }
 
 .mgr-progress__label {
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   min-width: 90px;
   text-align: right;
 }
@@ -515,31 +515,31 @@ function onAbort() {
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(60, 68, 80, 0.35);
+  border-top: 1px solid var(--ui-line);
 }
 
 .mgr-btn {
   padding: 6px 16px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
 }
 
 .mgr-btn:hover {
-  background: #343b49;
+  background: var(--ui-hover);
 }
 
 .mgr-btn--primary {
-  background: #2f80ed;
-  border-color: #2f80ed;
-  color: #ffffff;
+  background: var(--ui-accent);
+  border-color: var(--ui-link);
+  color: var(--ui-on-accent);
 }
 
 .mgr-btn--primary:hover {
-  background: #1a5bb8;
+  background: var(--ui-accent); color: var(--ui-on-accent);
 }
 
 .mgr-btn:disabled {

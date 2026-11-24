@@ -73,10 +73,10 @@ function close() { if (!busy.value) { selected.value = null; emit('close') } }
 </template>
 
 <style scoped>
-.project-mask { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
-.project-modal { width: min(760px, 94vw); max-height: 85vh; display: flex; flex-direction: column; background: #1d2026; border: 1px solid #454d5a; border-radius: 9px; color: #e6e6e6; box-shadow: 0 12px 40px #0008; }
+.project-mask { position: fixed; inset: 0; z-index: 9999; background: var(--ui-scrim); display: flex; align-items: center; justify-content: center; }
+.project-modal { width: min(760px, 94vw); max-height: 85vh; display: flex; flex-direction: column; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 9px; color: var(--ui-text); box-shadow: 0 12px 40px var(--ui-shadow); }
 header, footer { display: flex; align-items: center; gap: 10px; padding: 14px 18px; }
-header { border-bottom: 1px solid #373d48; } h2 { flex: 1; margin: 0; font-size: 16px; } h3 { font-size: 14px; margin: 18px 0 6px; }
-.body { overflow: auto; padding: 16px 18px; } .actions { display: flex; gap: 10px; } button { border: 1px solid #495464; border-radius: 5px; padding: 8px 13px; color: inherit; background: #303743; cursor: pointer; } button:disabled { opacity: .45; cursor: default; } .primary { background: #2f80ed; border-color: #2f80ed; } .close { border: 0; background: transparent; font-size: 22px; padding: 0 5px; }
-footer { justify-content: flex-end; border-top: 1px solid #373d48; } ul { margin: 6px 0; padding-left: 22px; } li, .path { overflow-wrap: anywhere; line-height: 1.6; } .path, .empty { color: #aeb7c5; } .notice, .missing { color: #ffcc80; } .missing { border: 1px solid #805e32; border-radius: 5px; padding: 10px; margin-top: 14px; }
+header { border-bottom: 1px solid var(--ui-line); } h2 { flex: 1; margin: 0; font-size: 16px; } h3 { font-size: 14px; margin: 18px 0 6px; }
+.body { overflow: auto; padding: 16px 18px; } .actions { display: flex; gap: 10px; } button { border: 1px solid var(--ui-edge); border-radius: 5px; padding: 8px 13px; color: inherit; background: var(--ui-control); cursor: pointer; } button:disabled { opacity: .45; cursor: default; } .primary { background: var(--ui-accent); border-color: var(--ui-link); color: var(--ui-on-accent); } .close { border: 0; background: transparent; font-size: 22px; padding: 0 5px; }
+footer { justify-content: flex-end; border-top: 1px solid var(--ui-line); } ul { margin: 6px 0; padding-left: 22px; } li, .path { overflow-wrap: anywhere; line-height: 1.6; } .path, .empty { color: var(--ui-muted); } .notice, .missing { color: var(--ui-warning); } .missing { border: 1px solid var(--ui-warning); border-radius: 5px; padding: 10px; margin-top: 14px; }
 </style>

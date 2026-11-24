@@ -107,6 +107,7 @@ func (a *App) saveConfig(cfg AppConfig) error {
 // call runtime methods later.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.watchAppearance(ctx)
 	cfg := a.loadConfig()
 	if cfg.LastDirs == nil {
 		cfg.LastDirs = map[string]string{}

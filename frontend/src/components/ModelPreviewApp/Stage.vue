@@ -13,6 +13,7 @@ import type { WmdlModelItem } from '../../stores/wmdlTypes'
 import { STAGE_WIDTH, STAGE_HEIGHT, FOCUS_BOX_SIZE } from '../../utils/consts'
 import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
 import { useMessage } from '../../composables/useMessage'
+import { currentTheme, themeColor } from '../../themes/appearance'
 import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
@@ -325,9 +326,10 @@ function startTransform(mode: TransformMode) {
     const half = FOCUS_BOX_SIZE / 2
     focusBox = new PIXI.Graphics()
     focusBox.y = focusBoxOffsetY.value
-    focusBox.lineStyle(4, 0x2f80ed, 0.9)
+    focusBox.tint = themeColor('link')
+    focusBox.lineStyle(4, 0xffffff, 0.9)
     focusBox.drawRect(-half, -half, FOCUS_BOX_SIZE, FOCUS_BOX_SIZE)
-    focusBox.lineStyle(2, 0x2f80ed, 0.5)
+    focusBox.lineStyle(2, 0xffffff, 0.5)
     focusBox.moveTo(-half, 0)
     focusBox.lineTo(half, 0)
     focusBox.moveTo(0, -half)
@@ -861,16 +863,30 @@ function drawGuides() {
   graphics.clear()
   const matched = snappedGuides.value.filter(guide => store.guides.includes(guide))
   for (const guide of store.guides) {
-    if (!matched.includes(guide)) draw(guide, deleting && guide === candidate ? 0xff8268 : 0x60dcff, 0.95)
+    if (!matched.includes(guide)) draw(guide, themeColor(deleting && guide === candidate ? 'danger' : 'link'), 0.95)
   }
-  for (const guide of matched) draw(guide, 0x63ff8d, 1, 2.2)
+  for (const guide of matched) draw(guide, themeColor('success'), 1, 2.2)
   if (candidate && !deleting) {
     const key = previewGuideKey(candidate)
-    if (!store.guides.some(guide => previewGuideKey(guide) === key)) draw(candidate, 0x60dcff, 0.5)
+    if (!store.guides.some(guide => previewGuideKey(guide) === key)) draw(candidate, themeColor('link'), 0.5)
   }
 }
 
-watch([() => store.guides, guideMode, guideCandidate, guidesVisible, snappedGuides, guideOverflow], drawGuides, { deep: true })
+watch([() => store.guides, guideMode, guideCandidate, guidesVisible, snappedGuides, guideOverflow, currentTheme], drawGuides, { deep: true })
+
+let frameLines: PIXI.Graphics | null = null
+let cameraLines: PIXI.Graphics | null = null
+function tintOverlays() {
+  if (frameLines) frameLines.tint = themeColor('success')
+  if (cameraLines) cameraLines.tint = themeColor('warning')
+  if (focusBox) focusBox.tint = themeColor('link')
+  if (moveCrosshair) moveCrosshair.tint = themeColor('text')
+  for (const c of groupContainers.values()) {
+    const cross = c.children.find(ch => ch instanceof PIXI.Graphics) as PIXI.Graphics | undefined
+    if (cross) cross.tint = themeColor('warning')
+  }
+}
+watch(currentTheme, tintOverlays)
 
 watch(frameRateLimit, (limit) => {
   if (app) app.ticker.maxFPS = limit
@@ -945,9 +961,9 @@ async function init() {
 
   // 创建边框容器（rootContainer 的子节点，渲染层级最高）
   frameContainer = new PIXI.Container()
-  const frame = new PIXI.Graphics()
+  const frame = frameLines = new PIXI.Graphics()
   const { left, right, top, bottom } = PREVIEW_FRAME
-  frame.lineStyle(2, 0x00FF00)
+  frame.lineStyle(2, 0xffffff)
   frame.drawRect(left, top, right - left, bottom - top)
   // 四个顶点处的横竖延伸线（向外溢出边框）
   const ext = 1280
@@ -963,8 +979,8 @@ async function init() {
   rootContainer.addChild(frameContainer)
 
   const camera = new PIXI.Container()
-  const cameraFrame = new PIXI.Graphics()
-  cameraFrame.lineStyle(16, 0xffdd00)
+  const cameraFrame = cameraLines = new PIXI.Graphics()
+  cameraFrame.lineStyle(16, 0xffffff)
   cameraFrame.drawRect(-STAGE_WIDTH / 2, -STAGE_HEIGHT / 2, STAGE_WIDTH, STAGE_HEIGHT)
   cameraFrame.moveTo(0, -STAGE_HEIGHT / 2)
   cameraFrame.lineTo(0, -STAGE_HEIGHT / 2 - 100)
@@ -976,7 +992,8 @@ async function init() {
   rootContainer.addChild(camera)
   previewRuntime.specialContainers.set(SpecialId.Camera, camera)
 
-  moveCrosshair = buildStageCrosshair(6, 8, 0xffffff)
+  moveCrosshair = buildStageCrosshair(6, 8)
+  tintOverlays()
   moveCrosshair.visible = false
   app.stage.addChild(moveCrosshair)
 
@@ -1046,6 +1063,7 @@ function ensureGroupContainer(group: FigureGroupEntry): L2dwContainer {
 
   // 准心作为 groupContainer 的子节点，始终在原点（随容器同步变换）
   const crosshair = buildStageCrosshair()
+  crosshair.tint = themeColor('warning')
   crosshair.visible = false
   c.addChild(crosshair)
 
@@ -1100,7 +1118,6 @@ function destroyGroupContainer(groupId: string): void {
 function buildStageCrosshair(
   mainWidth = 8,
   extraWidth = 8,
-  color = 0xffff66,
 ): PIXI.Graphics {
   const g = new PIXI.Graphics()
   const OUTLINE = 0x000000 // 黑描边
@@ -1116,7 +1133,7 @@ function buildStageCrosshair(
   g.moveTo(0, GAP-4); g.lineTo(0, W+4)
 
   // 主线叠在描边中央
-  g.lineStyle(mainWidth, color)
+  g.lineStyle(mainWidth, 0xffffff)
   g.moveTo(-W, 0); g.lineTo(-GAP, 0)
   g.moveTo(GAP, 0); g.lineTo(W, 0)
   g.moveTo(0, -W); g.lineTo(0, -GAP)
@@ -2198,6 +2215,7 @@ function dispose() {
     frameContainer = null
   }
   guideGraphics = null
+  frameLines = cameraLines = null
   moveCrosshair = null
 
   if (app) {
@@ -2314,7 +2332,7 @@ function dispose() {
 .stage {
   position: relative;
   height: 100%;
-  background: #181a20;
+  background: var(--ui-window);
   overflow: hidden;
 }
 
@@ -2353,14 +2371,14 @@ function dispose() {
   left: 16px;
   bottom: 16px;
   padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--ui-floating);
+  border: 1px solid var(--ui-edge);
   border-radius: 8px;
-  color: #fff;
+  color: var(--ui-text);
   font-size: 13px;
   line-height: 1.6;
   z-index: 10;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: none;
   user-select: none;
 }
 
@@ -2372,7 +2390,7 @@ function dispose() {
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 6px;
-  color: #ffe082;
+  color: var(--ui-warning);
 }
 
 .transform-hint__line + .transform-hint__line {
@@ -2386,7 +2404,7 @@ function dispose() {
   align-items: center;
   justify-content: center;
   margin: 0;
-  color: #6b7280;
+  color: var(--ui-muted);
   font-size: 14px;
   pointer-events: none;
   text-align: center;
@@ -2402,18 +2420,13 @@ function dispose() {
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--ui-floating);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #fff;
-  text-shadow:
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000,
-    1px 1px 0 #000,
-    0 0 2px rgba(0, 0, 0, 0.85);
+  color: var(--ui-text);
+  text-shadow: none;
   user-select: none;
 }
 
@@ -2424,9 +2437,9 @@ function dispose() {
 .stage__next-mode-select {
   pointer-events: auto;
   font: inherit;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 3px;
   padding: 2px 6px;
   cursor: pointer;
@@ -2434,12 +2447,12 @@ function dispose() {
 
 .stage__next-mode-select:focus-visible {
   outline: none;
-  border-color: #b3e5fc;
+  border-color: var(--ui-link);
 }
 
 .stage__next-mode-select option {
-  color: #fff;
-  background: #1f2024;
+  color: var(--ui-text);
+  background: var(--ui-panel);
 }
 
 .stage__bottom-blocks {
@@ -2458,13 +2471,8 @@ function dispose() {
 .stage__hints {
   font-size: 12px;
   line-height: 1.5;
-  color: #fff;
-  text-shadow:
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000,
-    1px 1px 0 #000,
-    0 0 2px rgba(0, 0, 0, 0.85);
+  color: var(--ui-text);
+  text-shadow: none;
   user-select: none;
 }
 
@@ -2474,17 +2482,17 @@ function dispose() {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--ui-floating);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
   color: inherit;
   font: inherit;
   cursor: pointer;
-  text-shadow: inherit;
+  text-shadow: none;
 }
 
 .stage__hints-toggle:hover {
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--ui-floating);
 }
 
 .stage__hints-toggle-text {
@@ -2498,8 +2506,8 @@ function dispose() {
 .stage__hints-body {
   margin-top: 6px;
   padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--ui-floating);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
   width: max-content;
   max-width: calc(100vw - 32px);
@@ -2513,7 +2521,7 @@ function dispose() {
   margin: 0 0 4px 0;
   font-size: 11px;
   font-weight: 600;
-  color: #ffe082;
+  color: var(--ui-warning);
   letter-spacing: 0.5px;
 }
 
@@ -2544,12 +2552,12 @@ function dispose() {
   text-align: left;
   border-radius: 3px;
   cursor: pointer;
-  text-shadow: inherit;
+  text-shadow: none;
 }
 
 .stage__hints-item:hover,
 .stage__hints-item:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--ui-hover);
   outline: none;
 }
 
@@ -2557,7 +2565,7 @@ function dispose() {
   flex: 0 0 auto;
   min-width: 96px;
   font-weight: 600;
-  color: #b3e5fc;
+  color: var(--ui-link);
 }
 
 .stage__hints-desc {
@@ -2565,6 +2573,6 @@ function dispose() {
 }
 
 .stage__hints.is-collapsed .stage__hints-toggle {
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--ui-floating);
 }
 </style>

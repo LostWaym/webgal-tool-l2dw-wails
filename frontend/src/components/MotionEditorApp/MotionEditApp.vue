@@ -522,8 +522,8 @@ async function onLoad() {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #1a1a20;
-  color: #e6e6e6;
+  background: var(--ui-window);
+  color: var(--ui-text);
 }
 
 .motion-editor__header {
@@ -533,8 +533,8 @@ async function onLoad() {
   flex-shrink: 0;
   height: 38px;
   padding: 0 12px;
-  background: #242830;
-  border-bottom: 1px solid #3a4150;
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-line);
 }
 
 .motion-editor__title {
@@ -548,18 +548,18 @@ async function onLoad() {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 4px 10px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .motion-editor__wmdl:hover {
-  border-color: #2f80ed;
-  color: #5fa8ff;
+  border-color: var(--ui-link);
+  color: var(--ui-link);
 }
 
 .motion-editor__spacer {
@@ -568,10 +568,10 @@ async function onLoad() {
 
 .motion-editor__time {
   padding: 4px 10px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
@@ -580,8 +580,8 @@ async function onLoad() {
 }
 
 .motion-editor__time:hover {
-  border-color: #2f80ed;
-  color: #5fa8ff;
+  border-color: var(--ui-link);
+  color: var(--ui-link);
 }
 
 .motion-editor__lanim {
@@ -592,18 +592,18 @@ async function onLoad() {
 
 .he-btn {
   padding: 4px 10px;
-  background: #2c313a;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .he-btn:hover:not(:disabled) {
-  background: #343b49;
-  border-color: #2f80ed;
+  background: var(--ui-hover);
+  border-color: var(--ui-link);
 }
 
 .he-btn:disabled {
@@ -617,15 +617,15 @@ async function onLoad() {
 .motion-menu__panel {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
   width: 220px;
-  padding: 4px; background: #2c313a; border: 1px solid #3a4150; border-radius: 4px;
+  padding: 4px; background: var(--ui-control); border: 1px solid var(--ui-line); border-radius: 4px;
 }
 .motion-menu__items { max-height: 55vh; overflow-y: auto; }
 .motion-menu__items button, .motion-menu__items span {
   display: block; width: 100%; padding: 6px 8px; text-align: left;
-  white-space: nowrap; color: #e6e6e6; font-size: 12px;
+  white-space: nowrap; color: var(--ui-text); font-size: 12px;
 }
 .motion-menu__items button { border: 0; background: transparent; cursor: pointer; }
-.motion-menu__items button:hover { background: #343b49; }
+.motion-menu__items button:hover { background: var(--ui-hover); }
 
 .motion-editor__body {
   display: flex;

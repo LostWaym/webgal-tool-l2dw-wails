@@ -285,7 +285,7 @@ function onOpenModal() {
           aria-label="取色器（占位）"
           tabindex="-1"
         >
-          <img :src="dropletIcon" alt="" />
+          <img class="ui-icon" :src="dropletIcon" alt="" />
         </button>
       </div>
     </div>
@@ -438,7 +438,7 @@ function onOpenModal() {
   aspect-ratio: 1 / 1;
   min-width: 0;
   border-radius: 4px;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--ui-line);
   cursor: crosshair;
   touch-action: none;
 }
@@ -478,7 +478,7 @@ function onOpenModal() {
   width: 14px;
   min-height: 0;
   border-radius: 4px;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--ui-line);
   cursor: ns-resize;
   touch-action: none;
   background: linear-gradient(
@@ -511,8 +511,8 @@ function onOpenModal() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 3px;
   cursor: pointer;
   opacity: 0.6;
@@ -537,8 +537,8 @@ function onOpenModal() {
 
 .cp-mode {
   display: inline-flex;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-line);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -547,39 +547,39 @@ function onOpenModal() {
   padding: 3px 8px;
   background: transparent;
   border: none;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 11px;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
 
 .cp-mode__btn.is-active {
-  background: #2f80ed;
-  color: #fff;
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
 }
 
 .cp-swatch {
   flex: 1;
   height: 18px;
   border-radius: 3px;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--ui-edge);
 }
 
 .cp-modal-btn {
   width: 22px;
   height: 22px;
   padding: 0;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 3px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 12px;
   cursor: pointer;
   transition: border-color 0.15s;
 }
 
 .cp-modal-btn:hover {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 /* ── 输入框 ── */
@@ -593,8 +593,8 @@ function onOpenModal() {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
   padding: 0 6px;
   min-width: 0;
@@ -602,11 +602,11 @@ function onOpenModal() {
 }
 
 .cp-input:focus-within {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .cp-input__label {
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 11px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   flex-shrink: 0;
@@ -619,7 +619,7 @@ function onOpenModal() {
   padding: 4px 0;
   background: transparent;
   border: none;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   outline: none;

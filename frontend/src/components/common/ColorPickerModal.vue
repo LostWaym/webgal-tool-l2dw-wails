@@ -169,7 +169,7 @@ function onMaskClick(e: MouseEvent) {
 .cp-modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--ui-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,11 +180,11 @@ function onMaskClick(e: MouseEvent) {
 .cp-modal {
   width: min(420px, 92vw);
   padding: 16px;
-  background-color: rgba(29, 32, 38, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: var(--ui-dialog);
+  border: 1px solid var(--ui-edge);
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  color: #e6e6e6;
+  box-shadow: 0 10px 30px var(--ui-shadow);
+  color: var(--ui-text);
 }
 
 .cp-modal__header {
@@ -197,7 +197,7 @@ function onMaskClick(e: MouseEvent) {
 .cp-modal__title {
   margin: 0;
   font-size: 15px;
-  color: #ffffff;
+  color: var(--ui-text);
 }
 
 .icon-btn {
@@ -210,14 +210,14 @@ function onMaskClick(e: MouseEvent) {
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #8a93a3;
+  color: var(--ui-muted);
   font-size: 16px;
   cursor: pointer;
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e6e6e6;
+  background: var(--ui-hover);
+  color: var(--ui-text);
 }
 
 .cp-modal__body {
@@ -232,16 +232,16 @@ function onMaskClick(e: MouseEvent) {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: #8a93a3;
+  color: var(--ui-muted);
 }
 
 .cp-modal__input {
   width: 100%;
   padding: 8px 10px;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   outline: none;
@@ -250,26 +250,26 @@ function onMaskClick(e: MouseEvent) {
 }
 
 .cp-modal__input:focus {
-  border-color: #2f80ed;
+  border-color: var(--ui-link);
 }
 
 .cp-modal__error {
   font-size: 12px;
-  color: #ff6b6b;
+  color: var(--ui-danger);
 }
 
 .cp-modal__hint {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--ui-muted);
   line-height: 1.5;
 }
 
 .cp-modal__hint code {
-  background: #262b34;
+  background: var(--ui-control);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 11px;
-  color: #e6e6e6;
+  color: var(--ui-text);
 }
 
 .cp-modal__footer {
@@ -280,28 +280,28 @@ function onMaskClick(e: MouseEvent) {
 
 .card-btn {
   padding: 6px 14px;
-  background: #262b34;
-  border: 1px solid #3a4150;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-edge);
   border-radius: 4px;
-  color: #e6e6e6;
+  color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
 }
 
 .card-btn:hover {
-  background: #2c313a;
+  background: var(--ui-control);
 }
 
 .card-btn--primary {
-  background: #2f80ed;
-  border-color: #2f80ed;
-  color: #fff;
+  background: var(--ui-accent);
+  border-color: var(--ui-link);
+  color: var(--ui-on-accent);
 }
 
 .card-btn--primary:hover {
-  background: #3f90ff;
-  border-color: #3f90ff;
+  background: var(--ui-accent-hover);
+  border-color: var(--ui-link); color: var(--ui-on-accent);
 }
 
 /* 渐入渐出 */

@@ -656,11 +656,11 @@ const COMMON_SHORTCUT_HINTS: ShortcutHint[] = [
   },
   {
     keys: 'F2',
-    description: '打开演出编辑器窗口',
+    description: '打开表情编辑器窗口',
     entry: {
       key: 'F2',
       keys: 'F2',
-      description: '打开演出编辑器窗口',
+      description: '打开表情编辑器窗口',
       targets: ['model', 'background', 'stage', 'figureGroup', 'none'],
       handlerKey: 'openActorEditor',
       run: () => {

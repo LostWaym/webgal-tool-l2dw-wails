@@ -269,7 +269,7 @@ func (a *App) SetPreviewFocusBoxOffsetY(offset float64) error {
 }
 
 // AppMode 暴露当前进程的窗口模式给前端，main.ts 据此决定挂载 App 还是 ModelEditApp。
-// 返回 "editor" 表示编辑器模式，"actor" 表示演出编辑器模式，"motion" 表示动作编辑器模式，
+// 返回 "editor" 表示编辑器模式，"actor" 表示表情编辑器模式，"motion" 表示动作编辑器模式，
 // "main" 表示主窗口模式。
 func (a *App) AppMode() string {
 	if actorFlag {
@@ -290,7 +290,7 @@ func (a *App) EditorWmdlPath() string {
 	return editorWmdlPath
 }
 
-// ActorWmdlPath 返回启动时通过 --actor-wmdl 参数传入的 wmdl 文件绝对路径；演出编辑器进程使用，
+// ActorWmdlPath 返回启动时通过 --actor-wmdl 参数传入的 wmdl 文件绝对路径；表情编辑器进程使用，
 // 若未传则返回空串。主进程调用始终返回空串。
 func (a *App) ActorWmdlPath() string {
 	return actorWmdlPath
@@ -342,7 +342,7 @@ func (a *App) OpenEditor(wmdlPath string) error {
 }
 
 // OpenActorEditor 异步 spawn 一个新的 L2DW 进程（带 --actor 参数），新进程会打开
-// 独立的"演出编辑器"窗口。子进程在 main.go 启动时识别该 flag 后进入演出编辑器模式。
+// 独立的"表情编辑器"窗口。子进程在 main.go 启动时识别该 flag 后进入表情编辑器模式。
 //
 // wmdlPath 非空时附带 --actor-wmdl 参数传递到子进程；子进程启动后会自动加载该 wmdl 文件。
 // 这里只 Start() 不 Wait()，避免阻塞主窗口的 UI 线程；新进程退出由 OS 回收。

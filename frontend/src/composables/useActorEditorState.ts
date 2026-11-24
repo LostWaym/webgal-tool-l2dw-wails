@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 
 /**
- * 演出编辑器（独立窗口）的导出覆盖层状态。
+ * 表情编辑器（独立窗口）的导出覆盖层状态。
  *
  * 与原 useExpressionEditorModal 相比：
  *   - 移除了 `visible`（独立窗口始终可见，不再有显隐概念）；

@@ -37,7 +37,7 @@ const props = withDefaults(
     highlight?: boolean
     /** 是否在卡片标题右侧显示"重置"按钮。 */
     showReset?: boolean
-    /** 是否显示左上角的 calc 切换按钮（仅演出编辑器需要）。默认 false，避免污染其他场景。 */
+    /** 是否显示左上角的 calc 切换按钮（仅表情编辑器需要）。默认 false，避免污染其他场景。 */
     showCalcSwitch?: boolean
     /** 当前 calc 类型。默认 'set'。 */
     calcType?: ParamCalc

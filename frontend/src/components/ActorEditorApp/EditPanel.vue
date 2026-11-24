@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 演出编辑器的右侧面板：表情 Tab + 参数 Tab + 导出覆盖层。
+ * 表情编辑器的右侧面板：表情 Tab + 参数 Tab + 导出覆盖层。
  *
  * 来自原 ExpressionEditorModal.vue 的右侧部分 + 导出 Modal 逻辑，
  * 这里是迁移后的载体，不再是 Modal 而是独立面板。

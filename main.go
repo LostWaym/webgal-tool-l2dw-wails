@@ -21,11 +21,11 @@ var editorFlag bool
 // editorWmdlPath 由 --wmdl 参数携带；编辑器进程启动时若非空，会自动加载该 wmdl 文件。
 var editorWmdlPath string
 
-// actorFlag 标记当前进程是否以"演出编辑器"模式启动。
+// actorFlag 标记当前进程是否以"表情编辑器"模式启动。
 // 主进程启动时不会带此 flag；子进程（由 App.OpenActorEditor 拉起）会带。
 var actorFlag bool
 
-// actorWmdlPath 由 --actor-wmdl 参数携带；演出编辑器进程启动时若非空，会自动加载该 wmdl 文件。
+// actorWmdlPath 由 --actor-wmdl 参数携带；表情编辑器进程启动时若非空，会自动加载该 wmdl 文件。
 var actorWmdlPath string
 
 // motionFlag 标记当前进程是否以"动作编辑器"模式启动。
@@ -90,7 +90,7 @@ func main() {
 		title = "L2DW-Wails - 模型编辑器"
 		width, height = 1400, 900
 	} else if actorFlag {
-		title = "L2DW-Wails - 演出编辑器"
+		title = "L2DW-Wails - 表情编辑器"
 		width, height = 1200, 800
 	} else if motionFlag {
 		title = "L2DW-Wails - 动作编辑器"

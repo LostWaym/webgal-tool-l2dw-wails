@@ -13,7 +13,7 @@ export type { MotionEntry, ExprEntry }
  *   - mult: 在当前值上乘以倍数
  * 仅运行时由编辑器设置，不持久化到 .wmdl。
  *
- * 默认值为 'set'（演出编辑器刚加载时 calc 缺省走覆盖语义）。
+ * 默认值为 'set'（表情编辑器刚加载时 calc 缺省走覆盖语义）。
  * 注意：表达式文件中的 'none' 不会以 ParamCalc 形式出现，
  *       而是由 EditPanel 通过 toRangeCalc 从 CalcKind 映射为 'add'。
  */

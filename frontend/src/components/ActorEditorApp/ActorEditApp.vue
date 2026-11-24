@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * 演出编辑器（Actor Editor）的根组件。
+ * 表情编辑器的根组件。
  *
  * 布局：
  *   顶部  标题栏（模型选择器 + 当前 wmdl 文件名）
  *   中部  左侧 ActorStage (PIXI 预览) + 右侧 EditPanel (表情/参数面板)
  *
- * 数据：复用 useWmdlModelEditorStore，仅在演出编辑模式下持有当前 wmdl 的副本。
+ * 数据：复用 useWmdlModelEditorStore，仅在表情编辑模式下持有当前 wmdl 的副本。
  * 加载逻辑由 main.ts 在启动时（通过 --actor-wmdl 参数）自动触发。
  *
  * 右侧面板支持拖拽调整宽度（min 280, max 600）。
@@ -42,7 +42,7 @@ function onApplyParams(params: Array<{ id: string; val: number; calc: ParamCalc 
 <template>
   <div class="actor-app">
     <header class="actor-app__header">
-      <h1 class="actor-app__title">演出编辑器</h1>
+      <h1 class="actor-app__title">表情编辑器</h1>
       <div class="actor-app__meta">
         <span class="actor-app__wmdl-name" :title="store.currentWmdl.wmdlFilePath ?? ''">
           {{ wmdlName }}

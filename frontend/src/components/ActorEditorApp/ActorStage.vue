@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 演出编辑器的舞台容器。
+ * 表情编辑器的舞台容器。
  *
  * 直接复用 common/Live2dPreview.vue 渲染 wmdl 模型组，
  * 由其负责居中 / 缩放 / 重置按钮等所有视口交互。

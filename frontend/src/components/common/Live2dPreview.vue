@@ -542,7 +542,7 @@ defineExpose({
   },
   /**
    * 暴露当前已加载的所有 Live2DModel（按 wmdlConfig.models 顺序），
-   * 用于父组件（如演出编辑器 ActorStage）将实例同步到
+   * 用于父组件（如表情编辑器 ActorStage）将实例同步到
    * editRuntime.live2dModels，从而让 coreAdapter / store.populate* 读到模型。
    */
   getLoadedModels(): Live2DModel[] {

@@ -13,7 +13,7 @@ import './live2d/loader'
 // 根据 Go 暴露的 AppMode 选择根组件：
 //   - "main"    → 主窗口（App.vue）
 //   - "editor"  → 模型编辑器（ModelEditApp.vue）
-//   - "actor"   → 演出编辑器（ActorEditApp.vue）
+//   - "actor"   → 表情编辑器（ActorEditApp.vue）
 //   - "motion"  → 动作编辑器（MotionEditApp.vue）
 // AppMode 是异步绑定（wails runtime 初始化后才可用），所以包一层 async IIFE。
 async function bootstrap() {
@@ -32,7 +32,7 @@ async function bootstrap() {
 
   const app = createApp(rootComponent).use(createPinia())
 
-  // 编辑器 / 演出编辑器模式：若启动时通过 --wmdl / --actor-wmdl 传入了文件路径，自动加载它。
+  // 编辑器 / 表情编辑器模式：若启动时通过 --wmdl / --actor-wmdl 传入了文件路径，自动加载它。
   if (mode === 'editor') {
     void loadStartupWmdl(EditorWmdlPath)
   } else if (mode === 'actor') {

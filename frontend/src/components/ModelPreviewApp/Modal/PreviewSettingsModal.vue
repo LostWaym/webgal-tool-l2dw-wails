@@ -14,6 +14,7 @@ import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../
 import NumberInput from '../../common/NumberInput.vue'
 import ThemeSelect from '../../common/ThemeSelect.vue'
 import { currentTheme, selectTheme, themes } from '../../../themes/appearance'
+import { vTabIndicator } from '../../../utils/tabIndicator'
 
 const props = defineProps<{ visible: boolean; initialTab?: 'motionExpression' }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -82,7 +83,8 @@ function onSeparatorInput(event: Event) {
           <button class="close" aria-label="关闭" @click="emit('close')">×</button>
         </header>
         <div class="body">
-          <nav class="settings-tabs" aria-label="设置分类">
+          <nav v-tab-indicator class="settings-tabs" aria-label="设置分类">
+            <span class="tab-indicator tab-indicator--vertical" aria-hidden="true" />
             <button type="button" :class="{ active: activeTab === 'misc' }" :aria-current="activeTab === 'misc' ? 'page' : undefined" @click="activeTab = 'misc'">杂项</button>
             <button type="button" :class="{ active: activeTab === 'appearance' }" :aria-current="activeTab === 'appearance' ? 'page' : undefined" @click="activeTab = 'appearance'">外观</button>
             <button type="button" :class="{ active: activeTab === 'motionExpression' }" :aria-current="activeTab === 'motionExpression' ? 'page' : undefined" @click="activeTab = 'motionExpression'">动作/表情</button>
@@ -155,10 +157,9 @@ header, footer { display: flex; flex-shrink: 0; align-items: center; padding: 14
 header { border-bottom: 1px solid var(--ui-line); }
 h2 { flex: 1; margin: 0; font-size: 16px; }
 .body { display: flex; flex: 1; min-height: 0; }
-.settings-tabs { width: 140px; flex-shrink: 0; overflow-y: auto; padding: 12px 8px; border-right: 1px solid var(--ui-line); }
+.settings-tabs { position: relative; width: 140px; flex-shrink: 0; overflow-y: auto; padding: 12px 8px; border-right: 1px solid var(--ui-line); }
 .settings-tabs button { position: relative; display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; }
 .settings-tabs button.active { background: transparent; color: var(--ui-link); }
-.settings-tabs button.active::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: var(--ui-radius-pill); background: var(--ui-accent); }
 .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 18px; }
 .separator-label, .frame-rate-label, .focus-offset-label, .guide-visibility-label { margin-top: 20px; }
 .viewport-section { margin-top: 24px; }

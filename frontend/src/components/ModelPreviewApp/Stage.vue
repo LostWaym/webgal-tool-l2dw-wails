@@ -845,22 +845,26 @@ function drawGuides() {
   const deleting = guideMode.value === 'delete'
   const draw = (guide: PreviewGuide, color: number, alpha: number, width = 1) => {
     const [a, b] = previewGuideEnds(guide)
-    graphics.lineStyle(width * unit, color, alpha)
-    graphics.moveTo(a.x, a.y)
-    graphics.lineTo(b.x, b.y)
-    if (guideOverflow.value > 0) {
-      const dx = guide.axis === 'y' ? guideOverflow.value : 0
-      const dy = guide.axis === 'x' ? guideOverflow.value : 0
+    const drawLayer = (layerColor: number, layerAlpha: number, lineWidth: number, radius: number) => {
+      graphics.lineStyle(lineWidth * unit, layerColor, layerAlpha)
       graphics.moveTo(a.x, a.y)
-      graphics.lineTo(a.x - dx, a.y - dy)
-      graphics.moveTo(b.x, b.y)
-      graphics.lineTo(b.x + dx, b.y + dy)
+      graphics.lineTo(b.x, b.y)
+      if (guideOverflow.value > 0) {
+        const dx = guide.axis === 'y' ? guideOverflow.value : 0
+        const dy = guide.axis === 'x' ? guideOverflow.value : 0
+        graphics.moveTo(a.x, a.y)
+        graphics.lineTo(a.x - dx, a.y - dy)
+        graphics.moveTo(b.x, b.y)
+        graphics.lineTo(b.x + dx, b.y + dy)
+      }
+      graphics.lineStyle(0)
+      graphics.beginFill(layerColor, layerAlpha)
+      graphics.drawCircle(a.x, a.y, radius * unit)
+      graphics.drawCircle(b.x, b.y, radius * unit)
+      graphics.endFill()
     }
-    graphics.lineStyle(0)
-    graphics.beginFill(color, alpha)
-    graphics.drawCircle(a.x, a.y, 3 * unit)
-    graphics.drawCircle(b.x, b.y, 3 * unit)
-    graphics.endFill()
+    drawLayer(0x000000, alpha * 0.7, width + 2, 4)
+    drawLayer(color, alpha, width, 3)
   }
   graphics.clear()
   const matched = snappedGuides.value.filter(guide => store.guides.includes(guide))

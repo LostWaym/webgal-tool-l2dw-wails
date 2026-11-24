@@ -36,6 +36,7 @@ import settingsIcon from '../../assets/icons/settings.png'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
 import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
+import { vTabIndicator } from '../../utils/tabIndicator'
 import { ListFilterPresetFiles, SaveFilterPresetFile } from '../../../wailsjs/go/main/App'
 
 const store = useModelStore()
@@ -910,7 +911,8 @@ function onLabelDragEnd() {
     <div class="panel__drag-handle" @mousedown="onDragStart" />
 
     <!-- 页签 -->
-    <div class="panel__tabs">
+    <div v-tab-indicator class="panel__tabs">
+      <span class="tab-indicator tab-indicator--underline" aria-hidden="true" />
       <button
         v-for="tab in visibleTabs"
         :key="tab.key"
@@ -1071,7 +1073,8 @@ function onLabelDragEnd() {
 
     <!-- 变换表单 -->
     <div v-else-if="activeTab === 'transform'" class="panel__motion-expression">
-      <div class="transform-toolbar" role="group" aria-label="变换模块">
+      <div v-tab-indicator class="transform-toolbar" role="group" aria-label="变换模块">
+        <span class="tab-indicator tab-indicator--block" aria-hidden="true" />
         <button type="button" :class="{ 'is-active': transformSection === 'basic' }" :aria-pressed="transformSection === 'basic'" @click="transformSection = 'basic'">基础</button>
         <button v-if="store.selectedId !== SpecialId.Camera" type="button" :class="{ 'is-active': transformSection === 'filter' }" :aria-pressed="transformSection === 'filter'" @click="transformSection = 'filter'">滤镜</button>
         <template v-if="showLive2dParams">
@@ -1735,6 +1738,7 @@ function onLabelDragEnd() {
 }
 
 .panel__tabs {
+  position: relative;
   display: flex;
   border-bottom: 1px solid var(--ui-line);
   padding: 4px 10px 0;
@@ -1747,6 +1751,8 @@ function onLabelDragEnd() {
   padding: 7px 2px;
   font-size: 14px;
 }
+
+.tab-btn.is-active::after { display: none; }
 
 .tab-btn__label {
   position: relative;
@@ -1803,6 +1809,7 @@ function onLabelDragEnd() {
 }
 
 .transform-toolbar {
+  position: relative;
   display: flex;
   flex: 0 0 auto;
   padding: 6px 8px;
@@ -1811,6 +1818,8 @@ function onLabelDragEnd() {
 }
 
 .transform-toolbar button {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
   padding: 6px 2px;
@@ -1828,7 +1837,7 @@ function onLabelDragEnd() {
 }
 
 .transform-toolbar button.is-active {
-  background: var(--ui-accent);
+  background: transparent;
   color: var(--ui-on-accent);
 }
 

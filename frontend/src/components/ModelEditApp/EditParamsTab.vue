@@ -109,10 +109,7 @@ function onReset(id: string) {
         pld尚未对moc3这部分参数支持，无法保存
       </div>
       <label class="apply-all-toggle" :class="{ 'is-on': applyAll }">
-        <input v-model="applyAll" type="checkbox" />
-        <span class="apply-all-toggle__track" aria-hidden="true">
-          <span class="apply-all-toggle__thumb" />
-        </span>
+        <input v-model="applyAll" class="ui-switch" type="checkbox" role="switch" />
         <span class="apply-all-toggle__label">应用于所有模型</span>
       </label>
       <SearchInput
@@ -193,51 +190,6 @@ function onReset(id: string) {
 
 .apply-all-toggle.is-on {
   color: var(--ui-text);
-}
-
-.apply-all-toggle input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-}
-
-.apply-all-toggle__track {
-  position: relative;
-  display: inline-block;
-  width: 28px;
-  height: 14px;
-  background: var(--ui-control);
-  border: 1px solid var(--ui-edge);
-  border-radius: 999px;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.apply-all-toggle__thumb {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 10px;
-  height: 10px;
-  background: var(--ui-muted);
-  border-radius: 50%;
-  transition: transform 0.15s, background 0.15s;
-}
-
-.apply-all-toggle.is-on .apply-all-toggle__track {
-  background: var(--ui-accent);
-  border-color: var(--ui-link);
-}
-
-.apply-all-toggle.is-on .apply-all-toggle__thumb {
-  transform: translateX(14px);
-  background: var(--ui-on-accent);
-}
-
-.apply-all-toggle input:focus-visible + .apply-all-toggle__track {
-  outline: 2px solid var(--ui-link);
-  outline-offset: 2px;
 }
 
 .empty-hint {

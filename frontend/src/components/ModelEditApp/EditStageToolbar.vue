@@ -40,7 +40,9 @@ function onWatchChange(checked: boolean) {
     </button>
     <label class="toolbar-toggle">
       <input
+        class="ui-switch"
         type="checkbox"
+        role="switch"
         :checked="store.dynamicTextureWatch"
         :disabled="modelsEmpty"
         @change="onWatchChange(($event.target as HTMLInputElement).checked)"
@@ -74,12 +76,6 @@ function onWatchChange(checked: boolean) {
   font-size: 12px;
   color: var(--ui-text);
   user-select: none;
-  cursor: pointer;
-}
-
-.toolbar-toggle input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
   cursor: pointer;
 }
 

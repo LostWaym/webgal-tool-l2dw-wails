@@ -258,7 +258,7 @@ function onCancel() {
                 />
               </label>
               <label class="config-field config-field--inline">
-                <input v-model="scanSubfolders" type="checkbox" />
+                <input v-model="scanSubfolders" class="ui-switch" type="checkbox" role="switch" />
                 <span>递归扫描子文件夹</span>
               </label>
             </div>
@@ -332,7 +332,7 @@ function onCancel() {
 }
 
 .batch-modal {
-  background: var(--ui-panel);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   width: min(720px, 90vw);
   height: min(640px, 90vh);
@@ -470,7 +470,7 @@ function onCancel() {
 .mini-input {
   width: 90px;
   padding: 4px 8px;
-  background: var(--ui-well);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: 4px;
   color: var(--ui-text);

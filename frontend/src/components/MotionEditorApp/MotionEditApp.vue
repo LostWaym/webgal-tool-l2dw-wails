@@ -540,6 +540,8 @@ async function onLoad() {
 .motion-editor__title {
   font-weight: 600;
   font-size: 13px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .motion-editor__wmdl {
@@ -554,7 +556,8 @@ async function onLoad() {
   color: var(--ui-muted);
   font-size: 12px;
   cursor: pointer;
-  flex-shrink: 0;
+  flex: 0 1 220px;
+  min-width: 0;
 }
 
 .motion-editor__wmdl:hover {
@@ -586,6 +589,8 @@ async function onLoad() {
 
 .motion-editor__lanim {
   max-width: 260px;
+  flex: 0 1 260px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -600,6 +605,7 @@ async function onLoad() {
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .he-btn:hover:not(:disabled) {
@@ -620,16 +626,16 @@ async function onLoad() {
 .motion-menu__panel {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
   width: 220px;
-  padding: 6px; background: var(--ui-panel); border: 1px solid var(--ui-line);
+  padding: 6px; background: var(--ui-menu-fill); border: 1px solid var(--ui-link);
   border-radius: var(--ui-radius-control); box-shadow: var(--ui-panel-shadow);
 }
 .motion-menu__items { max-height: 55vh; overflow-y: auto; }
 .motion-menu__items button, .motion-menu__items span {
   display: block; width: 100%; padding: 6px 8px; text-align: left;
-  white-space: nowrap; color: var(--ui-text); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text); font-size: 12px;
 }
-.motion-menu__items button { border: 0; background: transparent; cursor: pointer; }
-.motion-menu__items button:hover { background: var(--ui-hover); }
+.motion-menu__items button { border: 0; border-radius: var(--ui-radius-compact); background: transparent; cursor: pointer; }
+.motion-menu__items button:hover, .motion-menu__items button:focus-visible { background: var(--ui-hover); }
 
 .motion-editor__body {
   display: flex;

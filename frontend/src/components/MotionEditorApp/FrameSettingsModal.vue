@@ -135,7 +135,7 @@ function onApply() {
 }
 
 .frame-modal {
-  background-color: var(--ui-dialog);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   width: min(420px, 92vw);
   border-radius: var(--ui-radius-panel);
@@ -202,7 +202,7 @@ function onApply() {
 .frame-field__input {
   flex: 1;
   padding: 6px 10px;
-  background: var(--ui-panel);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: var(--ui-radius-compact);
   color: var(--ui-text);

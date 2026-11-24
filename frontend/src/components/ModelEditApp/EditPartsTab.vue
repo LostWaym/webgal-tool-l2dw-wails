@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
 }
 
 .preset-toggle {
-  background: var(--ui-control);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: 4px;
   color: var(--ui-text);
@@ -309,16 +309,17 @@ onBeforeUnmount(() => {
   max-height: 240px;
   overflow-y: auto;
   margin: 0;
-  padding: 4px 0;
+  padding: 4px;
   list-style: none;
-  background: var(--ui-control);
-  border: 1px solid var(--ui-line);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px var(--ui-shadow);
+  background: var(--ui-menu-fill);
+  border: 1px solid var(--ui-link);
+  border-radius: var(--ui-radius-control);
+  box-shadow: var(--ui-panel-shadow);
 }
 
 .preset-item {
   padding: 6px 12px;
+  border-radius: var(--ui-radius-compact);
   font-size: 13px;
   color: var(--ui-text);
   cursor: pointer;

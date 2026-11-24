@@ -289,7 +289,8 @@ function onApplyToModel() {
                         <label class="form-row__check-label">
                           <input
                             type="checkbox"
-                            class="form-row__check"
+                            class="ui-switch"
+                            role="switch"
                             :checked="numVal(item.key as string) === 1"
                             @change="(e: any) => toggleBool(item.key as string, e.target.checked)"
                           />
@@ -375,7 +376,7 @@ function onApplyToModel() {
 }
 
 .filter-preset-modal {
-  background-color: var(--ui-dialog);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   width: min(900px, 94vw);
   height: min(640px, 86vh);
@@ -608,13 +609,6 @@ function onApplyToModel() {
   color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
-}
-
-.form-row__check {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--ui-link);
 }
 
 .form-row__color-label {

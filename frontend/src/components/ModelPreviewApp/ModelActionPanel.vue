@@ -1153,7 +1153,7 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
-                <button class="reset-btn" @click="resetTransform">重置</button>
+                <button class="snapshot-btn reset-action-btn" @click="resetTransform">重置</button>
               </div>
             </li>
           </ul>
@@ -1204,7 +1204,8 @@ function onLabelDragEnd() {
                     <label class="form-row__check-label">
                       <input
                         type="checkbox"
-                        class="form-row__check"
+                        class="ui-switch"
+                        role="switch"
                         :checked="filterState[item.key as keyof FilterState] === 1"
                         @change="(e: any) => onFilterToggle(item.key as keyof FilterState, e.target.checked)"
                       />
@@ -1255,7 +1256,8 @@ function onLabelDragEnd() {
           <label class="form-row__check-label">
             <input
               type="checkbox"
-              class="form-row__check"
+              class="ui-switch"
+              role="switch"
               :checked="focusState.enabled"
               @change="(e: any) => onFocusToggle('enabled', e.target.checked)"
             />
@@ -1304,7 +1306,8 @@ function onLabelDragEnd() {
                 <label class="form-row__check-label">
                   <input
                     type="checkbox"
-                    class="form-row__check"
+                    class="ui-switch"
+                    role="switch"
                     :checked="focusState.instant"
                     @change="(e: any) => onFocusToggle('instant', e.target.checked)"
                   />
@@ -1314,7 +1317,7 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
-                <button class="reset-btn" @click="resetFocus">重置注视</button>
+                <button class="snapshot-btn reset-action-btn" @click="resetFocus">重置注视</button>
               </div>
             </li>
           </ul>
@@ -1331,7 +1334,8 @@ function onLabelDragEnd() {
           <label class="form-row__check-label">
             <input
               type="checkbox"
-              class="form-row__check"
+              class="ui-switch"
+              role="switch"
               :checked="blinkState.enabled"
               @change="(e: any) => onBlinkToggle(e.target.checked)"
             />
@@ -1402,7 +1406,7 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
-                <button class="reset-btn" @click="resetBlink">重置眨眼</button>
+                <button class="snapshot-btn reset-action-btn" @click="resetBlink">重置眨眼</button>
               </div>
             </li>
           </ul>
@@ -1456,6 +1460,9 @@ function onLabelDragEnd() {
           <input
             tabindex="-1"
             type="checkbox"
+            class="ui-switch"
+            role="switch"
+            aria-label="忽略立绘组选中"
             :checked="!!store.selectedModel.ignoreFigureGroupSelect"
             @mousedown.prevent
             @change="store.setModelIgnoreFigureGroupSelect(store.selectedModel.id, ($event.target as HTMLInputElement).checked)"
@@ -1562,6 +1569,9 @@ function onLabelDragEnd() {
           <input
             tabindex="-1"
             type="checkbox"
+            class="ui-switch"
+            role="switch"
+            aria-label="包括背景"
             :checked="store.selectedFigureGroup.includeBackground"
             @mousedown.prevent
             @change="onFigureGroupFlagChange('includeBackground', ($event.target as HTMLInputElement).checked)"
@@ -1572,6 +1582,9 @@ function onLabelDragEnd() {
           <input
             tabindex="-1"
             type="checkbox"
+            class="ui-switch"
+            role="switch"
+            aria-label="包含所有立绘"
             :checked="store.selectedFigureGroup.includeAllFigures"
             @mousedown.prevent
             @change="onFigureGroupFlagChange('includeAllFigures', ($event.target as HTMLInputElement).checked)"
@@ -1582,6 +1595,9 @@ function onLabelDragEnd() {
           <input
             tabindex="-1"
             type="checkbox"
+            class="ui-switch"
+            role="switch"
+            aria-label="指令复制包含主场景"
             :checked="store.selectedFigureGroup.includeStageMainCmdCopy"
             @mousedown.prevent
             @change="onFigureGroupFlagChange('includeStageMainCmdCopy', ($event.target as HTMLInputElement).checked)"
@@ -1592,6 +1608,9 @@ function onLabelDragEnd() {
           <input
             tabindex="-1"
             type="checkbox"
+            class="ui-switch"
+            role="switch"
+            aria-label="主场景应用镜头变换"
             :checked="store.selectedFigureGroup.applyCameraToStageCopy"
             @mousedown.prevent
             @change="onFigureGroupFlagChange('applyCameraToStageCopy', ($event.target as HTMLInputElement).checked)"
@@ -1602,6 +1621,9 @@ function onLabelDragEnd() {
           <input
             tabindex="-1"
             type="checkbox"
+            class="ui-switch"
+            role="switch"
+            aria-label="仅编辑锚点"
             :checked="store.selectedFigureGroup.editAnchorOnly"
             @mousedown.prevent
             @change="onFigureGroupFlagChange('editAnchorOnly', ($event.target as HTMLInputElement).checked)"
@@ -2013,7 +2035,7 @@ function onLabelDragEnd() {
 .form-input {
   flex: 1;
   padding: 8px 12px;
-  background: var(--ui-control);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: 6px;
   color: var(--ui-text);
@@ -2035,23 +2057,8 @@ function onLabelDragEnd() {
   gap: 8px;
 }
 
-.reset-btn {
-  padding: 8px 24px;
-  background: var(--ui-accent);
-  border: none;
-  border-radius: 6px;
-  color: var(--ui-on-accent);
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.reset-btn:hover {
-  background: var(--ui-accent-hover); color: var(--ui-on-accent);
-}
-
+.reset-btn,
 .snapshot-btn {
-  flex: 1;
   padding: 8px 12px;
   background: var(--ui-control);
   border: 1px solid var(--ui-edge);
@@ -2062,9 +2069,17 @@ function onLabelDragEnd() {
   transition: background 0.15s, border-color 0.15s;
 }
 
+.snapshot-btn { flex: 1; }
+
+.reset-btn:hover,
 .snapshot-btn:hover {
   background: var(--ui-hover);
   border-color: var(--ui-link);
+}
+
+.reset-action-btn {
+  flex: none;
+  padding-inline: 24px;
 }
 
 /* ───────── 信息页签 ───────── */
@@ -2214,13 +2229,6 @@ function onLabelDragEnd() {
   color: var(--ui-text);
   font-size: 13px;
   cursor: pointer;
-}
-
-.form-row__check {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--ui-link);
 }
 
 .form-row__color-label {

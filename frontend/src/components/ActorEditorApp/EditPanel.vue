@@ -355,7 +355,7 @@ async function onOpenOutputDir() {
     <header class="actor-panel__header">
       <h2 class="actor-panel__title">
         编辑面板
-        <span class="actor-panel__subtitle" v-if="selectedModel">（{{ selectedModel.name }}）</span>
+        <span class="actor-panel__subtitle" v-if="selectedModel" :title="selectedModel.name">（{{ selectedModel.name }}）</span>
       </h2>
       <button class="ui-button toolbar-btn" :disabled="!hasSelection" @click="onOpenMotionSample">动作采样</button>
       <button
@@ -419,7 +419,7 @@ async function onOpenOutputDir() {
           </div>
           <div class="params-tab__actions">
             <label class="physics-toggle" title="显示被 Live2D 物理系统驱动的参数（只读）">
-              <input v-model="showPhysics" type="checkbox" />
+              <input v-model="showPhysics" class="ui-switch" type="checkbox" role="switch" />
               <span>显示物理参数</span>
             </label>
             <button
@@ -516,7 +516,7 @@ async function onOpenOutputDir() {
             </div>
 
             <label class="export-checkbox">
-              <input v-model="compress" type="checkbox" />
+              <input v-model="compress" class="ui-switch" type="checkbox" role="switch" />
               <span>压缩输出（单行）</span>
             </label>
 
@@ -563,14 +563,24 @@ async function onOpenOutputDir() {
   font-size: 14px;
   font-weight: 600;
   flex: 1;
+  min-width: 0;
   color: var(--ui-text);
 }
 
 .actor-panel__subtitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 400;
   color: var(--ui-muted);
   margin-left: 4px;
+}
+
+.actor-panel__header > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .actor-panel__tabs {
@@ -624,6 +634,7 @@ async function onOpenOutputDir() {
 
 .expr-list__name {
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .expr-list__path {
@@ -692,13 +703,6 @@ async function onOpenOutputDir() {
   user-select: none;
 }
 
-.physics-toggle input {
-  width: 13px;
-  height: 13px;
-  accent-color: var(--ui-link);
-  cursor: pointer;
-}
-
 .physics-mask {
   position: absolute;
   inset: 0;
@@ -736,6 +740,7 @@ async function onOpenOutputDir() {
 
 .actor-export-modal {
   width: min(440px, 92%);
+  max-height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -760,10 +765,13 @@ async function onOpenOutputDir() {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .actor-export-modal__footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
@@ -879,16 +887,13 @@ async function onOpenOutputDir() {
   cursor: pointer;
 }
 
-.export-checkbox input {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--ui-link);
-  cursor: pointer;
-}
-
 .toolbar-btn {
   padding: 6px 14px;
   font-size: 12px;
+}
+
+.actor-export-modal__footer .toolbar-btn {
+  white-space: nowrap;
 }
 
 .icon-btn {

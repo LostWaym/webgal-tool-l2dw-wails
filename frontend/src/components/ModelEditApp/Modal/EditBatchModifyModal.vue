@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import ThemeSelect from '../../common/ThemeSelect.vue'
 import { choosePath } from '../../../utils/fileDialog'
 import {
   PickMotionFile,
@@ -56,6 +57,10 @@ const paramName = ref<string>('')
 const paramValue = ref<number>(0)
 const calc = ref<CalcKind>('none')
 const action = ref<Action>('set')
+const calcOptions: Array<{ value: CalcKind; label: string }> = [
+  { value: 'none', label: '无' }, { value: 'add', label: 'add' },
+  { value: 'mult', label: 'mult' }, { value: 'set', label: 'set' },
+]
 
 const kindLabel = computed(() => (modal.state.kind === 'motion' ? '动作' : '表情'))
 
@@ -71,6 +76,10 @@ const candidateCount = computed(() => filteredEntries.value.length)
 const selectedCount = computed(() => filteredEntries.value.filter((e) => selected.value.has(e.absPath)).length)
 
 const isExpression = computed(() => modal.state.kind === 'expression')
+const actionOptions = computed<Array<{ value: Action; label: string }>>(() => [
+  { value: 'set', label: '设定' }, { value: 'remove', label: '移除' },
+  ...(isExpression.value ? [{ value: 'applyCalcOne' as Action, label: '应用 calc 到当前参数' }, { value: 'applyCalcAll' as Action, label: '应用 calc 到所有参数' }] : []),
+])
 
 // 字段按 action 显隐：
 //   - 动作 (motion)：总是显示参数名 + 参数值
@@ -320,7 +329,7 @@ function onClose() {
               <button class="op-btn" :disabled="busy" @click="pickFolder">打开文件夹</button>
               <button class="op-btn" :disabled="busy || !folder" @click="onRescan">重新扫描</button>
               <label class="config-field config-field--inline">
-                <input v-model="scanSubfolders" type="checkbox" />
+                <input v-model="scanSubfolders" class="ui-switch" type="checkbox" role="switch" />
                 <span>递归扫描子文件夹</span>
               </label>
             </template>
@@ -348,21 +357,11 @@ function onClose() {
               </label>
               <label v-if="showCalc" class="config-field">
                 <span>calc</span>
-                <select v-model="calc" class="mini-input">
-                  <option value="none">无</option>
-                  <option value="add">add</option>
-                  <option value="mult">mult</option>
-                  <option value="set">set</option>
-                </select>
+                <ThemeSelect id="batch-calc" class="mini-select" :model-value="calc" :options="calcOptions" label="calc" compact @update:model-value="calc = $event as CalcKind" />
               </label>
               <label class="config-field">
                 <span>动作</span>
-                <select v-model="action" class="mini-input">
-                  <option value="set">设定</option>
-                  <option value="remove">移除</option>
-                  <option v-if="isExpression" value="applyCalcOne">应用 calc 到当前参数</option>
-                  <option v-if="isExpression" value="applyCalcAll">应用 calc 到所有参数</option>
-                </select>
+                <ThemeSelect id="batch-action" class="mini-select" :model-value="action" :options="actionOptions" label="动作" compact @update:model-value="action = $event as Action" />
               </label>
             </div>
           </section>
@@ -442,7 +441,7 @@ function onClose() {
 }
 
 .batch-modal {
-  background: var(--ui-panel);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   width: min(720px, 90vw);
   height: min(640px, 90vh);
@@ -571,7 +570,7 @@ function onClose() {
 .mini-input {
   width: 120px;
   padding: 4px 8px;
-  background: var(--ui-well);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: 4px;
   color: var(--ui-text);
@@ -584,9 +583,7 @@ function onClose() {
   border-color: var(--ui-link);
 }
 
-select.mini-input {
-  font-family: inherit;
-}
+.mini-select { width: 120px; font-size: 12px; }
 
 .batch-modal__body {
   flex: 1;

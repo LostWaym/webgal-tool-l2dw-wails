@@ -62,7 +62,7 @@ function onClear() {
   width: 100%;
   box-sizing: border-box;
   flex-shrink: 0;
-  background: var(--ui-control);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: var(--ui-radius-search);
   color: var(--ui-text);

@@ -49,7 +49,7 @@
     "colors": {
       "window": "#101521", "panel": "#171d2b", "well": "#131926", "control": "#222c3d", "hover": "#303c50",
       "line": "#354358", "edge": "#8197b1", "text": "#edf4ff", "muted": "#b6c6d9",
-      "accent": "#62e7ef", "on-accent": "#0c2830", "link": "#90f1f8", "selected": "#294454",
+      "accent": "#75cdd3", "on-accent": "#0c2830", "link": "#9bd9de", "selected": "#294454",
       "success": "#8ce4ad", "warning": "#ffcf88", "danger": "#ffb2c4", "alternate": "#f39edb"
     }
   },

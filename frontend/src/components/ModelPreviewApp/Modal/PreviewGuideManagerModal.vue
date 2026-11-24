@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ThemeSelect from '../../common/ThemeSelect.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useMessage } from '../../../composables/useMessage'
 import { useModelStore } from '../../../stores/previewStore'
@@ -17,6 +18,7 @@ const groups = computed(() => axes.map(group => ({
 
 const modal = ref<HTMLElement | null>(null)
 const importMode = ref<'merge' | 'replace'>('merge')
+const importModeOptions = [{ value: 'merge', label: '合并' }, { value: 'replace', label: '替换' }]
 const busy = ref(false)
 let returnFocus: HTMLElement | null = null
 const rowKeys = new WeakMap<PreviewGuide, number>()
@@ -153,10 +155,7 @@ async function importFile() {
         <div class="guide-body">
           <div class="toolbar">
             <label>载入方式
-              <select v-model="importMode" :disabled="busy">
-                <option value="merge">合并</option>
-                <option value="replace">替换</option>
-              </select>
+              <ThemeSelect id="guide-import-mode" :model-value="importMode" :options="importModeOptions" :disabled="busy" label="载入方式" compact @update:model-value="importMode = $event === 'replace' ? 'replace' : 'merge'" />
             </label>
             <button type="button" :disabled="busy" @click="importFile">载入…</button>
             <button type="button" :disabled="busy" @click="exportFile">导出…</button>
@@ -223,7 +222,7 @@ li { display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 
 li + li { border-top: 1px solid var(--ui-line); }
 .coordinate { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
 button, input, select { padding: 6px 9px; border: 1px solid var(--ui-edge); border-radius: 5px; color: inherit; background: var(--ui-control); }
-input { box-sizing: border-box; background: var(--ui-well); }
+input { box-sizing: border-box; background: var(--ui-field-fill); }
 button { cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
 .add { min-width: 30px; padding: 2px 7px; background: var(--ui-selected); border-color: var(--ui-link); font-size: 18px; line-height: 24px; }

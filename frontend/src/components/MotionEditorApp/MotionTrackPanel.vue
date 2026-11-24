@@ -786,11 +786,11 @@ function onHeadDrag(dx: number) {
         </ul>
       </div>
       <label class="track-panel__physics-toggle" title="显示被 Live2D 物理系统驱动的参数（只读）">
-        <input v-model="showPhysics" type="checkbox" />
+        <input v-model="showPhysics" class="ui-switch" type="checkbox" role="switch" />
         <span>显示物理参数</span>
       </label>
       <label class="track-panel__physics-toggle" title="在车道上按帧绘制采样线段">
-        <input v-model="showCurve" type="checkbox" />
+        <input v-model="showCurve" class="ui-switch" type="checkbox" role="switch" />
         <span>显示采样线</span>
       </label>
     </div>
@@ -1047,8 +1047,8 @@ function onHeadDrag(dx: number) {
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: var(--ui-panel);
-  border: 1px solid var(--ui-line);
+  background: var(--ui-menu-fill);
+  border: 1px solid var(--ui-link);
   border-radius: var(--ui-radius-control);
   box-shadow: var(--ui-panel-shadow);
 }
@@ -1117,6 +1117,11 @@ function onHeadDrag(dx: number) {
   overflow: hidden;
   gap: 3px;
   padding: 4px 8px;
+}
+
+.head-row :deep(.range-card .range-card__track),
+.head-row :deep(.range-card:not(.is-highlight) .range-card__track) {
+  background: color-mix(in srgb, var(--ui-edge) 52%, var(--ui-well));
 }
 
 .head-row--ruler {
@@ -1254,15 +1259,21 @@ function onHeadDrag(dx: number) {
 }
 
 .lane-row__key {
+  --key-color: var(--ui-accent);
+  --key-border: color-mix(in srgb, var(--key-color) 40%, var(--ui-window));
   position: absolute;
   width: 10px;
   height: 10px;
   box-sizing: border-box;
   border-radius: 50%;
-  background: var(--ui-accent);
-  border: 1px solid var(--ui-link);
+  background: var(--key-color);
+  border: 1px solid var(--key-border);
   cursor: ew-resize;
   transform: translate(-50%, -50%);
+}
+
+:global(:root[data-scheme="light"]) .lane-row__key {
+  --key-border: color-mix(in srgb, var(--key-color) 30%, var(--ui-text));
 }
 
 .lane-row__key:hover {
@@ -1273,9 +1284,8 @@ function onHeadDrag(dx: number) {
 
 /* 组合器帧点：绿色系以示区分；定义缺失时灰显 */
 .lane-row__key--composer {
+  --key-color: var(--ui-success);
   border-radius: 2px;
-  background: var(--ui-success);
-  border-color: var(--ui-success);
 }
 
 .lane-row__key--composer:hover {

@@ -252,7 +252,7 @@ const fileName = computed(() => {
     <!-- 顶部操作区 -->
     <div class="file-name" :title="store.currentWmdl.wmdlFilePath">{{ fileName }}</div>
     <header class="wmdl-tab__header">
-      <button class="ui-button ui-button--primary op-btn" :disabled="busy" @click="onLoad">加载 wmdl</button>
+      <button class="ui-button op-btn" :disabled="busy" @click="onLoad">加载 wmdl</button>
       <button class="ui-button op-btn" :disabled="busy" @click="onSave">保存 wmdl</button>
     </header>
 
@@ -479,18 +479,24 @@ const fileName = computed(() => {
 .field__input,
 .field__textarea {
   padding: 6px 8px;
-  background: var(--ui-well);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: var(--ui-radius-compact);
   color: var(--ui-text);
   font-size: 13px;
   font-family: inherit;
+  box-shadow: var(--ui-control-shadow);
   resize: vertical;
 }
 
 .field__input:focus,
 .field__textarea:focus {
   border-color: var(--ui-link);
+}
+.field__input:focus-visible,
+.field__textarea:focus-visible {
+  outline: 1px solid var(--ui-link);
+  outline-offset: -2px;
 }
 
 .field__input--num {

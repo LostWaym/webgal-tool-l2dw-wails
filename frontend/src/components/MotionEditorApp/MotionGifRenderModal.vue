@@ -4,6 +4,7 @@
  * 点击渲染后逐帧抓取预览视口 → gif.js 编码 → 保存对话框选路径落盘。
  */
 import { computed, ref, watch } from 'vue'
+import ThemeSelect from '../common/ThemeSelect.vue'
 import { choosePath } from '../../utils/fileDialog'
 import { useMotionGifRenderModal, type GifSizeMode } from '../../composables/useMotionGifRenderModal'
 import { useMotionEditorStore } from '../../stores/motionEditor'
@@ -51,6 +52,7 @@ const repeatOptions = [
   { value: -1, label: '不循环' },
   { value: 3, label: '循环 3 次' },
 ]
+const colorOptions = [256, 128, 64, 32].map(value => ({ value, label: String(value) }))
 
 function clampFrame(text: string, fallback: number): number {
   const n = Math.round(Number(text))
@@ -236,24 +238,17 @@ function onAbort() {
 
             <div class="mgr-field">
               <span class="mgr-field__label">循环</span>
-              <select v-model.number="state.repeat" class="mgr-field__input" :disabled="state.rendering">
-                <option v-for="opt in repeatOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-              </select>
+              <ThemeSelect id="gif-repeat" class="mgr-field__select" :model-value="state.repeat" :options="repeatOptions" :disabled="state.rendering" label="循环" compact @update:model-value="state.repeat = Number($event)" />
             </div>
 
             <div class="mgr-field">
               <span class="mgr-field__label">色数</span>
-              <select v-model.number="state.colors" class="mgr-field__input" :disabled="state.rendering">
-                <option :value="256">256</option>
-                <option :value="128">128</option>
-                <option :value="64">64</option>
-                <option :value="32">32</option>
-              </select>
+              <ThemeSelect id="gif-colors" class="mgr-field__select" :model-value="state.colors" :options="colorOptions" :disabled="state.rendering" label="色数" compact @update:model-value="state.colors = Number($event)" />
               <span class="mgr-field__hint">全动画共享调色板，越少体积越小</span>
             </div>
 
             <label class="mgr-check">
-              <input v-model="state.interframeDiff" type="checkbox" :disabled="state.rendering" />
+              <input v-model="state.interframeDiff" class="ui-switch" type="checkbox" role="switch" :disabled="state.rendering" />
               <span>帧间差分（只编码变化像素，体积更小）</span>
             </label>
 
@@ -312,7 +307,7 @@ function onAbort() {
 }
 
 .mgr-modal {
-  background-color: var(--ui-dialog);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   width: min(480px, 92vw);
   border-radius: var(--ui-radius-panel);
@@ -383,7 +378,7 @@ function onAbort() {
 
 .mgr-field__input {
   padding: 6px 10px;
-  background: var(--ui-panel);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: 4px;
   color: var(--ui-text);
@@ -403,6 +398,7 @@ function onAbort() {
 .mgr-field__input--narrow {
   width: 70px;
 }
+.mgr-field__select { width: 110px; font-size: 13px; }
 
 .mgr-field__dash {
   color: var(--ui-muted);

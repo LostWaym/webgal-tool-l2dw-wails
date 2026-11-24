@@ -14,8 +14,13 @@
   --ui-control-line: color-mix(in srgb, var(--ui-edge) 36%, var(--ui-line));
   --ui-control-top: color-mix(in srgb, var(--ui-control) 88%, var(--ui-text));
   --ui-control-fill: linear-gradient(var(--ui-control-top), var(--ui-control));
+  --ui-field-fill: linear-gradient(115deg, var(--ui-control-top), var(--ui-control));
+  --ui-menu-fill: linear-gradient(135deg, var(--ui-control), var(--ui-panel) 70%);
+  --ui-dialog-fill: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--ui-accent) 7%, var(--ui-panel)), transparent 70%), linear-gradient(135deg, var(--ui-panel), var(--ui-window));
   --ui-control-shadow: inset 0 1px rgb(255 255 255 / 8%), 0 2px 4px rgb(8 6 20 / 16%);
   --ui-panel-shadow: 0 12px 32px var(--ui-shadow);
+  --ui-stage-background: var(--ui-window);
+  --ui-stage-fill: radial-gradient(ellipse at 50% 20%, color-mix(in srgb, var(--ui-accent) 5%, transparent), transparent 75%), linear-gradient(145deg, color-mix(in srgb, var(--ui-stage-background) 93%, black), color-mix(in srgb, var(--ui-stage-background) 84%, black));
   --ui-stage-glass-opacity: 82%;
   --ui-stage-glass: color-mix(in srgb, var(--ui-panel) var(--ui-stage-glass-opacity), transparent);
   --ui-shortcut-ink: var(--ui-link);
@@ -25,6 +30,7 @@
 }
 
 :root[data-scheme="light"] {
+  --ui-stage-fill: var(--ui-window);
   --ui-icon-filter: invert(1);
   --ui-shadow: rgb(61 45 98 / 17%);
   --ui-control-top: color-mix(in srgb, var(--ui-control) 32%, white);
@@ -63,6 +69,7 @@
   justify-content: center;
   gap: 5px;
   background: var(--ui-control-fill);
+  background-color: var(--ui-control);
   color: var(--ui-text);
   border: 1px solid var(--ui-control-line);
   border-radius: var(--ui-radius-control);
@@ -93,7 +100,7 @@
 .ui-button--primary:active:not(:disabled) { background: var(--ui-accent-hover); }
 
 .ui-dialog {
-  background: var(--ui-panel);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius-panel);
@@ -150,8 +157,44 @@ button {
 input, select, textarea {
   accent-color: var(--ui-accent);
 }
+input.ui-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  display: inline-block;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ui-edge);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-control);
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+input.ui-switch::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ui-muted);
+  transition: transform 0.15s, background 0.15s;
+}
+input.ui-switch:checked { background: var(--ui-accent); border-color: var(--ui-link); }
+input.ui-switch:checked::before { transform: translateX(14px); background: var(--ui-on-accent); }
+input.ui-switch:focus-visible { outline: 2px solid var(--ui-link); outline-offset: 2px; }
+input.ui-switch:disabled { opacity: 0.5; cursor: not-allowed; }
 select, textarea, input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']) {
   border-radius: var(--ui-radius-compact);
+}
+input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']), textarea {
+  background: var(--ui-field-fill);
+  color: var(--ui-text);
 }
 
 input::placeholder, textarea::placeholder { color: var(--ui-muted); opacity: 1; }

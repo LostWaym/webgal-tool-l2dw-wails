@@ -426,7 +426,7 @@ function cancelEdit() {
   flex: 1 1 auto;
   text-align: center;
   color: var(--ui-text);
-  background: var(--ui-panel);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-line);
   border-radius: 3px;
   padding: 2px 4px;
@@ -440,7 +440,7 @@ function cancelEdit() {
 
 .value-input {
   flex: 1 1 auto;
-  background: var(--ui-well);
+  background: var(--ui-field-fill);
   color: var(--ui-text);
   border: 1px solid var(--ui-link);
   border-radius: 3px;

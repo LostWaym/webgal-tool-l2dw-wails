@@ -12,6 +12,7 @@ import { OpenEditor, OpenActorEditor, OpenMotionEditor, GetNextArgMode, SetNextA
 import type { WmdlModelItem } from '../../stores/wmdlTypes'
 import { STAGE_WIDTH, STAGE_HEIGHT, FOCUS_BOX_SIZE } from '../../utils/consts'
 import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type ShortcutEntry, type ShortcutHint, getNextMode, setNextMode, NEXT_ARG_MODE_OPTIONS, type NextArgMode } from '../../composables/useShortcuts'
+import ThemeSelect from '../common/ThemeSelect.vue'
 import { useMessage } from '../../composables/useMessage'
 import { currentTheme, themeColor } from '../../themes/appearance'
 import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
@@ -63,8 +64,8 @@ GetNextArgMode().then((savedMode) => {
   useMessage().warning('读取 next 后处理设置失败，使用当前选项')
 })
 
-function onNextModeChange(e: Event) {
-  const v = (e.target as HTMLSelectElement).value as NextArgMode
+function onNextModeChange(value: string | number) {
+  const v = value as NextArgMode
   nextModeChanged = true
   setNextMode(v)
   nextMode.value = v
@@ -1872,7 +1873,7 @@ function attachDomHandlers() {
     const active = document.activeElement
     if (!active) return false
     const tag = active.tagName.toLowerCase()
-    return tag === 'input' || tag === 'textarea' || tag === 'select' || (active as HTMLElement).isContentEditable
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || active.getAttribute('role') === 'combobox' || (active as HTMLElement).isContentEditable
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -2271,16 +2272,14 @@ function dispose() {
     <!-- 左上角：复制指令的 -next 后处理模式 -->
     <div v-if="!isTransforming" class="stage__next-mode">
       <label class="stage__next-mode-label" for="stage-next-mode-select">next 后处理:</label>
-      <select
+      <ThemeSelect
         id="stage-next-mode-select"
         class="stage__next-mode-select"
-        :value="nextMode"
-        @change="onNextModeChange"
-      >
-        <option v-for="opt in NEXT_ARG_MODE_OPTIONS" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
+        :model-value="nextMode"
+        :options="NEXT_ARG_MODE_OPTIONS"
+        compact
+        @update:model-value="onNextModeChange"
+      />
     </div>
     <!-- <p v-if="!store.models.length && !backgroundSprite" class="stage__hint">
       点击左上角 “加载模型” 按钮选择 Live2D 模型文件 (.model.json 或 .model3.json)
@@ -2333,7 +2332,7 @@ function dispose() {
 .stage {
   position: relative;
   height: 100%;
-  background: var(--ui-window);
+  background: var(--ui-stage-fill);
   overflow: hidden;
 }
 
@@ -2440,21 +2439,7 @@ function dispose() {
 .stage__next-mode-select {
   pointer-events: auto;
   font: inherit;
-  color: var(--ui-text);
-  background: var(--ui-control);
-  border: 1px solid var(--ui-edge);
-  border-radius: var(--ui-radius-compact);
-  padding: 4px 7px;
-  cursor: pointer;
-}
-
-.stage__next-mode-select:focus-visible {
-  border-color: var(--ui-link);
-}
-
-.stage__next-mode-select option {
-  color: var(--ui-text);
-  background: var(--ui-panel);
+  width: 130px;
 }
 
 .stage__bottom-blocks {

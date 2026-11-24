@@ -12,6 +12,7 @@ import { usePreviewViewportSettings } from '../../../composables/usePreviewViewp
 import { usePreviewRotationSnap } from '../../../composables/usePreviewRotationSnap'
 import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../composables/usePreviewViewportSettings'
 import NumberInput from '../../common/NumberInput.vue'
+import ThemeSelect from '../../common/ThemeSelect.vue'
 import { currentTheme, selectTheme, themes } from '../../../themes/appearance'
 
 const props = defineProps<{ visible: boolean; initialTab?: 'motionExpression' }>()
@@ -22,6 +23,7 @@ watch(() => props.visible, (visible) => {
 })
 const folders = useMotionExpressionFolders()
 const { frameRateLimit, update: updateFrameRateLimit } = usePreviewFrameRateLimit()
+const frameRateOptions = PREVIEW_FRAME_RATE_LIMITS.map(value => ({ value, label: value === 0 ? '无限制' : `${value} 帧` }))
 const { offsetY: focusBoxOffsetY, update: updateFocusBoxOffsetY } = usePreviewFocusBoxOffset()
 const { alwaysShowGuides, update: updateGuideVisibility } = usePreviewGuideVisibility()
 const { length: guideOverflow, update: updateGuideOverflow } = usePreviewGuideOverflow()
@@ -58,10 +60,6 @@ function onChange(event: Event) {
   })
 }
 
-function onFrameRateLimitChange(event: Event) {
-  updateFrameRateLimit(Number((event.target as HTMLSelectElement).value))
-}
-
 function onGuideVisibilityChange(event: Event) {
   updateGuideVisibility((event.target as HTMLInputElement).checked)
 }
@@ -92,12 +90,10 @@ function onSeparatorInput(event: Event) {
           </nav>
           <div class="settings-content">
             <template v-if="activeTab === 'misc'">
-              <label><input type="checkbox" :checked="legacyMode" @change="onChange"> 使用旧版表情混合模式</label>
+              <label><input class="ui-switch" type="checkbox" role="switch" :checked="legacyMode" @change="onChange"> 使用旧版表情混合模式</label>
               <p>仅影响预览窗口中所有 Cubism 2 模型的表情参数混合，修改后立即生效。</p>
               <label class="frame-rate-label" for="preview-frame-rate-limit">帧率限制</label>
-              <select id="preview-frame-rate-limit" class="frame-rate-select" :value="frameRateLimit" @change="onFrameRateLimitChange">
-                <option v-for="limit in PREVIEW_FRAME_RATE_LIMITS" :key="limit" :value="limit">{{ limit === 0 ? '无限制' : `${limit} 帧` }}</option>
-              </select>
+              <ThemeSelect id="preview-frame-rate-limit" class="frame-rate-select" :model-value="frameRateLimit" :options="frameRateOptions" @update:model-value="updateFrameRateLimit(Number($event))" />
               <p>仅影响预览主舞台，修改后立即生效并自动保存。</p>
               <label>旋转吸附间隔（度）</label>
               <NumberInput :model-value="rotationSnap" :min="0.01" :step="0.01" @update:model-value="updateRotationSnap" />
@@ -105,14 +101,14 @@ function onSeparatorInput(event: Event) {
               <label class="focus-offset-label">注视框 Y 轴偏移</label>
               <NumberInput :model-value="focusBoxOffsetY" :step="1" @update:model-value="updateFocusBoxOffsetY" />
               <p>按 L 调整注视时使用，单位为模型变换空间坐标；正值向下，负值向上。修改后自动保存。</p>
-              <label class="guide-visibility-label"><input type="checkbox" :checked="alwaysShowGuides" @change="onGuideVisibilityChange"> 常驻显示游标</label>
+              <label class="guide-visibility-label"><input class="ui-switch" type="checkbox" role="switch" :checked="alwaysShowGuides" @change="onGuideVisibilityChange"> 常驻显示游标</label>
               <p>{{ PREVIEW_GUIDE_VISIBILITY_KEYS }} 可切换此设置。关闭时，游标只在编辑游标或 G 移动时按住 Alt 的情况下显示。</p>
               <label class="guide-visibility-label">游标溢出长度（像素）</label>
               <NumberInput :model-value="guideOverflow" :min="0" :step="1" @update:model-value="updateGuideOverflow" />
               <p>游标在画框两端各延伸的舞台坐标长度，随舞台缩放；设为 0 时不延伸。修改后自动保存。</p>
             </template>
             <template v-else-if="activeTab === 'motionExpression'">
-              <label><input type="checkbox" :checked="folders.settings.enabled" @change="onFoldersEnabledChange"> 启用文件夹划分</label>
+              <label><input class="ui-switch" type="checkbox" role="switch" :checked="folders.settings.enabled" @change="onFoldersEnabledChange"> 启用文件夹划分</label>
               <p>按动作和表情名称模拟文件夹，不修改模型数据。</p>
               <label class="separator-label" for="folder-separator">文件夹分隔符</label>
               <input id="folder-separator" class="separator-input" type="text" :value="folders.settings.separator" @input="onSeparatorInput">
@@ -160,15 +156,22 @@ header { border-bottom: 1px solid var(--ui-line); }
 h2 { flex: 1; margin: 0; font-size: 16px; }
 .body { display: flex; flex: 1; min-height: 0; }
 .settings-tabs { width: 140px; flex-shrink: 0; overflow-y: auto; padding: 12px 8px; border-right: 1px solid var(--ui-line); }
-.settings-tabs button { display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; }
-.settings-tabs button.active { background: var(--ui-selected); color: var(--ui-link); }
+.settings-tabs button { position: relative; display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; }
+.settings-tabs button.active { background: transparent; color: var(--ui-link); }
+.settings-tabs button.active::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: var(--ui-radius-pill); background: var(--ui-accent); }
 .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 18px; }
 .separator-label, .frame-rate-label, .focus-offset-label, .guide-visibility-label { margin-top: 20px; }
 .viewport-section { margin-top: 24px; }
 .viewport-section h3 { margin: 0 0 12px; font-size: 15px; }
 .viewport-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .viewport-fields label { flex: 1; min-width: 160px; }
-.separator-input, .frame-rate-select { width: 100%; margin-top: 8px; padding: 8px; border: 1px solid var(--ui-edge); border-radius: var(--ui-radius-compact); color: inherit; background: var(--ui-well); }
+.frame-rate-select { margin-top: 8px; }
+.separator-input { width: 100%; margin-top: 8px; padding: 9px 12px; border: 1px solid var(--ui-edge); border-radius: var(--ui-radius-control); color: inherit; background: var(--ui-field-fill); box-shadow: var(--ui-control-shadow); }
+.separator-input:hover, .separator-input:focus { border-color: var(--ui-link); }
+.settings-content :deep(.number-input) { display: inline-block; flex: 0 1 160px; width: 160px; max-width: 100%; line-height: 1.4; vertical-align: middle; border-radius: var(--ui-radius-control); }
+.settings-content > :deep(.number-input) { display: block; margin-top: 8px; }
+.settings-content :deep(.number-input:focus-visible) { outline: 1px solid var(--ui-link); outline-offset: -2px; }
+.settings-content :deep(.number-input--editing) { border-color: var(--ui-link); background: var(--ui-well); }
 label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 p { margin: 10px 0 0; color: var(--ui-muted); font-size: 13px; line-height: 1.6; }
 button { border: 1px solid var(--ui-control-line); border-radius: var(--ui-radius-control); padding: 8px 13px; color: inherit; background: var(--ui-control-fill); cursor: pointer; }

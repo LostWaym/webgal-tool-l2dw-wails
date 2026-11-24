@@ -168,7 +168,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--ui-panel);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: 3px;
   padding: 3px 6px;
@@ -202,18 +202,19 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: 1000;
   margin: 0;
-  padding: 4px 0;
+  padding: 4px;
   list-style: none;
-  background: var(--ui-control);
-  border: 1px solid var(--ui-line);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px var(--ui-shadow);
+  background: var(--ui-menu-fill);
+  border: 1px solid var(--ui-link);
+  border-radius: var(--ui-radius-control);
+  box-shadow: var(--ui-panel-shadow);
   max-height: 200px;
   overflow-y: auto;
 }
 
 .composer-card__item {
   padding: 4px 10px;
+  border-radius: var(--ui-radius-compact);
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, monospace;
   color: var(--ui-text);
@@ -228,6 +229,7 @@ onBeforeUnmount(() => {
 }
 
 .composer-card__item.is-active {
+  background: var(--ui-selected);
   color: var(--ui-link);
 }
 

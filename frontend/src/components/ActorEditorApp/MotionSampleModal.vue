@@ -86,7 +86,8 @@ onBeforeUnmount(() => { loadToken++ })
       <section class="ui-dialog sample-modal" role="dialog" aria-modal="true" aria-labelledby="motion-sample-title">
         <header class="sample-header">
           <h2 id="motion-sample-title">从动作采样表情</h2>
-          <span v-if="motion?.skippedTargets.length" class="sample-warning" role="status">
+          <span v-if="motion?.skippedTargets.length" class="sample-warning" role="status"
+            :title="`已跳过非参数曲线：${motion.skippedTargets.join('、')}`">
             已跳过非参数曲线：{{ motion.skippedTargets.join('、') }}
           </span>
           <button type="button" class="sample-close" aria-label="关闭" @click="emit('close')">×</button>
@@ -125,9 +126,9 @@ onBeforeUnmount(() => { loadToken++ })
 .sample-mask { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: var(--ui-scrim); }
 .sample-modal { width: min(1000px, 92vw); height: min(740px, 90vh); display: flex; flex-direction: column; overflow: hidden; }
 .sample-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--ui-line); }
-.sample-header h2 { margin: 0 auto 0 0; font-size: 16px; }
-.sample-close { background: none; border: 0; color: var(--ui-text); font-size: 24px; cursor: pointer; }
-.sample-warning { color: var(--ui-warning); font-size: 12px; }
+.sample-header h2 { margin: 0 auto 0 0; font-size: 16px; flex-shrink: 0; }
+.sample-close { background: none; border: 0; color: var(--ui-text); font-size: 24px; cursor: pointer; flex-shrink: 0; }
+.sample-warning { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-warning); font-size: 12px; }
 .sample-body { display: flex; flex: 1; min-height: 0; }
 .sample-list { width: 250px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-right: 1px solid var(--ui-line); }
 .sample-list__scroll { overflow: auto; min-height: 0; }

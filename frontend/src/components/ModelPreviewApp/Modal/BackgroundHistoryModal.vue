@@ -68,7 +68,7 @@ function onRemove(path: string) {
 }
 
 .bg-history-modal {
-  background-color: var(--ui-dialog);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   width: min(900px, 94vw);
   height: min(640px, 86vh);

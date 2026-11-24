@@ -622,9 +622,13 @@ defineExpose({
   position: relative;
   width: 100%;
   height: 100%;
-  background-color: var(--ui-well);
+  background: var(--ui-stage-fill);
   border-radius: 6px;
   overflow: hidden;
+}
+
+:global(:root[data-scheme="light"]) .live2d-preview {
+  background: var(--ui-well);
 }
 
 .live2d-preview :deep(canvas) {

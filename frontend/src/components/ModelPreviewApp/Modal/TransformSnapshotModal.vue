@@ -137,7 +137,7 @@ function onClearAll() {
           <header class="snapshot-modal__header">
             <h2 class="snapshot-modal__title">
               变换快照
-              <span class="snapshot-modal__subtitle" v-if="selectedName">（{{ selectedName }}）</span>
+              <span class="snapshot-modal__subtitle" v-if="selectedName" :title="selectedName">（{{ selectedName }}）</span>
             </h2>
             <div class="snapshot-modal__toolbar">
               <button class="toolbar-btn" @click="onSave">保存</button>
@@ -246,6 +246,10 @@ function onClearAll() {
   font-size: 15px;
   font-weight: 600;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   /* 文字完全不透明（覆盖父级 rgba 背景的视觉效果） */
   color: var(--ui-text);
 }
@@ -259,6 +263,7 @@ function onClearAll() {
 
 .snapshot-modal__toolbar {
   display: flex;
+  flex-shrink: 0;
   gap: 6px;
   margin-right: 10px;
 }
@@ -270,6 +275,7 @@ function onClearAll() {
   border-radius: 4px;
   color: var(--ui-text);
   font-size: 12px;
+  white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.12s ease;
 }
@@ -293,6 +299,7 @@ function onClearAll() {
 }
 
 .icon-btn {
+  flex-shrink: 0;
   background-color: transparent;
   border: none;
   color: var(--ui-text);

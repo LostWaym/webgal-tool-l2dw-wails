@@ -144,7 +144,7 @@ async function onConfirm() {
             </div>
 
             <label v-if="state.format === 'motion3'" class="mex-check">
-              <input v-model="minify" type="checkbox" />
+              <input v-model="minify" class="ui-switch" type="checkbox" role="switch" />
               <span>压缩输出（单行）</span>
             </label>
 
@@ -187,7 +187,7 @@ async function onConfirm() {
 }
 
 .mex-modal {
-  background-color: var(--ui-dialog);
+  background: var(--ui-dialog-fill);
   color: var(--ui-text);
   width: min(440px, 92vw);
   border-radius: var(--ui-radius-panel);
@@ -254,7 +254,7 @@ async function onConfirm() {
 .mex-field__input {
   flex: 1;
   padding: 6px 10px;
-  background: var(--ui-panel);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: 4px;
   color: var(--ui-text);

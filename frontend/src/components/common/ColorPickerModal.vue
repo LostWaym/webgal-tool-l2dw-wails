@@ -180,7 +180,7 @@ function onMaskClick(e: MouseEvent) {
 .cp-modal {
   width: min(420px, 92vw);
   padding: 16px;
-  background-color: var(--ui-dialog);
+  background: var(--ui-dialog-fill);
   border: 1px solid var(--ui-edge);
   border-radius: var(--ui-radius-panel);
   box-shadow: var(--ui-panel-shadow);

@@ -53,5 +53,7 @@
 - **弹消息 / 气泡 / 提示**：`frontend/src/composables/useMessage.ts` 导出 `useMessage()`，提供 success、info、warning、error。
 - **搜索栏**：`frontend/src/components/common/SearchInput.vue`；搜索规则见 `AGENTS.md`。
 - **轻量数值输入**：`frontend/src/components/common/NumberInput.vue`，用于展示态文本与点击编辑。
+- **主题下拉框**：`frontend/src/components/common/ThemeSelect.vue`，提供带键盘操作和视口内弹层的单选控件。
+- **开关 / toggle**：`frontend/src/style.css` 的 `ui-switch` 样式用于布尔功能开关；列表多选仍使用复选框。
 - **拖拽调参输入**：`frontend/src/components/ModelEditApp/EditRangeCard.vue`，用于带重置和标签拖拽的数值调节。
 - **通用模态模式**：`frontend/src/composables/useXxxModal.ts` 管理状态，Modal 组件通过 Teleport 挂载；可参考背景历史或滤镜预设。

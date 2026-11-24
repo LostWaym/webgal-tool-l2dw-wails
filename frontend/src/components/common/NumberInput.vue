@@ -148,9 +148,10 @@ onBeforeUnmount(() => {
 <style scoped>
 .number-input {
   flex: 1;
+  width: 100%;
   min-width: 0;
   padding: 8px 12px;
-  background: var(--ui-control);
+  background: var(--ui-field-fill);
   border: 1px solid var(--ui-edge);
   border-radius: var(--ui-radius-compact);
   color: var(--ui-text);
@@ -158,6 +159,7 @@ onBeforeUnmount(() => {
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
   font-family: inherit;
+  box-shadow: var(--ui-control-shadow);
 }
 
 .number-input--display {
@@ -175,6 +177,8 @@ onBeforeUnmount(() => {
 .number-input--display:focus {
   border-color: var(--ui-link);
 }
+
+.number-input:focus-visible { outline: 1px solid var(--ui-link); outline-offset: -2px; }
 
 .number-input--editing {
   width: 100%;

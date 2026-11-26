@@ -313,22 +313,7 @@ function clamp(value: number, min: number, max: number): number {
 
 // 从模型同步变换数据到 store
 function syncTransformFromModel() {
-  if (!store.selectedId) return
-  // 立绘组：容器由 Stage 直接维护，无需同步单个容器的变换到 store
-  if (isFigureGroupId(store.selectedId)) return
-  const container = getL2dwContainer()
-  if (!container) return
-
-  const state: TransformState = {
-    x: Math.round(container.x * 100) / 100,
-    y: Math.round(container.y * 100) / 100,
-    scale: {
-      x: Math.round(container.scale.x * 100) / 100,
-      y: Math.round(container.scale.y * 100) / 100,
-    },
-    rotation: Math.round(container.rotation * 180 / Math.PI),
-  }
-  store.setTransformState(store.selectedId, state)
+  if (store.selectedId) store.syncTransformFromModel(store.selectedId)
 }
 
 // 变换外部回调（由 Stage 调用）

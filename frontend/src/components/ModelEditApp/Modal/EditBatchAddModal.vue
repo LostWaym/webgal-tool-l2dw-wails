@@ -5,6 +5,7 @@ import { PickDirectory } from '../../../../wailsjs/go/main/App'
 import { useWmdlModelEditorStore, type ScannedEntry } from '../../../stores/wmdlModelEditor'
 import { pathDirname } from '../../../path_utils'
 import { useBatchAddModal } from '../../../composables/useBatchAddModal'
+import { useFilteredSelection } from '../../../composables/useFilteredSelection'
 
 /**
  * 全屏"批量添加动作/表情"模态。
@@ -27,7 +28,6 @@ const modal = useBatchAddModal()
 
 const folder = ref<string>('')
 const entries = ref<ScannedEntry[]>([])
-const selected = ref<Set<string>>(new Set())
 const busy = ref(false)
 const errorMsg = ref<string>('')
 
@@ -49,36 +49,7 @@ const modelDir = computed(() => {
 
 const filteredEntries = computed(() => entries.value.filter((e) => e.kind === modal.state.kind))
 
-const allFilteredSelected = computed(() => {
-  const list = filteredEntries.value
-  if (list.length === 0) return false
-  return list.every((e) => selected.value.has(e.absPath))
-})
-
-function isSelected(absPath: string): boolean {
-  return selected.value.has(absPath)
-}
-
-function toggleOne(absPath: string) {
-  const next = new Set(selected.value)
-  if (next.has(absPath)) {
-    next.delete(absPath)
-  } else {
-    next.add(absPath)
-  }
-  selected.value = next
-}
-
-function toggleAllFiltered() {
-  const list = filteredEntries.value
-  const next = new Set(selected.value)
-  if (allFilteredSelected.value) {
-    for (const e of list) next.delete(e.absPath)
-  } else {
-    for (const e of list) next.add(e.absPath)
-  }
-  selected.value = next
-}
+const { selected, allFilteredSelected, isSelected, toggleOne, toggleAllFiltered } = useFilteredSelection(filteredEntries)
 
 function toggleNode(node: string) {
   const next = new Set(checkedNodes.value)

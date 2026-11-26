@@ -326,19 +326,7 @@ func (a *App) EnsureDirAndOpenInExplorer(dir string) error {
 // 这里只 Start() 不 Wait()，避免阻塞主窗口的 UI 线程；新进程退出由 OS 回收。
 // 不传 Stdin/Stdout/Stderr，避免子进程意外继承/阻塞主进程的 console。
 func (a *App) OpenEditor(wmdlPath string) error {
-	self, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	args := []string{"--editor"}
-	if wmdlPath != "" {
-		args = append(args, "--wmdl", wmdlPath)
-	}
-	cmd := exec.Command(self, args...)
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	return cmd.Start()
+	return startEditor("--editor", "--wmdl", wmdlPath)
 }
 
 // OpenActorEditor 异步 spawn 一个新的 L2DW 进程（带 --actor 参数），新进程会打开
@@ -348,19 +336,7 @@ func (a *App) OpenEditor(wmdlPath string) error {
 // 这里只 Start() 不 Wait()，避免阻塞主窗口的 UI 线程；新进程退出由 OS 回收。
 // 不传 Stdin/Stdout/Stderr，避免子进程意外继承/阻塞主进程的 console。
 func (a *App) OpenActorEditor(wmdlPath string) error {
-	self, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	args := []string{"--actor"}
-	if wmdlPath != "" {
-		args = append(args, "--actor-wmdl", wmdlPath)
-	}
-	cmd := exec.Command(self, args...)
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	return cmd.Start()
+	return startEditor("--actor", "--actor-wmdl", wmdlPath)
 }
 
 // OpenMotionEditor 异步 spawn 一个新的 L2DW 进程（带 --motion 参数），新进程会打开
@@ -370,19 +346,19 @@ func (a *App) OpenActorEditor(wmdlPath string) error {
 // 这里只 Start() 不 Wait()，避免阻塞主窗口的 UI 线程；新进程退出由 OS 回收。
 // 不传 Stdin/Stdout/Stderr，避免子进程意外继承/阻塞主进程的 console。
 func (a *App) OpenMotionEditor(wmdlPath string) error {
+	return startEditor("--motion", "--motion-wmdl", wmdlPath)
+}
+
+func startEditor(mode, pathFlag, wmdlPath string) error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	args := []string{"--motion"}
+	args := []string{mode}
 	if wmdlPath != "" {
-		args = append(args, "--motion-wmdl", wmdlPath)
+		args = append(args, pathFlag, wmdlPath)
 	}
-	cmd := exec.Command(self, args...)
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	return cmd.Start()
+	return exec.Command(self, args...).Start()
 }
 
 type pickerKind int
@@ -924,55 +900,19 @@ func (a *App) SaveModelJsonFileDialog(currentPath string) (string, error) {
 // 覆盖；否则相对于可执行文件所在目录下的 assets/part_presets 解析；
 // 解析失败时回退到当前工作目录下的 assets/part_presets。
 func presetDir() string {
-	if v := os.Getenv("L2DW_PART_PRESETS_DIR"); v != "" {
-		return v
-	}
-	if exe, err := os.Executable(); err == nil {
-		return filepath.Join(filepath.Dir(exe), "assets", "part_presets")
-	}
-	return filepath.Join("assets", "part_presets")
+	return resourceDir("L2DW_PART_PRESETS_DIR", filepath.Join("assets", "part_presets"))
 }
 
 // ListPresetFiles 列出预设目录下所有 .txt 预设文件的 basename。
 // 不存在的目录返回空切片（不报错），以便前端可以无感降级。
 func (a *App) ListPresetFiles() ([]string, error) {
-	dir := presetDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, err
-	}
-	out := []string{}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".txt") {
-			continue
-		}
-		out = append(out, name)
-	}
-	return out, nil
+	return listResourceFiles(presetDir(), ".txt")
 }
 
 // ReadPresetFile 读取指定预设文件的内容。filename 必须是 ListPresetFiles
 // 返回的 basename 之一，防止越界读取预设目录之外的文件。
 func (a *App) ReadPresetFile(filename string) (string, error) {
-	if filename == "" {
-		return "", fmt.Errorf("ReadPresetFile: filename is empty")
-	}
-	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
-		return "", fmt.Errorf("ReadPresetFile: invalid filename %q", filename)
-	}
-	path := filepath.Join(presetDir(), filename)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return readResourceFile("ReadPresetFile", presetDir(), filename)
 }
 
 // motionPresetDir 返回动作编辑器参数筛选预设目录的绝对路径。
@@ -980,55 +920,19 @@ func (a *App) ReadPresetFile(filename string) (string, error) {
 // 可执行文件所在目录下的 assets/motion_part_presets 解析；解析失败时
 // 回退到当前工作目录下的 assets/motion_part_presets。
 func motionPresetDir() string {
-	if v := os.Getenv("L2DW_MOTION_PART_PRESETS_DIR"); v != "" {
-		return v
-	}
-	if exe, err := os.Executable(); err == nil {
-		return filepath.Join(filepath.Dir(exe), "assets", "motion_part_presets")
-	}
-	return filepath.Join("assets", "motion_part_presets")
+	return resourceDir("L2DW_MOTION_PART_PRESETS_DIR", filepath.Join("assets", "motion_part_presets"))
 }
 
 // ListMotionPresetFiles 列出动作编辑器预设目录下所有 .txt 预设文件的
 // basename。不存在的目录返回空切片（不报错），以便前端可以无感降级。
 func (a *App) ListMotionPresetFiles() ([]string, error) {
-	dir := motionPresetDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, err
-	}
-	out := []string{}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".txt") {
-			continue
-		}
-		out = append(out, name)
-	}
-	return out, nil
+	return listResourceFiles(motionPresetDir(), ".txt")
 }
 
 // ReadMotionPresetFile 读取指定动作编辑器预设文件的内容。filename 必须是
 // ListMotionPresetFiles 返回的 basename 之一，防止越界读取预设目录之外的文件。
 func (a *App) ReadMotionPresetFile(filename string) (string, error) {
-	if filename == "" {
-		return "", fmt.Errorf("ReadMotionPresetFile: filename is empty")
-	}
-	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
-		return "", fmt.Errorf("ReadMotionPresetFile: invalid filename %q", filename)
-	}
-	path := filepath.Join(motionPresetDir(), filename)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return readResourceFile("ReadMotionPresetFile", motionPresetDir(), filename)
 }
 
 // composerDir 返回动作编辑器组合器定义目录的绝对路径。
@@ -1036,55 +940,19 @@ func (a *App) ReadMotionPresetFile(filename string) (string, error) {
 // 可执行文件所在目录下的 assets/motion_composors 解析；解析失败时
 // 回退到当前工作目录下的 assets/motion_composors。
 func composerDir() string {
-	if v := os.Getenv("L2DW_MOTION_COMPOSORS_DIR"); v != "" {
-		return v
-	}
-	if exe, err := os.Executable(); err == nil {
-		return filepath.Join(filepath.Dir(exe), "assets", "motion_composors")
-	}
-	return filepath.Join("assets", "motion_composors")
+	return resourceDir("L2DW_MOTION_COMPOSORS_DIR", filepath.Join("assets", "motion_composors"))
 }
 
 // ListComposerFiles 列出组合器定义目录下所有 .json 文件的 basename。
 // 不存在的目录返回空切片（不报错），以便前端可以无感降级。
 func (a *App) ListComposerFiles() ([]string, error) {
-	dir := composerDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, err
-	}
-	out := []string{}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".json") {
-			continue
-		}
-		out = append(out, name)
-	}
-	return out, nil
+	return listResourceFiles(composerDir(), ".json")
 }
 
 // ReadComposerFile 读取指定组合器定义文件的内容。filename 必须是
 // ListComposerFiles 返回的 basename 之一，防止越界读取目录之外的文件。
 func (a *App) ReadComposerFile(filename string) (string, error) {
-	if filename == "" {
-		return "", fmt.Errorf("ReadComposerFile: filename is empty")
-	}
-	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
-		return "", fmt.Errorf("ReadComposerFile: invalid filename %q", filename)
-	}
-	path := filepath.Join(composerDir(), filename)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return readResourceFile("ReadComposerFile", composerDir(), filename)
 }
 
 // filterPresetDir 返回滤镜预设目录的绝对路径。优先使用环境变量
@@ -1092,13 +960,7 @@ func (a *App) ReadComposerFile(filename string) (string, error) {
 // assets/filter_presets 解析；解析失败时回退到当前工作目录下的
 // assets/filter_presets。
 func filterPresetDir() string {
-	if v := os.Getenv("L2DW_FILTER_PRESETS_DIR"); v != "" {
-		return v
-	}
-	if exe, err := os.Executable(); err == nil {
-		return filepath.Join(filepath.Dir(exe), "assets", "filter_presets")
-	}
-	return filepath.Join("assets", "filter_presets")
+	return resourceDir("L2DW_FILTER_PRESETS_DIR", filepath.Join("assets", "filter_presets"))
 }
 
 // ensureFilterPresetDir 确保滤镜预设目录存在，不存在则创建。
@@ -1109,54 +971,21 @@ func ensureFilterPresetDir() error {
 // ListFilterPresetFiles 列出滤镜预设目录下所有 .json 文件的 basename。
 // 不存在的目录返回空切片（不报错），以便前端可以无感降级。
 func (a *App) ListFilterPresetFiles() ([]string, error) {
-	dir := filterPresetDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, err
-	}
-	out := []string{}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".json") {
-			continue
-		}
-		out = append(out, name)
-	}
-	return out, nil
+	return listResourceFiles(filterPresetDir(), ".json")
 }
 
 // ReadFilterPresetFile 读取指定滤镜预设文件的内容。filename 必须是
 // ListFilterPresetFiles 返回的 basename 之一，防止越界读取预设目录之外的文件。
 func (a *App) ReadFilterPresetFile(filename string) (string, error) {
-	if filename == "" {
-		return "", fmt.Errorf("ReadFilterPresetFile: filename is empty")
-	}
-	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
-		return "", fmt.Errorf("ReadFilterPresetFile: invalid filename %q", filename)
-	}
-	path := filepath.Join(filterPresetDir(), filename)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return readResourceFile("ReadFilterPresetFile", filterPresetDir(), filename)
 }
 
 // SaveFilterPresetFile 将 content 写入滤镜预设目录的 filename 文件。
 // filename 必须以 .json 结尾，不允许路径分隔符或 ..，防止越界写入。
 // 若目录不存在会自动创建。
 func (a *App) SaveFilterPresetFile(filename string, content string) error {
-	if filename == "" {
-		return fmt.Errorf("SaveFilterPresetFile: filename is empty")
-	}
-	if strings.ContainsAny(filename, "/\\") || strings.Contains(filename, "..") {
-		return fmt.Errorf("SaveFilterPresetFile: invalid filename %q", filename)
+	if err := validateResourceFilename("SaveFilterPresetFile", filename); err != nil {
+		return err
 	}
 	if !strings.HasSuffix(strings.ToLower(filename), ".json") {
 		return fmt.Errorf("SaveFilterPresetFile: filename must end with .json: %q", filename)
@@ -1237,24 +1066,15 @@ func (a *App) WriteBase64File(path string, base64Data string) error {
 // L2DW_SCREENSHOTS_DIR 覆盖；否则相对于可执行文件所在目录下的 screenshots
 // 解析；解析失败时回退到当前工作目录下的 screenshots。
 func screenshotDir() string {
-	if v := os.Getenv("L2DW_SCREENSHOTS_DIR"); v != "" {
-		return v
-	}
-	if exe, err := os.Executable(); err == nil {
-		return filepath.Join(filepath.Dir(exe), "screenshots")
-	}
-	return filepath.Join("screenshots")
+	return resourceDir("L2DW_SCREENSHOTS_DIR", "screenshots")
 }
 
 // SaveScreenshot 将 base64Data 解码后写入 screenshots 目录的 filename 文件。
 // filename 必须是纯文件名（不含路径分隔符 / .. 等），后缀必须为 .png。
 // 目录不存在会自动创建。返回写入文件的绝对路径。
 func (a *App) SaveScreenshot(filename string, base64Data string) (string, error) {
-	if filename == "" {
-		return "", fmt.Errorf("SaveScreenshot: filename is empty")
-	}
-	if strings.ContainsAny(filename, `/\`) || strings.Contains(filename, "..") {
-		return "", fmt.Errorf("SaveScreenshot: invalid filename %q", filename)
+	if err := validateResourceFilename("SaveScreenshot", filename); err != nil {
+		return "", err
 	}
 	if !strings.HasSuffix(strings.ToLower(filename), ".png") {
 		return "", fmt.Errorf("SaveScreenshot: filename must end with .png: %q", filename)

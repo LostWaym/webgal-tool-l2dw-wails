@@ -9,6 +9,7 @@ import {
 } from '../../../../wailsjs/go/main/App'
 import { useWmdlModelEditorStore, type ScannedEntry } from '../../../stores/wmdlModelEditor'
 import { useBatchModifyModal } from '../../../composables/useBatchModifyModal'
+import { useFilteredSelection } from '../../../composables/useFilteredSelection'
 import { useMessage } from '../../../composables/useMessage'
 import {
   modifyMtnFiles,
@@ -48,7 +49,6 @@ const mode = ref<Mode>('file')
 const filePath = ref<string>('')
 const folder = ref<string>('')
 const entries = ref<ScannedEntry[]>([])
-const selected = ref<Set<string>>(new Set())
 const busy = ref(false)
 const errorMsg = ref<string>('')
 const scanSubfolders = ref(true)
@@ -66,11 +66,7 @@ const kindLabel = computed(() => (modal.state.kind === 'motion' ? '动作' : '�
 
 const filteredEntries = computed(() => entries.value.filter((e) => e.kind === modal.state.kind))
 
-const allFilteredSelected = computed(() => {
-  const list = filteredEntries.value
-  if (list.length === 0) return false
-  return list.every((e) => selected.value.has(e.absPath))
-})
+const { selected, allFilteredSelected, isSelected, toggleOne, toggleAllFiltered } = useFilteredSelection(filteredEntries)
 
 const candidateCount = computed(() => filteredEntries.value.length)
 const selectedCount = computed(() => filteredEntries.value.filter((e) => selected.value.has(e.absPath)).length)
@@ -109,28 +105,6 @@ const confirmDisabled = computed(() => {
   if (mode.value === 'file') return !filePath.value
   return selectedCount.value === 0
 })
-
-function isSelected(absPath: string): boolean {
-  return selected.value.has(absPath)
-}
-
-function toggleOne(absPath: string) {
-  const next = new Set(selected.value)
-  if (next.has(absPath)) next.delete(absPath)
-  else next.add(absPath)
-  selected.value = next
-}
-
-function toggleAllFiltered() {
-  const list = filteredEntries.value
-  const next = new Set(selected.value)
-  if (allFilteredSelected.value) {
-    for (const e of list) next.delete(e.absPath)
-  } else {
-    for (const e of list) next.add(e.absPath)
-  }
-  selected.value = next
-}
 
 watch(
   () => [modal.state.visible, modal.state.kind] as const,

@@ -1,31 +1,16 @@
 import { readonly, ref } from 'vue'
 import { GetPreviewGuidesVisible, SetPreviewGuidesVisible } from '../../wailsjs/go/main/App'
-import { useMessage } from './useMessage'
+import { createPreferencePersistence } from './preferencePersistence'
 
 export const PREVIEW_GUIDE_VISIBILITY_KEYS = 'Ctrl + M'
 const alwaysShowGuides = ref(false)
-let initialized = false
-let changed = false
-let save = Promise.resolve()
+const persistence = createPreferencePersistence('游标显示设置', '使用默认选项', '当前选项仅在本次会话有效')
 
 export function usePreviewGuideVisibility() {
-  if (!initialized) {
-    initialized = true
-    GetPreviewGuidesVisible().then((visible) => {
-      if (!changed) alwaysShowGuides.value = visible
-    }).catch((err) => {
-      console.error('读取游标显示设置失败', err)
-      useMessage().warning('读取游标显示设置失败，使用默认选项')
-    })
-  }
+  persistence.loadOnce(GetPreviewGuidesVisible, visible => { alwaysShowGuides.value = visible })
 
   function update(visible: boolean) {
-    changed = true
-    alwaysShowGuides.value = visible
-    save = save.then(() => SetPreviewGuidesVisible(visible)).catch((err) => {
-      console.error('保存游标显示设置失败', err)
-      useMessage().warning('保存游标显示设置失败，当前选项仅在本次会话有效')
-    })
+    persistence.commit(() => { alwaysShowGuides.value = visible }, () => SetPreviewGuidesVisible(visible))
   }
 
   return { alwaysShowGuides: readonly(alwaysShowGuides), update }

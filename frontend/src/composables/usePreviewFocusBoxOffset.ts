@@ -1,31 +1,18 @@
 import { readonly, ref } from 'vue'
 import { GetPreviewFocusBoxOffsetY, SetPreviewFocusBoxOffsetY } from '../../wailsjs/go/main/App'
-import { useMessage } from './useMessage'
+import { createPreferencePersistence } from './preferencePersistence'
 
 const offsetY = ref(384)
-let initialized = false
-let changed = false
-let save = Promise.resolve()
+const persistence = createPreferencePersistence('注视框偏移', '使用默认值', '当前选项仅在本次会话有效')
 
 export function usePreviewFocusBoxOffset() {
-  if (!initialized) {
-    initialized = true
-    GetPreviewFocusBoxOffsetY().then((value) => {
-      if (!changed && value !== null && Number.isFinite(value)) offsetY.value = value
-    }).catch((err) => {
-      console.error('读取注视框偏移失败', err)
-      useMessage().warning('读取注视框偏移失败，使用默认值')
-    })
-  }
+  persistence.loadOnce(GetPreviewFocusBoxOffsetY, value => {
+    if (value !== null && Number.isFinite(value)) offsetY.value = value
+  })
 
   function update(value: number) {
     if (!Number.isFinite(value)) return
-    changed = true
-    offsetY.value = value
-    save = save.then(() => SetPreviewFocusBoxOffsetY(value)).catch((err) => {
-      console.error('保存注视框偏移失败', err)
-      useMessage().warning('保存注视框偏移失败，当前选项仅在本次会话有效')
-    })
+    persistence.commit(() => { offsetY.value = value }, () => SetPreviewFocusBoxOffsetY(value))
   }
 
   return { offsetY: readonly(offsetY), update }

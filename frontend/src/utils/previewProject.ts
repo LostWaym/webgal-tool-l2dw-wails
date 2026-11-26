@@ -1,7 +1,7 @@
 import { ReadTextFile, WriteTextFile, PickPreviewProjectFile, SavePreviewProjectFileDialog, MissingPreviewProjectFiles } from '../../wailsjs/go/main/App'
 import { choosePath } from './fileDialog'
 import { pathCombine, pathDirname, pathRelative } from '../path_utils'
-import { buildInMemoryWmdlConfig, buildModelItem, parseWmdlJson } from './wmdlUtils'
+import { buildInMemoryWmdlConfig, buildModelItem, deepClone as copy, parseWmdlJson } from './wmdlUtils'
 import { DEFAULT_TRANSFORM_STATE, useModelStore } from '../stores/previewStore'
 import { previewRuntime } from './runtimeRegistry'
 import { SpecialId } from '../live2d/specialIds'
@@ -31,7 +31,6 @@ export interface PreviewProject {
   blink: Record<string, BlinkState>
 }
 
-function copy<T>(value: T): T { return JSON.parse(JSON.stringify(value)) }
 const relative = (base: string, path: string) => path ? pathRelative(base, path) : ''
 const absolute = (base: string, path: string) => path ? pathCombine(base, path) : ''
 

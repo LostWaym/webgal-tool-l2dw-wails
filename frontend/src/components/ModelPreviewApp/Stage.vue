@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import * as PIXI from 'pixi.js'
 import { LoaderResource } from 'pixi.js'
+import { OutlineFilter } from 'pixi-filters'
 import { Live2DModel } from 'pixi-live2d-display-webgal'
 import { useModelStore } from '../../stores/previewStore'
 import type { FigureGroupEntry, FocusState } from '../../stores/previewStore'
@@ -15,7 +16,7 @@ import { getShortcutHints, resolveShortcutTargetType, runShortcutEntry, type Sho
 import ThemeSelect from '../common/ThemeSelect.vue'
 import { useMessage } from '../../composables/useMessage'
 import { currentTheme, themeColor } from '../../themes/appearance'
-import { isSpecialId, isFigureGroupId } from '../../live2d/specialIds'
+import { isSpecialId, isFigureGroupId, getSpecialName } from '../../live2d/specialIds'
 import emitter, { StageEvents } from '../../stores/emitter'
 import defaultBackgroundUrl from '../../assets/backgrounds/default.jpg'
 import { previewRuntime } from '../../utils/runtimeRegistry'
@@ -112,14 +113,131 @@ function updateSnappedGuides(guides: readonly PreviewGuide[] = []) {
   }
 }
 
-function onStageRightClick() {
-  if (guideMode.value !== 'none') setGuideMode('none')
+type TargetOption = { id: string; name: string }
+const targetMenu = ref<{ options: TargetOption[]; x: number; y: number } | null>(null)
+const targetMenuRef = ref<HTMLElement | null>(null)
+const targetMenuActive = ref(0)
+const targetOutlines = new Map<string, { wrapper: L2dwContainer; filter: OutlineFilter }>()
+
+function clearTargetOutline(id: string) {
+  const entry = targetOutlines.get(id)
+  if (!entry) return
+  const filters = entry.wrapper.filters
+  if (filters) entry.wrapper.filters = filters.filter(filter => filter !== entry.filter)
+  entry.filter.destroy()
+  targetOutlines.delete(id)
+}
+
+function syncTargetOutlines() {
+  const desired = new Map<string, number>()
+  const menu = targetMenu.value
+  if (menu) {
+    const selected = store.models.find(model => model.id === store.selectedId && model.visible)
+    if (selected) desired.set(selected.id, 0xffd34d)
+    const hovered = menu.options[targetMenuActive.value]
+    if (hovered && hovered.id !== selected?.id && store.models.some(model => model.id === hovered.id && model.visible)) {
+      desired.set(hovered.id, 0x65e68b)
+    }
+  }
+  for (const [id, entry] of targetOutlines) {
+    if (!desired.has(id) || containersById.get(id) !== entry.wrapper) clearTargetOutline(id)
+  }
+  for (const [id, color] of desired) {
+    const wrapper = containersById.get(id)
+    if (!wrapper || !wrapper.visible || wrapper.destroyed || !wrapper.children.length) continue
+    const existing = targetOutlines.get(id)
+    if (existing) {
+      existing.filter.color = color
+      continue
+    }
+    const filter = new OutlineFilter(3, color, 0.15)
+    wrapper.filters = [...(wrapper.filters ?? []), filter]
+    targetOutlines.set(id, { wrapper, filter })
+  }
+}
+
+watch(
+  [targetMenu, targetMenuActive, () => store.selectedId, () => store.models.map(model => `${model.id}:${model.visible}`)],
+  syncTargetOutlines,
+  { flush: 'sync' },
+)
+
+function closeTargetMenu() {
+  targetMenu.value = null
+}
+
+function chooseTarget(index: number) {
+  const option = targetMenu.value?.options[index]
+  if (!option) return
+  closeTargetMenu()
+  store.select(option.id)
+}
+
+function onTargetMenuPointerMove(event: PointerEvent) {
+  const option = (event.target as Element).closest<HTMLElement>('[data-target-index]')
+  targetMenuActive.value = option ? Number(option.dataset.targetIndex) : -1
+}
+
+function onTargetMenuKeydown(event: KeyboardEvent) {
+  const menu = targetMenu.value
+  if (!menu) return
+  event.stopPropagation()
+  if (event.key === 'Escape') closeTargetMenu()
+  else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    targetMenuActive.value = targetMenuActive.value < 0
+      ? (event.key === 'ArrowDown' ? 0 : menu.options.length - 1)
+      : (targetMenuActive.value + (event.key === 'ArrowDown' ? 1 : -1) + menu.options.length) % menu.options.length
+    nextTick(() => targetMenuRef.value?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' }))
+  } else if (event.key === 'Home') targetMenuActive.value = 0
+  else if (event.key === 'End') targetMenuActive.value = menu.options.length - 1
+  else if (event.key === 'Enter' || event.key === ' ') chooseTarget(targetMenuActive.value)
+  else if (event.key === 'Tab') closeTargetMenu()
+  else return
+  event.preventDefault()
+}
+
+function containsLocalBounds(object: PIXI.DisplayObject, point: PIXI.Point): boolean {
+  if (!object.visible || !object.renderable || object.worldAlpha <= 0) return false
+  const local = object.toLocal(point)
+  return object.getLocalBounds().contains(local.x, local.y)
+}
+
+async function openTargetMenu(event: PointerEvent, canvas: HTMLCanvasElement) {
+  if (!app) return
+  const rect = canvas.getBoundingClientRect()
+  if (!rect.width || !rect.height) return
+  const point = new PIXI.Point(
+    (event.clientX - rect.left) * app.screen.width / rect.width,
+    (event.clientY - rect.top) * app.screen.height / rect.height,
+  )
+  const options: TargetOption[] = [{ id: SpecialId.StageMain, name: getSpecialName(SpecialId.StageMain) }]
+  if (backgroundSprite && backgroundContainer?.visible && containsLocalBounds(backgroundSprite, point)) {
+    options.push({ id: SpecialId.BgContainer, name: getSpecialName(SpecialId.BgContainer) })
+  }
+  options.push({ id: SpecialId.Camera, name: getSpecialName(SpecialId.Camera) })
+  for (const model of [...store.models].reverse()) {
+    const wrapper = containersById.get(model.id)
+    if (!model.visible || !wrapper?.visible || wrapper.alpha <= 0) continue
+    if (wrapper.children.some(child => containsLocalBounds(child, point))) {
+      options.push({ id: model.id, name: model.name })
+    }
+  }
+  targetMenuActive.value = -1
+  targetMenu.value = { options, x: event.clientX, y: event.clientY }
+  await nextTick()
+  const menu = targetMenuRef.value
+  if (!menu || !targetMenu.value) return
+  const bounds = menu.getBoundingClientRect()
+  targetMenu.value.x = Math.max(4, Math.min(event.clientX, window.innerWidth - bounds.width - 4))
+  targetMenu.value.y = Math.max(4, Math.min(event.clientY, window.innerHeight - bounds.height - 4))
+  menu.focus()
 }
 
 watch(() => props.interactionDisabled, disabled => {
   if (!disabled) return
   if (isTransforming.value) cancelTransform()
   setGuideMode('none')
+  closeTargetMenu()
 })
 
 // 注视模式（l）状态
@@ -1581,6 +1699,7 @@ async function reloadOne(id: string) {
 }
 
 function removeOne(id: string) {
+  clearTargetOutline(id)
   const entry = store.models.find((m) => m.id === id)
   // 图片立绘不走 wmdlSubModels
   if (entry?.kind !== 'image') {
@@ -1732,6 +1851,17 @@ function attachDomHandlers() {
       }
     }
 
+    if (e.button === 2 && guideMode.value !== 'none') {
+      setGuideMode('none')
+      e.preventDefault()
+      return
+    }
+    if (e.button === 2 && e.target === canvas && !isMiddleDown) {
+      e.preventDefault()
+      void openTargetMenu(e, canvas)
+      return
+    }
+
     if (guideMode.value !== 'none' && e.button === 0 && e.target === canvas) {
       trackGuidePointer(e)
       editGuideAtPointer(true)
@@ -1751,6 +1881,14 @@ function attachDomHandlers() {
   }
 
   const onPointerMove = (e: PointerEvent) => {
+    if (targetMenu.value) {
+      const bounds = targetMenuRef.value?.getBoundingClientRect()
+      if (bounds && (e.clientX < bounds.left - 32 || e.clientX > bounds.right + 32 ||
+          e.clientY < bounds.top - 32 || e.clientY > bounds.bottom + 32)) closeTargetMenu()
+      else if (bounds && (e.clientX < bounds.left || e.clientX > bounds.right ||
+          e.clientY < bounds.top || e.clientY > bounds.bottom)) targetMenuActive.value = -1
+      return
+    }
     if (props.interactionDisabled) return
     if (transformMode.value === 'r' || transformMode.value === 's') {
       visualPointer = new PIXI.Point(e.clientX, e.clientY)
@@ -1944,6 +2082,16 @@ function attachDomHandlers() {
   }
 
   const onPointerUp = (e: PointerEvent) => {
+    if (e.type === 'pointercancel' && targetMenu.value) {
+      closeTargetMenu()
+    } else if (e.button === 2 && targetMenu.value) {
+      const element = document.elementFromPoint(e.clientX, e.clientY)
+      const option = element?.closest<HTMLElement>('[data-target-index]')
+      const index = option && targetMenuRef.value?.contains(option) ? Number(option.dataset.targetIndex) : -1
+      if (index >= 0) chooseTarget(index)
+      else closeTargetMenu()
+      e.preventDefault()
+    }
     // pointerup 一定触发（任意按钮），统一清空中键状态
     if (isMiddleDown && !props.interactionDisabled && e.type !== 'pointercancel') {
       trackGuidePointer(e)
@@ -1959,6 +2107,7 @@ function attachDomHandlers() {
 
   // 滚轮缩放 Root（乘法因子：scale 大小时手感一致）
   const onWheel = (e: WheelEvent) => {
+    if (targetMenu.value || props.interactionDisabled) return
     if (!rootContainer || !app) return
     e.preventDefault()
     const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
@@ -1993,6 +2142,7 @@ function attachDomHandlers() {
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
+    if (targetMenu.value) return
     if (props.interactionDisabled) return
     if (e.key === 'F1') {
       e.preventDefault()
@@ -2197,6 +2347,8 @@ function attachDomHandlers() {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('blur', onBlur)
+  window.addEventListener('blur', closeTargetMenu)
+  window.addEventListener('resize', closeTargetMenu)
 
   // Save for cleanup
   previewRuntime.cleanup = () => {
@@ -2210,6 +2362,8 @@ function attachDomHandlers() {
     window.removeEventListener('keydown', onKeyDown)
     window.removeEventListener('keyup', onKeyUp)
     window.removeEventListener('blur', onBlur)
+    window.removeEventListener('blur', closeTargetMenu)
+    window.removeEventListener('resize', closeTargetMenu)
   }
 }
 
@@ -2307,6 +2461,7 @@ watch(
 )
 
 function dispose() {
+  closeTargetMenu()
   stopObservingViewport?.()
   stopObservingViewport = null
 
@@ -2362,8 +2517,42 @@ function dispose() {
 </script>
 
 <template>
-  <section class="stage" @pointerdown.right="onStageRightClick" @contextmenu.prevent>
+  <section class="stage" @contextmenu.prevent>
     <div ref="containerRef" class="stage__canvas" :class="guideCursor" />
+    <Teleport to="body">
+      <div v-if="targetMenu" class="target-menu-backdrop" @pointerdown.stop.prevent @click.stop.prevent @contextmenu.prevent />
+      <Transition name="target-menu">
+        <div
+          v-if="targetMenu"
+          ref="targetMenuRef"
+          class="target-menu"
+          :style="{ left: `${targetMenu.x}px`, top: `${targetMenu.y}px` }"
+          role="listbox"
+          aria-label="选择舞台对象"
+          tabindex="0"
+          @pointerdown.stop
+          @pointermove="onTargetMenuPointerMove"
+          @contextmenu.prevent
+          @keydown="onTargetMenuKeydown"
+        >
+          <div class="target-menu__title">移至目标后松开右键选择</div>
+          <div
+            v-for="(option, index) in targetMenu.options"
+            :key="option.id"
+            class="target-menu__option"
+            :class="{ 'is-active': index === targetMenuActive, 'is-selected': option.id === store.selectedId }"
+            :data-active="index === targetMenuActive"
+            :data-target-index="index"
+            role="option"
+            :aria-selected="option.id === store.selectedId"
+            @click.stop.prevent
+          >
+            <span class="target-menu__name" :title="option.name">{{ option.name }}</span>
+            <span v-if="option.id === store.selectedId" class="target-menu__check" aria-hidden="true">✓</span>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
     <svg v-if="transformVisual" class="stage__transform-visual" aria-hidden="true">
       <template v-if="transformVisual.mode === 'g'">
         <line v-if="Math.hypot(transformVisual.current.x - transformVisual.origin.x, transformVisual.current.y - transformVisual.origin.y) > 1"
@@ -2475,6 +2664,51 @@ function dispose() {
 </template>
 
 <style scoped>
+.target-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19998;
+}
+.target-menu {
+  position: fixed;
+  z-index: 19999;
+  width: min(240px, calc(100vw - 8px));
+  max-height: min(320px, calc(100vh - 8px));
+  overflow-y: auto;
+  padding: 6px;
+  color: var(--ui-text);
+  background: var(--ui-menu-fill);
+  border: 1px solid var(--ui-edge);
+  border-radius: var(--ui-radius-control);
+  box-shadow: var(--ui-panel-shadow);
+  outline: none;
+  transform-origin: top left;
+}
+.target-menu__title {
+  padding: 5px 10px 7px;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.target-menu__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: var(--ui-radius-compact);
+  cursor: pointer;
+}
+.target-menu__option.is-active { background: var(--ui-hover); }
+.target-menu__option.is-selected { color: var(--ui-link); }
+.target-menu__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.target-menu__check { flex: none; }
+.target-menu-enter-active, .target-menu-leave-active { transition: opacity 120ms ease, transform 120ms ease; }
+.target-menu-enter-from, .target-menu-leave-to { opacity: 0; transform: scale(0.97); }
+.target-menu-leave-active { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .target-menu-enter-active, .target-menu-leave-active { transition: none; }
+}
 .stage {
   position: relative;
   height: 100%;

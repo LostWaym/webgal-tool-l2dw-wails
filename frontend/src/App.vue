@@ -29,7 +29,8 @@ const guideVisibility = usePreviewGuideVisibility()
 const { leftEnabled: autoHideLeftPanel, rightEnabled: autoHideRightPanel } = usePreviewAutoHidePanels()
 const leftPanelOpen = ref(false)
 const rightPanelOpen = ref(false)
-const edgeSize = 24
+const edgeSize = 32
+const panelLeaveTolerance = 12
 let panelPointerDown = false
 
 function updatePanelVisibility(e: MouseEvent) {
@@ -37,8 +38,8 @@ function updatePanelVisibility(e: MouseEvent) {
   if ((!autoHideLeftPanel.value && !autoHideRightPanel.value) || panelPointerDown || e.buttons) return
   const leftWidth = document.querySelector<HTMLElement>('.app__left')?.offsetWidth ?? 0
   const rightWidth = document.querySelector<HTMLElement>('.model-action-panel')?.offsetWidth ?? 0
-  leftPanelOpen.value = autoHideLeftPanel.value && e.clientX <= (leftPanelOpen.value ? leftWidth : edgeSize)
-  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && e.clientX >= window.innerWidth - (rightPanelOpen.value ? rightWidth : edgeSize)
+  leftPanelOpen.value = autoHideLeftPanel.value && e.clientX <= (leftPanelOpen.value ? leftWidth + panelLeaveTolerance : edgeSize)
+  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && e.clientX >= window.innerWidth - (rightPanelOpen.value ? rightWidth + panelLeaveTolerance : edgeSize)
 }
 
 function onPanelPointerDown(e: MouseEvent) {
@@ -57,8 +58,8 @@ function resetPanels() {
   rightPanelOpen.value = false
 }
 
-function onWindowMouseLeave() {
-  if (!panelPointerDown) resetPanels()
+function onWindowMouseLeave(e: MouseEvent) {
+  if (!panelPointerDown && (e.clientX <= 0 || e.clientX >= window.innerWidth)) resetPanels()
 }
 
 watch(autoHideLeftPanel, () => { leftPanelOpen.value = false })
@@ -74,6 +75,7 @@ const guideManagerVisible = ref(false)
 const settingsVisible = ref(false)
 const settingsTab = ref<'motionExpression' | undefined>()
 const stageVisible = ref(true)
+const modelListWidth = ref<number>()
 const actionPanelWidth = ref<number>()
 const focusVisible = ref(false)
 const focusMode = ref<InstanceType<typeof FocusMode> | null>(null)
@@ -169,11 +171,13 @@ onBeforeUnmount(() => {
   <div
     class="app"
     :class="{ 'is-transforming': isTransforming, 'has-action-panel': store.selectedId, 'auto-hide-left-panel': autoHideLeftPanel, 'auto-hide-right-panel': autoHideRightPanel, 'left-panel-open': leftPanelOpen, 'right-panel-open': rightPanelOpen }"
-    :style="{ '--preview-action-preferred-width': actionPanelWidth === undefined ? undefined : `${actionPanelWidth}px` }"
+    :style="{ '--preview-action-preferred-width': actionPanelWidth === undefined ? undefined : `${actionPanelWidth}px`, '--preview-list-preferred-width': modelListWidth === undefined ? undefined : `${modelListWidth}px`, '--preview-panel-edge-size': `${edgeSize}px` }"
   >
-    <ModelList class="app__left" :inert="autoHideLeftPanel && !leftPanelOpen ? '' : undefined" @project="projectVisible = true" @guides="guideManagerVisible = true" @settings="settingsVisible = true" />
+    <ModelList class="app__left" :inert="autoHideLeftPanel && !leftPanelOpen ? '' : undefined" @resize="modelListWidth = $event" @project="projectVisible = true" @guides="guideManagerVisible = true" @settings="settingsVisible = true" />
     <Stage v-if="stageVisible" class="app__right" :interaction-disabled="focusVisible || guideManagerVisible" :guide-manager-visible="guideManagerVisible" />
     <ModelActionPanel v-if="store.selectedId" :inert="autoHideRightPanel && !rightPanelOpen ? '' : undefined" @resize="actionPanelWidth = $event" @open-motion-expression-settings="openMotionExpressionSettings" />
+    <div v-if="autoHideLeftPanel && !leftPanelOpen" class="app__edge-hint app__edge-hint--left" aria-hidden="true">›</div>
+    <div v-if="autoHideRightPanel && !rightPanelOpen && store.selectedId" class="app__edge-hint app__edge-hint--right" aria-hidden="true">‹</div>
     <TransformSnapshotModal />
     <FilterPresetModal />
     <BackgroundHistoryModal />
@@ -197,7 +201,7 @@ onBeforeUnmount(() => {
 }
 
 .app__left {
-  width: clamp(270px, 23.2vw, 376px);
+  width: var(--preview-list-preferred-width, 320px);
   flex-shrink: 0;
   border-right: 1px solid var(--ui-line);
   border-radius: 0 var(--ui-radius-panel) var(--ui-radius-panel) 0;
@@ -209,10 +213,34 @@ onBeforeUnmount(() => {
 }
 
 .app.has-action-panel {
-  --preview-action-width: min(
-    var(--preview-action-preferred-width, clamp(280px, 25.2vw, 408px)),
-    max(200px, calc(100vw - 560px))
-  );
+  --preview-action-width: var(--preview-action-preferred-width, 360px);
+}
+
+.app__edge-hint {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: var(--preview-panel-edge-size);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-panel);
+  color: var(--ui-muted);
+  opacity: 0.65;
+  font-size: 24px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.app__edge-hint--left {
+  left: 0;
+  border-right: 1px solid var(--ui-line);
+}
+
+.app__edge-hint--right {
+  right: 0;
+  border-left: 1px solid var(--ui-line);
 }
 
 .app.auto-hide-left-panel .app__left {
@@ -224,6 +252,10 @@ onBeforeUnmount(() => {
   transform: translateX(-100%);
   pointer-events: none;
   transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s ease;
+}
+
+.app.auto-hide-left-panel {
+  --preview-stage-left-inset: var(--preview-panel-edge-size);
 }
 
 .app.auto-hide-right-panel .model-action-panel {
@@ -238,8 +270,8 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
-.app.auto-hide-right-panel:not(.right-panel-open) {
-  --preview-action-obstruction: 0px;
+.app.auto-hide-right-panel.has-action-panel:not(.right-panel-open) {
+  --preview-action-obstruction: var(--preview-panel-edge-size);
 }
 
 @media (prefers-reduced-motion: reduce) {

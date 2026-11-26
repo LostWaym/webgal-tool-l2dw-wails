@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { choosePath } from '../../utils/fileDialog'
 import { useModelStore } from '../../stores/previewStore'
 import { SPECIAL_IDS, SpecialId, getSpecialName } from '../../live2d/specialIds'
@@ -11,12 +11,36 @@ import { usePreviewModelReload } from '../../composables/usePreviewModelReload'
 import UiIcon from '../common/UiIcon.vue'
 
 const store = useModelStore()
-const emit = defineEmits<{ (e: 'project'): void; (e: 'guides'): void; (e: 'settings'): void }>()
+const emit = defineEmits<{ (e: 'project'): void; (e: 'guides'): void; (e: 'settings'): void; (e: 'resize', width: number): void }>()
 const bgHistoryModal = useBackgroundHistoryModal()
 const filterPresetModal = useFilterPresetModal()
 const snapshotModal = useTransformSnapshotModal()
 const { reloadConfig, reloadTextures } = usePreviewModelReload()
 const dragFromIndex = ref<number | null>(null)
+
+function onResizeMove(e: MouseEvent) {
+  emit('resize', Math.max(270, Math.min(500, e.clientX)))
+}
+
+function onResizeEnd() {
+  document.removeEventListener('mousemove', onResizeMove)
+  document.removeEventListener('mouseup', onResizeEnd)
+  window.removeEventListener('blur', onResizeEnd)
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+}
+
+function onResizeStart(e: MouseEvent) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  document.addEventListener('mousemove', onResizeMove)
+  document.addEventListener('mouseup', onResizeEnd)
+  window.addEventListener('blur', onResizeEnd)
+  document.body.style.cursor = 'ew-resize'
+  document.body.style.userSelect = 'none'
+}
+
+onBeforeUnmount(onResizeEnd)
 
 async function onAdd() {
   await store.addFromPicker()
@@ -107,6 +131,7 @@ function onDragEnd() {
 
 <template>
   <aside class="model-list">
+    <div class="model-list__resize-handle" @mousedown="onResizeStart" />
     <header class="model-list__header">
       <button class="ui-button add-btn" @click="onAdd"><UiIcon name="model" />加载模型</button>
       <button class="ui-button add-btn" @click="onAddImage"><UiIcon name="image" />加载图片</button>
@@ -270,6 +295,7 @@ function onDragEnd() {
 
 <style scoped>
 .model-list {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -295,6 +321,21 @@ function onDragEnd() {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+}
+
+.model-list__resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 2;
+  transition: background 0.15s;
+}
+
+.model-list__resize-handle:hover {
+  background: var(--ui-accent);
 }
 
 .add-btn .ui-symbol { font-size: 18px; color: var(--ui-link); }
@@ -463,7 +504,7 @@ function onDragEnd() {
   z-index: 2;
   top: 50%;
   left: 100%;
-  transform: translateY(-50%);
+  transform: translate(-6px, -50%);
   display: flex;
   padding: 2px;
   border: 1px solid var(--ui-line);
@@ -472,12 +513,20 @@ function onDragEnd() {
   box-shadow: 0 3px 8px var(--ui-shadow);
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .model-row__quick-actions:hover .model-row__quick-menu,
 .model-row__quick-actions:focus-within .model-row__quick-menu {
   opacity: 1;
+  transform: translate(0, -50%);
   pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-row__quick-menu {
+    transition: none;
+  }
 }
 
 .model-row__quick-btn {

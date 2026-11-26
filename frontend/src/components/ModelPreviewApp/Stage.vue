@@ -2560,7 +2560,7 @@ function dispose() {
 
 .stage__transform-hint {
   position: absolute;
-  left: 16px;
+  left: calc(16px + var(--preview-stage-left-inset, 0px));
   bottom: 16px;
   padding: 12px 16px;
   background: var(--ui-floating);
@@ -2607,7 +2607,7 @@ function dispose() {
 .stage__next-mode {
   position: absolute;
   top: 12px;
-  left: 12px;
+  left: calc(12px + var(--preview-stage-left-inset, 0px));
   z-index: 10;
   display: inline-flex;
   align-items: center;
@@ -2636,9 +2636,9 @@ function dispose() {
 
 .stage__bottom-blocks {
   position: absolute;
-  left: 16px;
+  left: calc(16px + var(--preview-stage-left-inset, 0px));
   bottom: 16px;
-  max-width: calc(100% - 32px - var(--preview-action-obstruction, var(--preview-action-width, 0px)));
+  max-width: calc(100% - 32px - var(--preview-stage-left-inset, 0px) - var(--preview-action-obstruction, var(--preview-action-width, 0px)));
   z-index: 10;
   display: flex;
   flex-direction: column;

@@ -10,6 +10,7 @@ import { PREVIEW_GUIDE_VISIBILITY_KEYS, usePreviewGuideVisibility } from '../../
 import { usePreviewGuideOverflow } from '../../../composables/usePreviewGuideOverflow'
 import { usePreviewViewportSettings } from '../../../composables/usePreviewViewportSettings'
 import { usePreviewRotationSnap } from '../../../composables/usePreviewRotationSnap'
+import { usePreviewAutoHidePanels } from '../../../composables/usePreviewAutoHidePanels'
 import type { PreviewViewportVersion, PreviewViewportTransform } from '../../../composables/usePreviewViewportSettings'
 import NumberInput from '../../common/NumberInput.vue'
 import ThemeSelect from '../../common/ThemeSelect.vue'
@@ -30,6 +31,7 @@ const { alwaysShowGuides, update: updateGuideVisibility } = usePreviewGuideVisib
 const { length: guideOverflow, update: updateGuideOverflow } = usePreviewGuideOverflow()
 const viewport = usePreviewViewportSettings()
 const { interval: rotationSnap, update: updateRotationSnap } = usePreviewRotationSnap()
+const { leftEnabled: autoHideLeftPanel, rightEnabled: autoHideRightPanel, updateLeft: updateAutoHideLeftPanel, updateRight: updateAutoHideRightPanel } = usePreviewAutoHidePanels()
 const viewportVersions: Array<{ key: PreviewViewportVersion; label: string }> = [
   { key: 'cubism2', label: 'Cubism 2' },
   { key: 'cubism3', label: 'Cubism 3+' },
@@ -92,6 +94,10 @@ function onSeparatorInput(event: Event) {
           </nav>
           <div class="settings-content">
             <template v-if="activeTab === 'misc'">
+              <label><input class="ui-switch" type="checkbox" role="switch" :checked="autoHideLeftPanel" @change="updateAutoHideLeftPanel(($event.target as HTMLInputElement).checked)"> 自动隐藏左侧模型列表</label>
+              <p>鼠标靠近窗口左边缘时显示，修改后自动保存。</p>
+              <label><input class="ui-switch" type="checkbox" role="switch" :checked="autoHideRightPanel" @change="updateAutoHideRightPanel(($event.target as HTMLInputElement).checked)"> 自动隐藏右侧操作区</label>
+              <p>鼠标靠近窗口右边缘时显示，修改后自动保存。</p>
               <label><input class="ui-switch" type="checkbox" role="switch" :checked="legacyMode" @change="onChange"> 使用旧版表情混合模式</label>
               <p>仅影响预览窗口中所有 Cubism 2 模型的表情参数混合，修改后立即生效。</p>
               <label class="frame-rate-label" for="preview-frame-rate-limit">帧率限制</label>

@@ -39,6 +39,8 @@ type AppConfig struct {
 	PreviewFocusBoxOffsetY    *float64                        `json:"previewFocusBoxOffsetY,omitempty"`
 	PreviewRotationSnap       *float64                        `json:"previewRotationSnap,omitempty"`
 	PreviewGuidesVisible      bool                            `json:"previewGuidesVisible,omitempty"`
+	PreviewAutoHideLeftPanel  bool                            `json:"previewAutoHideLeftPanel,omitempty"`
+	PreviewAutoHideRightPanel bool                            `json:"previewAutoHideRightPanel,omitempty"`
 	PreviewGuideOverflow      *float64                        `json:"previewGuideOverflow,omitempty"`
 	PreviewViewport           *PreviewViewportSettings        `json:"previewViewport,omitempty"`
 }
@@ -204,6 +206,34 @@ func (a *App) GetPreviewGuidesVisible() bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.loadConfig().PreviewGuidesVisible
+}
+
+func (a *App) GetPreviewAutoHideLeftPanel() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewAutoHideLeftPanel
+}
+
+func (a *App) SetPreviewAutoHideLeftPanel(enabled bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewAutoHideLeftPanel = enabled
+	return a.saveConfig(cfg)
+}
+
+func (a *App) GetPreviewAutoHideRightPanel() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.loadConfig().PreviewAutoHideRightPanel
+}
+
+func (a *App) SetPreviewAutoHideRightPanel(enabled bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.loadConfig()
+	cfg.PreviewAutoHideRightPanel = enabled
+	return a.saveConfig(cfg)
 }
 
 func (a *App) SetPreviewGuidesVisible(visible bool) error {

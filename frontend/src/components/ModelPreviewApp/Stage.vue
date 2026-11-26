@@ -148,6 +148,109 @@ let startScreenMP = new PIXI.Point(0, 0)
 // 鼠标起点/起点距离/方向是否已记录（首次 onPointerMove 时记录）
 let baseInitialized = false
 
+interface TransformVisual {
+  mode: 'g' | 'r' | 's'
+  origin: PIXI.Point
+  current: PIXI.Point
+  start?: PIXI.Point
+  end?: PIXI.Point
+  arc?: string
+  arrow?: string
+  axis?: string
+}
+
+const transformVisual = shallowRef<TransformVisual>()
+let visualParent: PIXI.Container | undefined
+let visualOrigin: PIXI.IPointData | undefined
+let visualPointer: PIXI.Point | undefined
+
+function beginTransformVisual(target: PIXI.Container) {
+  if (!target.parent) return
+  visualParent = target.parent
+  visualOrigin = target.parent.toLocal(target.toGlobal(target.pivot))
+  visualPointer = undefined
+  updateTransformVisual()
+}
+
+function updateTransformVisual() {
+  const mode = transformMode.value
+  const target = getTransformTarget()
+  const canvas = app?.view as HTMLCanvasElement | undefined
+  if (!app || !canvas || !target || !visualParent || !visualOrigin ||
+      (mode !== 'g' && mode !== 'r' && mode !== 's')) {
+    transformVisual.value = undefined
+    return
+  }
+  const rect = canvas.getBoundingClientRect()
+  if (!rect.width || !rect.height || !app.screen.width || !app.screen.height) return
+  const toCanvas = (point: PIXI.IPointData) => new PIXI.Point(
+    point.x * rect.width / app!.screen.width,
+    point.y * rect.height / app!.screen.height,
+  )
+  const origin = toCanvas(visualParent.toGlobal(visualOrigin))
+  const current = toCanvas(target.toGlobal(target.pivot))
+  if (![origin.x, origin.y, current.x, current.y].every(Number.isFinite)) {
+    transformVisual.value = undefined
+    return
+  }
+  const visual: TransformVisual = { mode, origin, current }
+  if (mode !== 'g' && baseInitialized && visualPointer) {
+    const pointer = new PIXI.Point(visualPointer.x - rect.left, visualPointer.y - rect.top)
+    const dx = pointer.x - origin.x
+    const dy = pointer.y - origin.y
+    const distance = Math.hypot(dx, dy)
+    if (mode === 's' && startDist >= 8 && distance >= 1) {
+      const group = isCurrentFigureGroup()
+      const startScale = axisLock.value === 'y'
+        ? (group ? groupStartScaleY : startScaleY)
+        : (group ? groupStartScaleX : startScaleX)
+      const scale = axisLock.value === 'y' ? target.scale.y : target.scale.x
+      const factor = startScale !== 0 ? Math.abs(scale / startScale) : 1
+      const ux = dx / distance
+      const uy = dy / distance
+      visual.start = new PIXI.Point(origin.x + ux * startDist, origin.y + uy * startDist)
+      visual.end = new PIXI.Point(origin.x + ux * startDist * factor, origin.y + uy * startDist * factor)
+      visual.axis = axisLock.value === 'none' ? undefined : axisLock.value.toUpperCase()
+    } else if (mode === 'r' && Math.hypot(startDirX, startDirY) > 0.5) {
+      const radius = Math.max(36, Math.min(72, distance))
+      const startAngle = Math.atan2(startDirY, startDirX)
+      const initialRotation = isCurrentFigureGroup() ? groupStartRotation : startRotation
+      const delta = target.rotation - initialRotation
+      const matrix = visualParent.worldTransform
+      const sx = rect.width / app.screen.width
+      const sy = rect.height / app.screen.height
+      const a = matrix.a * sx, b = matrix.b * sy, c = matrix.c * sx, d = matrix.d * sy
+      const determinant = a * d - b * c
+      let endAngle = startAngle + delta
+      if (Math.abs(determinant) > 1e-10) {
+        const x = (d * startDirX - c * startDirY) / determinant
+        const y = (-b * startDirX + a * startDirY) / determinant
+        const rotatedX = x * Math.cos(delta) - y * Math.sin(delta)
+        const rotatedY = x * Math.sin(delta) + y * Math.cos(delta)
+        endAngle = Math.atan2(b * rotatedX + d * rotatedY, a * rotatedX + c * rotatedY)
+      }
+      const screenDelta = Math.atan2(Math.sin(endAngle - startAngle), Math.cos(endAngle - startAngle))
+      visual.start = new PIXI.Point(origin.x + Math.cos(startAngle) * radius, origin.y + Math.sin(startAngle) * radius)
+      visual.end = new PIXI.Point(origin.x + Math.cos(endAngle) * radius, origin.y + Math.sin(endAngle) * radius)
+      if (Math.abs(screenDelta) > 0.04) {
+        visual.arc = `M ${visual.start.x} ${visual.start.y} A ${radius} ${radius} 0 0 ${screenDelta > 0 ? 1 : 0} ${visual.end.x} ${visual.end.y}`
+        const direction = Math.sign(screenDelta)
+        const tx = -Math.sin(endAngle) * direction, ty = Math.cos(endAngle) * direction
+        const bx = visual.end.x - tx * 8, by = visual.end.y - ty * 8
+        visual.arrow = `${visual.end.x},${visual.end.y} ${bx - ty * 4},${by + tx * 4} ${bx + ty * 4},${by - tx * 4}`
+      }
+    }
+  }
+  transformVisual.value = visual
+}
+
+function clearTransformVisual() {
+  transformVisual.value = undefined
+  visualParent = undefined
+  visualOrigin = undefined
+  visualPointer = undefined
+}
+
 // 立绘组变换用的 dummy 映射（不再 reparent 目标，而是创建 dummy 跟随 groupContainer）
 interface GroupDummyEntry {
   dummy: PIXI.Container
@@ -260,6 +363,7 @@ function refreshTransformHint() {
     transformHint.modeName = ''
     return
   }
+  updateTransformVisual()
   // 注视模式：显示注视坐标
   if (transformMode.value === 'l' && focusTargetId) {
     const f = store.getFocusState(focusTargetId)
@@ -456,6 +560,7 @@ function startTransform(mode: TransformMode) {
       { x: 0, y: 0 },
       app!,
     )
+    beginTransformVisual(groupContainer)
     return
   }
 
@@ -470,6 +575,7 @@ function startTransform(mode: TransformMode) {
   startRotation = target.rotation
   startScreenMP = pixiToClientCoords(target, { x: 0, y: 0 }, app!)
 
+  beginTransformVisual(target)
   emitter.emit(StageEvents.TransformStart, true)
   emitter.emit(StageEvents.TransformChange, store.selectedId)
   refreshTransformHint()
@@ -554,6 +660,7 @@ function endTransform() {
   }
 
   transformMode.value = 'none'
+  clearTransformVisual()
   altHeldInMove.value = false
   updateSnappedGuides()
   updateMoveCrosshair()
@@ -909,6 +1016,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   emitter.off(StageEvents.ReloadModel, reloadOne)
+  clearTransformVisual()
   dispose()
 })
 
@@ -1008,6 +1116,7 @@ async function init() {
     guideCandidate.value = undefined
     drawGuides()
     updateMoveCrosshair()
+    updateTransformVisual()
   })
   drawGuides()
 
@@ -1643,6 +1752,9 @@ function attachDomHandlers() {
 
   const onPointerMove = (e: PointerEvent) => {
     if (props.interactionDisabled) return
+    if (transformMode.value === 'r' || transformMode.value === 's') {
+      visualPointer = new PIXI.Point(e.clientX, e.clientY)
+    }
     trackGuidePointer(e)
     // 中键拖拽 Root
     if (!isTransforming.value && isMiddleDown && rootContainer) {
@@ -2025,6 +2137,7 @@ function attachDomHandlers() {
               gc.rotation = groupStartRotation
             }
             if (stageMain) stageMain.updateTransform()
+            updateTransformVisual()
           }
         }
         return
@@ -2040,6 +2153,7 @@ function attachDomHandlers() {
           }
         }
       }
+      updateTransformVisual()
       return
     }
 
@@ -2250,6 +2364,34 @@ function dispose() {
 <template>
   <section class="stage" @pointerdown.right="onStageRightClick" @contextmenu.prevent>
     <div ref="containerRef" class="stage__canvas" :class="guideCursor" />
+    <svg v-if="transformVisual" class="stage__transform-visual" aria-hidden="true">
+      <template v-if="transformVisual.mode === 'g'">
+        <line v-if="Math.hypot(transformVisual.current.x - transformVisual.origin.x, transformVisual.current.y - transformVisual.origin.y) > 1"
+          class="transform-visual__line transform-visual__line--dashed"
+          :x1="transformVisual.origin.x" :y1="transformVisual.origin.y"
+          :x2="transformVisual.current.x" :y2="transformVisual.current.y" />
+        <circle v-if="Math.hypot(transformVisual.current.x - transformVisual.origin.x, transformVisual.current.y - transformVisual.origin.y) > 8"
+          class="transform-visual__point" :cx="transformVisual.current.x" :cy="transformVisual.current.y" r="4" />
+      </template>
+      <template v-else-if="transformVisual.start && transformVisual.end">
+        <line class="transform-visual__line transform-visual__line--reference"
+          :x1="transformVisual.origin.x" :y1="transformVisual.origin.y"
+          :x2="transformVisual.start.x" :y2="transformVisual.start.y" />
+        <line class="transform-visual__line"
+          :x1="transformVisual.origin.x" :y1="transformVisual.origin.y"
+          :x2="transformVisual.end.x" :y2="transformVisual.end.y" />
+        <template v-if="transformVisual.mode === 'r'">
+          <path v-if="transformVisual.arc" class="transform-visual__line" :d="transformVisual.arc" />
+          <polygon v-if="transformVisual.arrow" class="transform-visual__point" :points="transformVisual.arrow" />
+        </template>
+        <template v-else>
+          <circle class="transform-visual__reference" :cx="transformVisual.start.x" :cy="transformVisual.start.y" r="7" />
+          <circle class="transform-visual__point" :cx="transformVisual.end.x" :cy="transformVisual.end.y" r="4" />
+          <text v-if="transformVisual.axis" class="transform-visual__axis" :x="transformVisual.end.x + 10" :y="transformVisual.end.y - 8">{{ transformVisual.axis }}</text>
+        </template>
+      </template>
+      <circle class="transform-visual__origin" :cx="transformVisual.origin.x" :cy="transformVisual.origin.y" r="6" />
+    </svg>
     <!-- 变换操作遮罩 -->
     <div
       v-if="isTransforming"
@@ -2348,6 +2490,52 @@ function dispose() {
 
 .stage__canvas :deep(canvas) {
   display: block;
+}
+
+.stage__transform-visual {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+  filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 1px #000);
+}
+
+.transform-visual__line {
+  fill: none;
+  stroke: var(--ui-warning);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.transform-visual__line--dashed {
+  stroke-dasharray: 7 5;
+}
+
+.transform-visual__line--reference {
+  opacity: 0.55;
+  stroke-dasharray: 3 4;
+}
+
+.transform-visual__origin,
+.transform-visual__point {
+  fill: var(--ui-warning);
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.transform-visual__reference {
+  fill: var(--ui-stage-fill);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.transform-visual__axis {
+  fill: #fff;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .stage__canvas--guide-add {
@@ -2450,7 +2638,7 @@ function dispose() {
   position: absolute;
   left: 16px;
   bottom: 16px;
-  max-width: calc(100% - 32px - var(--preview-action-width, 0px));
+  max-width: calc(100% - 32px - var(--preview-action-obstruction, var(--preview-action-width, 0px)));
   z-index: 10;
   display: flex;
   flex-direction: column;

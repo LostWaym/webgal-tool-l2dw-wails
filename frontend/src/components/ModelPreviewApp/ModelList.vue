@@ -19,7 +19,7 @@ const { reloadConfig, reloadTextures } = usePreviewModelReload()
 const dragFromIndex = ref<number | null>(null)
 
 function onResizeMove(e: MouseEvent) {
-  emit('resize', Math.max(270, Math.min(500, e.clientX)))
+  emit('resize', e.clientX)
 }
 
 function onResizeEnd() {

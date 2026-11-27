@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import ModelList from './components/ModelPreviewApp/ModelList.vue'
 import Stage from './components/ModelPreviewApp/Stage.vue'
 import ModelActionPanel from './components/ModelPreviewApp/ModelActionPanel.vue'
@@ -33,13 +33,17 @@ const edgeSize = 32
 const panelLeaveTolerance = 12
 let panelPointerDown = false
 
+function hasPanelInputFocus(selector: string) {
+  return isInputFocused() && !!document.activeElement?.closest(selector)
+}
+
 function updatePanelVisibility(e: MouseEvent) {
   if (panelPointerDown && !e.buttons) panelPointerDown = false
   if ((!autoHideLeftPanel.value && !autoHideRightPanel.value) || panelPointerDown || e.buttons) return
   const leftWidth = document.querySelector<HTMLElement>('.app__left')?.offsetWidth ?? 0
   const rightWidth = document.querySelector<HTMLElement>('.model-action-panel')?.offsetWidth ?? 0
-  leftPanelOpen.value = autoHideLeftPanel.value && e.clientX <= (leftPanelOpen.value ? leftWidth + panelLeaveTolerance : edgeSize)
-  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && e.clientX >= window.innerWidth - (rightPanelOpen.value ? rightWidth + panelLeaveTolerance : edgeSize)
+  leftPanelOpen.value = autoHideLeftPanel.value && (hasPanelInputFocus('.app__left') || e.clientX <= (leftPanelOpen.value ? leftWidth + panelLeaveTolerance : edgeSize))
+  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && (hasPanelInputFocus('.model-action-panel') || e.clientX >= window.innerWidth - (rightPanelOpen.value ? rightWidth + panelLeaveTolerance : edgeSize))
 }
 
 function onPanelPointerDown(e: MouseEvent) {
@@ -54,16 +58,16 @@ function onPanelPointerUp(e: MouseEvent) {
 
 function resetPanels() {
   panelPointerDown = false
-  leftPanelOpen.value = false
-  rightPanelOpen.value = false
+  leftPanelOpen.value = autoHideLeftPanel.value && hasPanelInputFocus('.app__left')
+  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && hasPanelInputFocus('.model-action-panel')
 }
 
 function onWindowMouseLeave(e: MouseEvent) {
   if (!panelPointerDown && (e.clientX <= 0 || e.clientX >= window.innerWidth)) resetPanels()
 }
 
-watch(autoHideLeftPanel, () => { leftPanelOpen.value = false })
-watch(autoHideRightPanel, () => { rightPanelOpen.value = false })
+watch(autoHideLeftPanel, enabled => { leftPanelOpen.value = enabled && hasPanelInputFocus('.app__left') })
+watch(autoHideRightPanel, enabled => { rightPanelOpen.value = enabled && !!store.selectedId && hasPanelInputFocus('.model-action-panel') })
 watch(() => store.selectedId, id => {
   if (!id) rightPanelOpen.value = false
 })
@@ -75,10 +79,30 @@ const guideManagerVisible = ref(false)
 const settingsVisible = ref(false)
 const settingsTab = ref<'motionExpression' | undefined>()
 const stageVisible = ref(true)
-const modelListWidth = ref<number>()
-const actionPanelWidth = ref<number>()
+const panelMinWidths = { left: 270, right: 200 }
+const maxPanelWidth = 500
+const minStageWidth = 240
+const preferredPanelWidths = { left: ref(320), right: ref(360) }
+const viewportWidth = ref(window.innerWidth)
+// 只约束实际宽度，窗口放大后恢复用户的拖拽偏好。
+const modelListWidth = computed(() => Math.min(
+  preferredPanelWidths.left.value,
+  Math.max(panelMinWidths.left, viewportWidth.value - minStageWidth - (store.selectedId ? panelMinWidths.right : 0)),
+))
+const actionPanelWidth = computed(() => store.selectedId ? Math.min(
+  preferredPanelWidths.right.value,
+  Math.max(panelMinWidths.right, viewportWidth.value - modelListWidth.value - minStageWidth),
+) : 0)
 const focusVisible = ref(false)
 const focusMode = ref<InstanceType<typeof FocusMode> | null>(null)
+
+function onPanelResize(side: keyof typeof panelMinWidths, width: number) {
+  preferredPanelWidths[side].value = Math.max(panelMinWidths[side], Math.min(maxPanelWidth, width))
+}
+
+function onWindowResize() {
+  viewportWidth.value = window.innerWidth
+}
 
 function onKeydown(e: KeyboardEvent) {
   if (guideManagerVisible.value) return
@@ -152,6 +176,7 @@ onMounted(() => {
   window.addEventListener('mousedown', onPanelPointerDown)
   window.addEventListener('mouseup', onPanelPointerUp)
   window.addEventListener('blur', resetPanels)
+  window.addEventListener('resize', onWindowResize)
   document.addEventListener('mouseleave', onWindowMouseLeave)
   emitter.on(StageEvents.TransformStart, onTransformStart)
 })
@@ -162,6 +187,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousedown', onPanelPointerDown)
   window.removeEventListener('mouseup', onPanelPointerUp)
   window.removeEventListener('blur', resetPanels)
+  window.removeEventListener('resize', onWindowResize)
   document.removeEventListener('mouseleave', onWindowMouseLeave)
   emitter.off(StageEvents.TransformStart, onTransformStart)
 })
@@ -171,11 +197,11 @@ onBeforeUnmount(() => {
   <div
     class="app"
     :class="{ 'is-transforming': isTransforming, 'has-action-panel': store.selectedId, 'auto-hide-left-panel': autoHideLeftPanel, 'auto-hide-right-panel': autoHideRightPanel, 'left-panel-open': leftPanelOpen, 'right-panel-open': rightPanelOpen }"
-    :style="{ '--preview-action-preferred-width': actionPanelWidth === undefined ? undefined : `${actionPanelWidth}px`, '--preview-list-preferred-width': modelListWidth === undefined ? undefined : `${modelListWidth}px`, '--preview-panel-edge-size': `${edgeSize}px` }"
+    :style="{ '--preview-action-width': `${actionPanelWidth}px`, '--preview-list-width': `${modelListWidth}px`, '--preview-panel-edge-size': `${edgeSize}px` }"
   >
-    <ModelList class="app__left" :inert="autoHideLeftPanel && !leftPanelOpen ? '' : undefined" @resize="modelListWidth = $event" @project="projectVisible = true" @guides="guideManagerVisible = true" @settings="settingsVisible = true" />
+    <ModelList class="app__left" :inert="autoHideLeftPanel && !leftPanelOpen ? '' : undefined" @resize="onPanelResize('left', $event)" @project="projectVisible = true" @guides="guideManagerVisible = true" @settings="settingsVisible = true" />
     <Stage v-if="stageVisible" class="app__right" :interaction-disabled="focusVisible || guideManagerVisible" :guide-manager-visible="guideManagerVisible" />
-    <ModelActionPanel v-if="store.selectedId" :inert="autoHideRightPanel && !rightPanelOpen ? '' : undefined" @resize="actionPanelWidth = $event" @open-motion-expression-settings="openMotionExpressionSettings" />
+    <ModelActionPanel v-if="store.selectedId" :inert="autoHideRightPanel && !rightPanelOpen ? '' : undefined" @resize="onPanelResize('right', $event)" @open-motion-expression-settings="openMotionExpressionSettings" />
     <div v-if="autoHideLeftPanel && !leftPanelOpen" class="app__edge-hint app__edge-hint--left" aria-hidden="true">›</div>
     <div v-if="autoHideRightPanel && !rightPanelOpen && store.selectedId" class="app__edge-hint app__edge-hint--right" aria-hidden="true">‹</div>
     <TransformSnapshotModal />
@@ -201,7 +227,7 @@ onBeforeUnmount(() => {
 }
 
 .app__left {
-  width: var(--preview-list-preferred-width, 320px);
+  width: var(--preview-list-width);
   flex-shrink: 0;
   border-right: 1px solid var(--ui-line);
   border-radius: 0 var(--ui-radius-panel) var(--ui-radius-panel) 0;
@@ -210,10 +236,6 @@ onBeforeUnmount(() => {
 .app__right {
   flex: 1;
   min-width: 0;
-}
-
-.app.has-action-panel {
-  --preview-action-width: var(--preview-action-preferred-width, 360px);
 }
 
 .app__edge-hint {

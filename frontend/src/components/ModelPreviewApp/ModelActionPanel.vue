@@ -808,7 +808,7 @@ function onTabConfigClick() {
 
 function onDragMove(e: MouseEvent) {
   const newWidth = window.innerWidth - e.clientX
-  emit('resize', Math.max(200, Math.min(500, newWidth)))
+  emit('resize', newWidth)
 }
 
 function onDragEnd() {
@@ -1683,6 +1683,7 @@ function onLabelDragEnd() {
   top: 0;
   bottom: 0;
   width: var(--preview-action-width);
+  box-sizing: border-box;
   z-index: 100;
   background: var(--ui-panel);
   border-left: 1px solid var(--ui-line);

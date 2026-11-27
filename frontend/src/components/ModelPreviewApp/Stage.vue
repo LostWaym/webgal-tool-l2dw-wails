@@ -28,6 +28,11 @@ import { usePreviewGuideOverflow } from '../../composables/usePreviewGuideOverfl
 import { getDevicePixelRatio, observePixiViewport } from '../../live2d/viewport'
 import { GUIDE_SNAP_PX, PREVIEW_FRAME, hitPreviewGuide, placePreviewGuide, previewGuideEnds, previewGuideKey, snapPreviewGuide, type GuideAxis, type PreviewGuide } from '../../utils/previewGuides'
 import UiIcon from '../common/UiIcon.vue'
+import StageRadialMenu from './StageRadialMenu.vue'
+import { getStageRadialActions, radialMenuIndex, radialMenuPosition, type StageRadialActionId } from '../../utils/stageRadialMenu'
+import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
+import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
+import { usePreviewModelReload } from '../../composables/usePreviewModelReload'
 
 const store = useModelStore()
 const props = defineProps<{ interactionDisabled?: boolean; guideManagerVisible?: boolean }>()
@@ -118,6 +123,74 @@ const targetMenu = ref<{ options: TargetOption[]; x: number; y: number } | null>
 const targetMenuRef = ref<HTMLElement | null>(null)
 const targetMenuActive = ref(0)
 const targetOutlines = new Map<string, { wrapper: L2dwContainer; filter: OutlineFilter }>()
+const filterPresetModal = useFilterPresetModal()
+const snapshotModal = useTransformSnapshotModal()
+const modelReload = usePreviewModelReload()
+const radialMenu = ref<{
+  id: string
+  name: string
+  x: number
+  y: number
+  scale: number
+  actions: ReturnType<typeof getStageRadialActions>
+  active: number
+  dx: number
+  dy: number
+} | null>(null)
+
+function closeRadialMenu() {
+  radialMenu.value = null
+}
+
+function openRadialMenu(event: PointerEvent) {
+  closeTargetMenu()
+  const id = store.selectedId
+  if (!id) {
+    useMessage().info('请先选中立绘或舞台对象')
+    return
+  }
+  const actions = getStageRadialActions(id, store.selectedModel?.kind)
+  if (!actions.length) {
+    useMessage().info('当前对象暂无可用的轮盘操作')
+    return
+  }
+  const position = radialMenuPosition(event.clientX, event.clientY, window.innerWidth, window.innerHeight)
+  radialMenu.value = {
+    id,
+    name: isSpecialId(id) ? getSpecialName(id) : store.selectedModel?.name ?? store.selectedFigureGroup?.name ?? id,
+    ...position,
+    actions,
+    active: -1,
+    dx: 0,
+    dy: 0,
+  }
+  updateRadialPointer(event)
+}
+
+function updateRadialPointer(event: PointerEvent) {
+  const menu = radialMenu.value
+  if (!menu) return
+  menu.dx = event.clientX - menu.x
+  menu.dy = event.clientY - menu.y
+  menu.active = radialMenuIndex(menu.dx, menu.dy, menu.actions)
+}
+
+async function runRadialAction(action: StageRadialActionId, id: string) {
+  // 弹窗消费当前选择；手势期间切换或删除目标时不对新目标执行。
+  if (store.selectedId !== id || !getStageRadialActions(id, store.selectedModel?.kind).some(item => item.id === action)) return
+  try {
+    if (action === 'filter') filterPresetModal.open()
+    else if (action === 'snapshot') {
+      store.syncTransformFromModel(id)
+      snapshotModal.open()
+    } else if (action === 'reloadConfig') modelReload.reloadConfig(id)
+    else await modelReload.reloadTextures(id)
+  } catch (error) {
+    useMessage().error(`轮盘操作失败：${error}`)
+  }
+}
+
+watch(() => store.selectedId, closeRadialMenu, { flush: 'sync' })
 
 function clearTargetOutline(id: string) {
   const entry = targetOutlines.get(id)
@@ -238,7 +311,8 @@ watch(() => props.interactionDisabled, disabled => {
   if (isTransforming.value) cancelTransform()
   setGuideMode('none')
   closeTargetMenu()
-})
+  closeRadialMenu()
+}, { flush: 'sync' })
 
 // 注视模式（l）状态
 let focusTargetId: string | null = null
@@ -1762,7 +1836,7 @@ function attachDomHandlers() {
   }
 
   const onCanvasEnter = (e: PointerEvent) => {
-    if (props.interactionDisabled || isMiddleDown) return
+    if (radialMenu.value || props.interactionDisabled || isMiddleDown) return
     trackGuidePointer(e)
     editGuideAtPointer()
   }
@@ -1828,8 +1902,18 @@ function attachDomHandlers() {
     refreshTransformHint()
   }
 
+  const isRadialTrigger = (e: PointerEvent) =>
+    !props.interactionDisabled && !isTransforming.value && guideMode.value === 'none' &&
+    (e.ctrlKey || e.metaKey) && e.button === 2 && e.target === canvas && !isMiddleDown
+
   const onPointerDown = (e: PointerEvent) => {
     if (props.interactionDisabled) return
+    if (isRadialTrigger(e)) {
+      e.preventDefault()
+      suppressRadialContextMenu = true
+      openRadialMenu(e)
+      return
+    }
     // 点击 canvas 时移除输入框焦点，避免快捷键被拦截
     if (document.activeElement instanceof HTMLInputElement ||
         document.activeElement instanceof HTMLTextAreaElement ||
@@ -1881,6 +1965,10 @@ function attachDomHandlers() {
   }
 
   const onPointerMove = (e: PointerEvent) => {
+    if (radialMenu.value) {
+      updateRadialPointer(e)
+      return
+    }
     if (targetMenu.value) {
       const bounds = targetMenuRef.value?.getBoundingClientRect()
       if (bounds && (e.clientX < bounds.left - 32 || e.clientX > bounds.right + 32 ||
@@ -2082,6 +2170,7 @@ function attachDomHandlers() {
   }
 
   const onPointerUp = (e: PointerEvent) => {
+    if (radialMenu.value) return
     if (e.type === 'pointercancel' && targetMenu.value) {
       closeTargetMenu()
     } else if (e.button === 2 && targetMenu.value) {
@@ -2105,8 +2194,77 @@ function attachDomHandlers() {
   window.addEventListener('pointerup', onPointerUp)
   window.addEventListener('pointercancel', onPointerUp)
 
+  let suppressRadialContextMenu = false
+  const stopRadialEvent = (event: Event) => {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+  // 捕获阶段隔离 Pixi 和其他面板，普通右键仍走原有冒泡处理。
+  const onRadialPointerDown = (event: PointerEvent) => {
+    if (radialMenu.value) {
+      stopRadialEvent(event)
+      return
+    }
+    suppressRadialContextMenu = false
+    if (isRadialTrigger(event)) {
+      onPointerDown(event)
+      stopRadialEvent(event)
+    }
+  }
+  const onRadialPointerMove = (event: PointerEvent) => {
+    if (!radialMenu.value) return
+    updateRadialPointer(event)
+    stopRadialEvent(event)
+  }
+  const onRadialPointerUp = (event: PointerEvent) => {
+    const menu = radialMenu.value
+    if (!menu) return
+    stopRadialEvent(event)
+    if (event.type === 'pointercancel') closeRadialMenu()
+    else if (event.button === 2) {
+      updateRadialPointer(event)
+      const action = menu.actions[menu.active]
+      closeRadialMenu()
+      if (action) void runRadialAction(action.id, menu.id)
+    }
+  }
+  const onRadialKeyDown = (event: KeyboardEvent) => {
+    if (!radialMenu.value) return
+    stopRadialEvent(event)
+    if (event.key === 'Escape') closeRadialMenu()
+  }
+  const onRadialKeyUp = (event: KeyboardEvent) => {
+    if (radialMenu.value) stopRadialEvent(event)
+  }
+  const onRadialWheel = (event: WheelEvent) => {
+    if (radialMenu.value) stopRadialEvent(event)
+  }
+  const onRadialContextMenu = (event: MouseEvent) => {
+    // WebView 可能在 pointerup 之后才发送 contextmenu。
+    if (radialMenu.value || suppressRadialContextMenu) stopRadialEvent(event)
+  }
+  const onRadialClick = (event: MouseEvent) => {
+    if (radialMenu.value || (event.button === 2 && suppressRadialContextMenu)) stopRadialEvent(event)
+  }
+  window.addEventListener('pointerdown', onRadialPointerDown, true)
+  window.addEventListener('pointermove', onRadialPointerMove, true)
+  window.addEventListener('pointerup', onRadialPointerUp, true)
+  window.addEventListener('pointercancel', onRadialPointerUp, true)
+  window.addEventListener('keydown', onRadialKeyDown, true)
+  window.addEventListener('keyup', onRadialKeyUp, true)
+  window.addEventListener('wheel', onRadialWheel, { capture: true, passive: false })
+  window.addEventListener('contextmenu', onRadialContextMenu, true)
+  window.addEventListener('click', onRadialClick, true)
+  window.addEventListener('auxclick', onRadialClick, true)
+  window.addEventListener('blur', closeRadialMenu)
+  window.addEventListener('resize', closeRadialMenu)
+
   // 滚轮缩放 Root（乘法因子：scale 大小时手感一致）
   const onWheel = (e: WheelEvent) => {
+    if (radialMenu.value) {
+      e.preventDefault()
+      return
+    }
     if (targetMenu.value || props.interactionDisabled) return
     if (!rootContainer || !app) return
     e.preventDefault()
@@ -2142,6 +2300,7 @@ function attachDomHandlers() {
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
+    if (radialMenu.value) return
     if (targetMenu.value) return
     if (props.interactionDisabled) return
     if (e.key === 'F1') {
@@ -2352,6 +2511,19 @@ function attachDomHandlers() {
 
   // Save for cleanup
   previewRuntime.cleanup = () => {
+    closeRadialMenu()
+    window.removeEventListener('pointerdown', onRadialPointerDown, true)
+    window.removeEventListener('pointermove', onRadialPointerMove, true)
+    window.removeEventListener('pointerup', onRadialPointerUp, true)
+    window.removeEventListener('pointercancel', onRadialPointerUp, true)
+    window.removeEventListener('keydown', onRadialKeyDown, true)
+    window.removeEventListener('keyup', onRadialKeyUp, true)
+    window.removeEventListener('wheel', onRadialWheel, true)
+    window.removeEventListener('contextmenu', onRadialContextMenu, true)
+    window.removeEventListener('click', onRadialClick, true)
+    window.removeEventListener('auxclick', onRadialClick, true)
+    window.removeEventListener('blur', closeRadialMenu)
+    window.removeEventListener('resize', closeRadialMenu)
     window.removeEventListener('pointerdown', onPointerDown)
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
@@ -2520,6 +2692,7 @@ function dispose() {
 <template>
   <section class="stage" @contextmenu.prevent>
     <div ref="containerRef" class="stage__canvas" :class="guideCursor" />
+    <StageRadialMenu v-if="radialMenu" v-bind="radialMenu" />
     <Teleport to="body">
       <div v-if="targetMenu" class="target-menu-backdrop" @pointerdown.stop.prevent @click.stop.prevent @contextmenu.prevent />
       <Transition name="target-menu">

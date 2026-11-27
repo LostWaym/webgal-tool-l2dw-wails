@@ -23,3 +23,9 @@
 - **Pixi 6 滤镜不会自动继承画布 DPR，可能导致 Live2D 缩小后额外模糊**：`Filter.resolution` 默认是 1；只提高画布分辨率仍会在离屏滤镜链中丢失细节。共用入口 `frontend/src/live2d/viewport.ts` 在绘制前遍历场景树的公开 `filters`，同步为当前 `renderer.resolution`，同时覆盖场景、包装容器和 Live2D 自带的 AlphaFilter。同步不能依赖 resize，否则异步加载模型或新增滤镜会漏掉；也不乘视口缩放，不删除透明度滤镜。`AlphaFilter(1)` 的参数是透明度，不是分辨率；Blur / Bloom 等复合滤镜需检查内部 pass 的分辨率语义，不能盲目改写内部降采样倍率。
 - **本地模型资源不是普通前端静态资源**：绝对路径资源通过 `frontend/src/path_utils.ts` 的 `toFileUrl` 和后端 `/abs_files/` 路由访问；不要把磁盘路径直接当作普通网页静态路径。
 - **Live2D 运行时由页面预先加载**：`frontend/index.html` 在应用入口之前加载运行时；仅安装 npm 依赖不等于运行时资源已就绪。
+
+## 前端与交互验证
+
+- **纯 Vite 浏览器实机验证 Wails UI**：启动 `npm run dev` 后用临时 HTML 入口在挂载前 mock `window.go.main.App`（返回 Promise 且支持设置读写回显），即可在浏览器实机测布局、主题与交互；依赖直接 `import 'vue'`，勿引用 `.vite/deps` 缓存路径，用完删除临时入口（不替代原生对话框与真实模型加载）。
+- **Pixi 对象接入 Vue 响应式**：需驱动模板的 Pixi 实例用 `shallowRef` 避免深度代理；涉及内置默认底图时，不可仅凭 Sprite 存在与否判断用户是否已加载背景。
+- **行内悬停菜单与拖拽清理**：悬停操作组应预留固定占位并以透明/位移过渡，避免展开时挤动名称导致双击误触；全局拖拽监听除 `pointerup` 外，还需在 `blur` 与 `onBeforeUnmount` 时清理并恢复 `cursor` / `userSelect`。

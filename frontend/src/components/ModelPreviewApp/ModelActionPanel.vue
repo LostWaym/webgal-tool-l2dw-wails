@@ -13,9 +13,7 @@ import {
   DEFAULT_TRANSFORM_TEMPLATE,
   FILTER_GROUPS,
   type FilterItemSpec,
-  type FilterGroupSpec,
 } from '../../utils/consts'
-import { L2dwContainer } from '../../live2d/L2dwContainer'
 import { isSpecialId, getSpecialName, SpecialId, MIN_CAMERA_SCALE, isFigureGroupId } from '../../live2d/specialIds'
 import { filterBySearch } from '../../utils/searchUtils'
 import emitter, { StageEvents } from '../../stores/emitter'
@@ -30,14 +28,13 @@ import UiIcon from '../common/UiIcon.vue'
 import NumberInput from '../common/NumberInput.vue'
 import FocusPicker from '../common/FocusPicker.vue'
 import ColorPicker, { type RGBColor } from '../common/ColorPicker.vue'
-import ColorPickerModal from '../common/ColorPickerModal.vue'
 import { useColorPickerModal, type ColorPickerTarget } from '../../composables/useColorPickerModal'
-import settingsIcon from '../../assets/icons/settings.png'
 import { previewRuntime } from '../../utils/runtimeRegistry'
 import { useTransformSnapshotModal } from '../../composables/useTransformSnapshotModal'
 import { useFilterPresetModal } from '../../composables/useFilterPresetModal'
 import { vTabIndicator } from '../../utils/tabIndicator'
-import { ListFilterPresetFiles, SaveFilterPresetFile } from '../../../wailsjs/go/main/App'
+import { ListFilterPresetFiles, SaveFilterPresetFile, SetClipboardText } from '../../../wailsjs/go/main/App'
+import { useNumberDrag } from '../../composables/useNumberDrag'
 
 const store = useModelStore()
 const emit = defineEmits<{
@@ -80,9 +77,22 @@ const expressionSearch = computed({
 })
 const motionCollapsed = ref(false)
 const expressionCollapsed = ref(false)
-const hoveredTab = ref<TabKey | null>(null) // 当前悬停的页签
 const msg = useMessage()
 const { reloadConfig, reloadTextures } = usePreviewModelReload()
+const numberDrag = useNumberDrag(() => store.selectedId)
+
+async function copyTemplate(content: string) {
+  if (!content.trim()) {
+    msg.warning('模板内容为空，无法复制')
+    return
+  }
+  try {
+    await SetClipboardText(content)
+    msg.success('已复制模板')
+  } catch (error) {
+    msg.warning(`复制模板失败：${String(error)}`)
+  }
+}
 
 // 根据选中物体动态生成可显示的页签
 const visibleTabs = ref<TabConfig[]>([])
@@ -146,38 +156,18 @@ const filterState = computed<FilterState>(
   () => store.getFilterState(store.selectedId),
 )
 
-/** 每个 group: { title, items: { key, label, min?, max?, step?, boolean?, colorPicker? }[] } */
-// FILTER_GROUPS / FilterItemSpec / FilterGroupSpec 现已从 utils/consts 导入
-
 /** 写某个滤镜字段到 store（store 内部会自动同步到 L2dwContainer） */
 function onFilterInput(key: keyof FilterState, value: number) {
   store.setFilterState(store.selectedId, { [key]: value } as Partial<FilterState>)
 }
 
-let filterDrag: { item: FilterItemSpec; startX: number; startValue: number; selectedId: string; pointerId: number } | null = null
-
 function onFilterLabelPointerDown(item: FilterItemSpec, e: PointerEvent) {
-  if (e.button !== 0 || !item.key || !store.selectedId) return
+  if (!item.key) return
   const value = filterState.value[item.key as keyof FilterState]
   if (typeof value !== 'number') return
-  e.preventDefault()
-  e.stopPropagation()
-  filterDrag = { item, startX: e.clientX, startValue: value, selectedId: store.selectedId, pointerId: e.pointerId }
-  const target = e.currentTarget as HTMLElement
-  target.setPointerCapture(e.pointerId)
-}
-
-function onFilterLabelPointerMove(e: PointerEvent) {
-  if (!filterDrag || filterDrag.pointerId !== e.pointerId || filterDrag.selectedId !== store.selectedId) return
-  const { item, startX, startValue } = filterDrag
   const step = item.step ?? 1
-  const precision = step < 1 ? 3 : 2
-  const value = clamp(startValue + (e.clientX - startX) * step / 3, item.min ?? -Infinity, item.max ?? Infinity)
-  onFilterInput(item.key as keyof FilterState, Number(value.toFixed(precision)))
-}
-
-function onFilterLabelPointerEnd(e: PointerEvent) {
-  if (filterDrag?.pointerId === e.pointerId) filterDrag = null
+  numberDrag.start(e, { value, step, min: item.min, max: item.max, precision: step < 1 ? 3 : 2,
+    update: value => onFilterInput(item.key as keyof FilterState, value) })
 }
 
 /** 切换布尔型滤镜（0/1） */
@@ -301,15 +291,20 @@ function resetBlink() {
   store.resetBlinkState(store.selectedId)
 }
 
-// 拖拽调参步幅
-const DRAG_STEP_X = 1        // X 轴每 px 增减量
-const DRAG_STEP_Y = -1       // Y 轴每 px 增减量（向上拖增大）
-const DRAG_STEP_SCALE = 0.001 // 缩放每 px 增减量
-const DRAG_STEP_ROTATION = 0.2 // 旋转每 px 增减角度
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(Math.min(value, max), min)
-}
+const focusFields = [
+  { key: 'x' as const, label: 'X', step: 0.01, min: -1, max: 1, precision: 2 },
+  { key: 'y' as const, label: 'Y', step: 0.01, min: -1, max: 1, precision: 2 },
+]
+const blinkFields = [
+  { key: 'blinkInterval' as const, label: '间隔', step: 100, min: 0, precision: 0 },
+  { key: 'blinkIntervalRandom' as const, label: '随机偏移', step: 10, min: 0, precision: 0 },
+  { key: 'closingDuration' as const, label: '闭眼时长', step: 10, min: 0, precision: 0 },
+  { key: 'closedDuration' as const, label: '闭合停留', step: 10, min: 0, precision: 0 },
+  { key: 'openingDuration' as const, label: '睁眼时长', step: 10, min: 0, precision: 0 },
+]
+const coordinateField = { step: 1, precision: 2 }
+const boundsRows = [[{ index: 0, label: 'x0' }, { index: 1, label: 'y0' }], [{ index: 2, label: 'x1' }, { index: 3, label: 'y1' }]]
+const anchorAxes = ['x', 'y'] as const
 
 // 从模型同步变换数据到 store
 function syncTransformFromModel() {
@@ -330,6 +325,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   emitter.off(StageEvents.TransformChange, onTransformChange)
+  onDragEnd()
 })
 
 // 获取变换目标容器：普通模型 -> L2dwContainer，占位项（StageMain / BGContainer）-> PIXI.Container
@@ -790,19 +786,16 @@ watch([motions, expressions], scrollToPlayingIfNeeded)
 
 // 拖拽宽度
 function onDragStart(e: MouseEvent) {
+  if (e.button !== 0) return
   e.preventDefault()
   document.addEventListener('mousemove', onDragMove)
   document.addEventListener('mouseup', onDragEnd)
+  window.addEventListener('blur', onDragEnd)
   document.body.style.cursor = 'ew-resize'
   document.body.style.userSelect = 'none'
 }
 
-// 是否显示当前页签的配置按钮
-const availableTabs: TabKey[] = ['motionExpression']
-const hasTabConfig = computed(() => availableTabs.includes(activeTab.value))
-
-// 页签配置按钮点击回调
-function onTabConfigClick() {
+function openMotionExpressionSettings() {
   emit('open-motion-expression-settings')
 }
 
@@ -814,79 +807,29 @@ function onDragMove(e: MouseEvent) {
 function onDragEnd() {
   document.removeEventListener('mousemove', onDragMove)
   document.removeEventListener('mouseup', onDragEnd)
+  window.removeEventListener('blur', onDragEnd)
   document.body.style.cursor = ''
   document.body.style.userSelect = ''
 }
 
-// 标签拖拽调参
-let _dragAxis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | null = null
-let _dragStartX = 0
-let _dragStartValue = 0
-
-function onLabelDragStart(axis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation', e: MouseEvent) {
-  e.preventDefault()
-  e.stopPropagation()
-  _dragAxis = axis
-  _dragStartX = e.clientX
-  _dragStartValue = axis === 'x' ? transformState.value.x
-                : axis === 'y' ? transformState.value.y
-                : axis === 'scaleX' ? transformState.value.scale.x
-                : axis === 'scaleY' ? transformState.value.scale.y
-                : transformState.value.rotation
-  document.addEventListener('mousemove', onLabelDragMove)
-  document.addEventListener('mouseup', onLabelDragEnd)
-  document.body.style.cursor = 'ew-resize'
-  document.body.style.userSelect = 'none'
-}
-
-function onLabelDragMove(e: MouseEvent) {
-  if (!_dragAxis) return
-  const container = getL2dwContainer()
-  if (!container) return
-
-  const delta = e.clientX - _dragStartX
-  const step = _dragAxis === 'x' ? DRAG_STEP_X
-             : _dragAxis === 'y' ? DRAG_STEP_Y
-             : (_dragAxis === 'scaleX' || _dragAxis === 'scaleY') ? DRAG_STEP_SCALE
-             : DRAG_STEP_ROTATION
-  const newVal = Math.round((_dragStartValue + delta * step) * 1000) / 1000
-
-  const newState: TransformState = {
-    ...transformState.value,
-    scale: { ...transformState.value.scale },
-  }
-
-  if (_dragAxis === 'x') {
-    container.x = newVal
-    newState.x = newVal
-  } else if (_dragAxis === 'y') {
-    container.y = newVal
-    newState.y = newVal
-  } else if (_dragAxis === 'scaleX') {
-    const value = store.selectedId === SpecialId.Camera ? Math.max(MIN_CAMERA_SCALE, newVal) : newVal
-    container.scale.x = value
-    newState.scale.x = value
-    if (store.selectedId === SpecialId.Camera) {
-      container.scale.y = value
-      newState.scale.y = value
-    }
-  } else if (_dragAxis === 'scaleY') {
-    container.scale.y = newVal
-    newState.scale.y = newVal
-  } else if (_dragAxis === 'rotation') {
-    container.rotation = newVal * Math.PI / 180
-    newState.rotation = newVal
-  }
-
-  store.setTransformState(store.selectedId, newState)
-}
-
-function onLabelDragEnd() {
-  _dragAxis = null
-  document.removeEventListener('mousemove', onLabelDragMove)
-  document.removeEventListener('mouseup', onLabelDragEnd)
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
+function onLabelDragStart(axis: 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation', e: PointerEvent) {
+  const scale = axis === 'scaleX' || axis === 'scaleY'
+  const value = scale ? transformState.value.scale[axis === 'scaleX' ? 'x' : 'y'] : transformState.value[axis as 'x' | 'y' | 'rotation']
+  numberDrag.start(e, {
+    value,
+    step: scale ? 0.001 : axis === 'rotation' ? 0.2 : axis === 'y' ? -1 : 1,
+    min: scale ? (store.selectedId === SpecialId.Camera ? MIN_CAMERA_SCALE : 0.01) : undefined,
+    max: scale ? 10 : undefined,
+    precision: 3,
+    pixelsPerStep: 1,
+    update: value => {
+      if (scale) {
+        transformState.value.scale[axis === 'scaleX' ? 'x' : 'y'] = value
+        if (store.selectedId === SpecialId.Camera) transformState.value.scale.y = value
+      } else transformState.value[axis as 'x' | 'y' | 'rotation'] = value
+      onTransformInput()
+    },
+  })
 }
 </script>
 
@@ -905,27 +848,11 @@ function onLabelDragEnd() {
         :class="{ 'is-active': activeTab === tab.key }"
         :aria-pressed="activeTab === tab.key"
         @click="activeTab = tab.key"
-        @mouseenter="hoveredTab = tab.key"
-        @mouseleave="hoveredTab = null"
       >
         <span class="tab-btn__label">
           <UiIcon :name="tab.key === 'motionExpression' ? 'play' : tab.key === 'transform' ? 'transform' : 'info'" />
           {{ tab.label }}
         </span>
-        <span
-          v-if="activeTab === tab.key && hasTabConfig"
-          class="tab-settings-overlay"
-          :class="{ 'is-visible': hoveredTab === tab.key }"
-        />
-        <img
-          v-if="activeTab === tab.key && hasTabConfig"
-          :src="settingsIcon"
-          class="tab-settings-btn"
-          alt="打开动作/表情设置"
-          title="打开动作/表情设置"
-          :class="{ 'is-visible': hoveredTab === tab.key }"
-          @click.stop="onTabConfigClick"
-        />
       </button>
     </div>
 
@@ -935,6 +862,9 @@ function onLabelDragEnd() {
       <div class="panel__list-region" :class="{ 'is-collapsed': motionCollapsed }">
         <div class="list-region-header">
           <span class="list-region-title">动作</span>
+          <button type="button" class="ui-button list-region-toggle" title="动作/表情设置" aria-label="动作/表情设置" @click="openMotionExpressionSettings">
+            <UiIcon name="settings" />
+          </button>
           <button
             type="button"
             class="ui-button list-region-shuffle"
@@ -967,20 +897,21 @@ function onLabelDragEnd() {
             <SearchInput v-model="motionSearch" variant="action" placeholder="搜索动作..." />
           </div>
           <nav v-if="folders.active.value && !motionSearch.trim()" class="list-breadcrumb" aria-label="动作目录">
-            <UiIcon name="down" />
+            <UiIcon name="folder" />
             <button type="button" :disabled="motionPath.length === 0" @click="motionPath = []">root</button>
             <template v-for="(part, index) in motionPath" :key="index">
-              <span aria-hidden="true">&gt;</span>
+              <UiIcon name="right" />
               <button type="button" :disabled="index === motionPath.length - 1" @click="motionPath = motionPath.slice(0, index + 1)">{{ part }}</button>
             </template>
           </nav>
           <ul class="panel__list is-dragging-scroll" v-bind="motionScroll.scrollHandlers" :ref="el => { motionScroll.containerRef.value = el as HTMLElement | null }">
-            <li v-for="folder in motionDirectory.folders" :key="`folder:${folder}`" class="list-item list-item--folder" @click="motionPath = [...motionPath, folder]">📁 {{ folder }}</li>
+            <li v-for="folder in motionDirectory.folders" :key="`folder:${folder}`" :title="folder" class="list-item list-item--folder" @click="motionPath = [...motionPath, folder]"><UiIcon name="folder" /><span>{{ folder }}</span></li>
             <li
               v-for="item in motionDirectory.entries"
               :key="`${item.group}_${item.index}`"
               :data-key="`${item.group}_${item.index}`"
               class="list-item"
+              :title="item.name"
               :class="{ 'is-playing': isMotionPlaying(item) }"
               @click="playMotion(item)"
             >
@@ -1029,20 +960,21 @@ function onLabelDragEnd() {
             <SearchInput v-model="expressionSearch" variant="action" placeholder="搜索表情..." />
           </div>
           <nav v-if="folders.active.value && !expressionSearch.trim()" class="list-breadcrumb" aria-label="表情目录">
-            <UiIcon name="down" />
+            <UiIcon name="folder" />
             <button type="button" :disabled="expressionPath.length === 0" @click="expressionPath = []">root</button>
             <template v-for="(part, index) in expressionPath" :key="index">
-              <span aria-hidden="true">&gt;</span>
+              <UiIcon name="right" />
               <button type="button" :disabled="index === expressionPath.length - 1" @click="expressionPath = expressionPath.slice(0, index + 1)">{{ part }}</button>
             </template>
           </nav>
           <ul class="panel__list is-dragging-scroll" v-bind="expressionScroll.scrollHandlers" :ref="el => { expressionScroll.containerRef.value = el as HTMLElement | null }">
-            <li v-for="folder in expressionDirectory.folders" :key="`folder:${folder}`" class="list-item list-item--folder" @click="expressionPath = [...expressionPath, folder]">📁 {{ folder }}</li>
+            <li v-for="folder in expressionDirectory.folders" :key="`folder:${folder}`" :title="folder" class="list-item list-item--folder" @click="expressionPath = [...expressionPath, folder]"><UiIcon name="folder" /><span>{{ folder }}</span></li>
             <li
               v-for="item in expressionDirectory.entries"
               :key="item.index"
               :data-key="item.index"
               class="list-item"
+              :title="item.name"
               :class="{ 'is-playing': isExpressionPlaying(item) }"
               @click="playExpression(item)"
             >
@@ -1083,14 +1015,14 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--pair">
-                <label @mousedown="(e) => onLabelDragStart('x', e)">X</label>
+                <label title="左右拖动调整数值" @pointerdown="(e) => onLabelDragStart('x', e)">X</label>
                 <NumberInput
                   :model-value="transformState.x"
                   :step="1"
                   :precision="2"
                   @update:model-value="(v: number) => { transformState.x = v; onTransformInput() }"
                 />
-                <label @mousedown="(e) => onLabelDragStart('y', e)">Y</label>
+                <label title="左右拖动调整数值" @pointerdown="(e) => onLabelDragStart('y', e)">Y</label>
                 <NumberInput
                   :model-value="transformState.y"
                   :step="1"
@@ -1101,7 +1033,7 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--pair">
-                <label title="X 缩放" @mousedown="(e) => onLabelDragStart('scaleX', e)">{{ store.selectedId === SpecialId.Camera ? '缩放' : '缩X' }}</label>
+                <label title="左右拖动调整数值" @pointerdown="(e) => onLabelDragStart('scaleX', e)">{{ store.selectedId === SpecialId.Camera ? '缩放' : '缩X' }}</label>
                 <NumberInput
                   :model-value="transformState.scale.x"
                   :step="0.01"
@@ -1110,7 +1042,7 @@ function onLabelDragEnd() {
                   :precision="3"
                   @update:model-value="(v: number) => { transformState.scale.x = v; if (store.selectedId === SpecialId.Camera) transformState.scale.y = v; onTransformInput() }"
                 />
-                <label v-if="store.selectedId !== SpecialId.Camera" title="Y 缩放" @mousedown="(e) => onLabelDragStart('scaleY', e)">缩Y</label>
+                <label v-if="store.selectedId !== SpecialId.Camera" title="左右拖动调整数值" @pointerdown="(e) => onLabelDragStart('scaleY', e)">缩Y</label>
                 <NumberInput
                   v-if="store.selectedId !== SpecialId.Camera"
                   :model-value="transformState.scale.y"
@@ -1124,7 +1056,7 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row">
-                <label @mousedown="(e) => onLabelDragStart('rotation', e)">旋转</label>
+                <label title="左右拖动调整数值" @pointerdown="(e) => onLabelDragStart('rotation', e)">旋转</label>
                 <NumberInput
                   :model-value="transformState.rotation"
                   :step="1"
@@ -1135,13 +1067,13 @@ function onLabelDragEnd() {
             </li>
             <li v-if="store.selectedId !== SpecialId.Camera" class="list-item list-item--row">
               <div class="form-row form-row--btn form-row--snapshot">
-                <button class="snapshot-btn" @click="onApplySnapshot">变换快照列表</button>
-                <button class="snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>
+                <button class="ui-button snapshot-btn" @click="onApplySnapshot">变换快照列表</button>
+                <button class="ui-button snapshot-btn" @click="onRecordSnapshot">记录变换快照</button>
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
-                <button class="snapshot-btn reset-action-btn" @click="resetTransform">重置</button>
+                <button class="ui-button snapshot-btn reset-action-btn" @click="resetTransform">重置</button>
               </div>
             </li>
           </ul>
@@ -1213,10 +1145,6 @@ function onLabelDragEnd() {
                       class="filter-drag-label"
                       title="左右拖动调整数值"
                       @pointerdown="(e) => onFilterLabelPointerDown(item, e)"
-                      @pointermove="onFilterLabelPointerMove"
-                      @pointerup="onFilterLabelPointerEnd"
-                      @pointercancel="onFilterLabelPointerEnd"
-                      @lostpointercapture="onFilterLabelPointerEnd"
                     >{{ item.label }}</label>
                     <NumberInput
                       :model-value="filterState[item.key as keyof FilterState] as number"
@@ -1263,30 +1191,10 @@ function onLabelDragEnd() {
                 @update:y="(v: number) => onFocusInput('y', v)"
               />
             </li>
-            <li class="list-item list-item--row">
+            <li v-for="field in focusFields" :key="field.key" class="list-item list-item--row">
               <div class="form-row">
-                <label>X</label>
-                <NumberInput
-                  :model-value="focusState.x"
-                  :step="0.01"
-                  :min="-1"
-                  :max="1"
-                  :precision="2"
-                  @update:model-value="(v: number) => onFocusInput('x', v)"
-                />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
-                <label>Y</label>
-                <NumberInput
-                  :model-value="focusState.y"
-                  :step="0.01"
-                  :min="-1"
-                  :max="1"
-                  :precision="2"
-                  @update:model-value="(v: number) => onFocusInput('y', v)"
-                />
+                <label title="左右拖动调整数值" @pointerdown="numberDrag.start($event, { ...field, value: focusState[field.key], update: v => onFocusInput(field.key, v) })">{{ field.label }}</label>
+                <NumberInput v-bind="field" :model-value="focusState[field.key]" @update:model-value="onFocusInput(field.key, $event)" />
               </div>
             </li>
             <li class="list-item list-item--row">
@@ -1305,7 +1213,7 @@ function onLabelDragEnd() {
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
-                <button class="snapshot-btn reset-action-btn" @click="resetFocus">重置注视</button>
+                <button class="ui-button snapshot-btn reset-action-btn" @click="resetFocus">重置注视</button>
               </div>
             </li>
           </ul>
@@ -1332,69 +1240,15 @@ function onLabelDragEnd() {
         </div>
         <div class="list-region-body">
           <ul class="panel__list" v-bind="blinkScroll.scrollHandlers">
-            <li class="list-item list-item--row">
+            <li v-for="field in blinkFields" :key="field.key" class="list-item list-item--row">
               <div class="form-row">
-                <label>间隔</label>
-                <NumberInput
-                  :model-value="blinkState.blinkInterval"
-                  :step="100"
-                  :min="0"
-                  :precision="0"
-                  @update:model-value="(v: number) => onBlinkInput('blinkInterval', v)"
-                />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
-                <label>随机偏移</label>
-                <NumberInput
-                  :model-value="blinkState.blinkIntervalRandom"
-                  :step="10"
-                  :min="0"
-                  :precision="0"
-                  @update:model-value="(v: number) => onBlinkInput('blinkIntervalRandom', v)"
-                />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
-                <label>闭眼时长</label>
-                <NumberInput
-                  :model-value="blinkState.closingDuration"
-                  :step="10"
-                  :min="0"
-                  :precision="0"
-                  @update:model-value="(v: number) => onBlinkInput('closingDuration', v)"
-                />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
-                <label>闭合停留</label>
-                <NumberInput
-                  :model-value="blinkState.closedDuration"
-                  :step="10"
-                  :min="0"
-                  :precision="0"
-                  @update:model-value="(v: number) => onBlinkInput('closedDuration', v)"
-                />
-              </div>
-            </li>
-            <li class="list-item list-item--row">
-              <div class="form-row">
-                <label>睁眼时长</label>
-                <NumberInput
-                  :model-value="blinkState.openingDuration"
-                  :step="10"
-                  :min="0"
-                  :precision="0"
-                  @update:model-value="(v: number) => onBlinkInput('openingDuration', v)"
-                />
+                <label title="左右拖动调整数值" @pointerdown="numberDrag.start($event, { ...field, value: blinkState[field.key], update: v => onBlinkInput(field.key, v) })">{{ field.label }}</label>
+                <NumberInput v-bind="field" :model-value="blinkState[field.key]" @update:model-value="onBlinkInput(field.key, $event)" />
               </div>
             </li>
             <li class="list-item list-item--row">
               <div class="form-row form-row--btn">
-                <button class="snapshot-btn reset-action-btn" @click="resetBlink">重置眨眼</button>
+                <button class="ui-button snapshot-btn reset-action-btn" @click="resetBlink">重置眨眼</button>
               </div>
             </li>
           </ul>
@@ -1407,7 +1261,8 @@ function onLabelDragEnd() {
       <div class="info-section">
         <div class="info-row">
           <label class="info-label">背景模板</label>
-          <button class="reset-btn reset-btn--small" @click="generateBgTemplate">生成背景模板</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="copyTemplate(bgTemplateInput)">复制</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="generateBgTemplate">生成背景模板</button>
         </div>
         <textarea
           v-model="bgTemplateInput"
@@ -1416,7 +1271,8 @@ function onLabelDragEnd() {
         />
         <div class="info-row">
           <label class="info-label">变换模板</label>
-          <button class="reset-btn reset-btn--small" @click="generateBgTransformTemplate">生成变换模板</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="copyTemplate(bgTransformTemplateInput)">复制</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="generateBgTransformTemplate">生成变换模板</button>
         </div>
         <textarea
           v-model="bgTransformTemplateInput"
@@ -1430,7 +1286,8 @@ function onLabelDragEnd() {
       <div class="info-section">
         <div class="info-row">
           <label class="info-label">变换模板</label>
-          <button class="reset-btn reset-btn--small" @click="generateStageTransformTemplate">生成变换模板</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="copyTemplate(stageTransformTemplateInput)">复制</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="generateStageTransformTemplate">生成变换模板</button>
         </div>
         <textarea
           v-model="stageTransformTemplateInput"
@@ -1458,42 +1315,17 @@ function onLabelDragEnd() {
         </div>
         <div v-if="store.selectedModel.kind !== 'image'" class="info-row--stack">
           <label class="info-label">bounds</label>
-          <div class="bounds-row">
-            <span class="bounds-row__name">x0</span>
-            <NumberInput
-              :model-value="store.selectedModel.wmdlConfig?.bounds?.[0] ?? 0"
-              :step="1"
-              :precision="2"
-              @update:model-value="(v: number) => onFigureBoundsChange(0, v)"
-            />
-            <span class="bounds-row__name">y0</span>
-            <NumberInput
-              :model-value="store.selectedModel.wmdlConfig?.bounds?.[1] ?? 0"
-              :step="1"
-              :precision="2"
-              @update:model-value="(v: number) => onFigureBoundsChange(1, v)"
-            />
-          </div>
-          <div class="bounds-row">
-            <span class="bounds-row__name">x1</span>
-            <NumberInput
-              :model-value="store.selectedModel.wmdlConfig?.bounds?.[2] ?? 0"
-              :step="1"
-              :precision="2"
-              @update:model-value="(v: number) => onFigureBoundsChange(2, v)"
-            />
-            <span class="bounds-row__name">y1</span>
-            <NumberInput
-              :model-value="store.selectedModel.wmdlConfig?.bounds?.[3] ?? 0"
-              :step="1"
-              :precision="2"
-              @update:model-value="(v: number) => onFigureBoundsChange(3, v)"
-            />
+          <div v-for="(row, index) in boundsRows" :key="index" class="bounds-row">
+            <template v-for="field in row" :key="field.index">
+              <label class="bounds-row__name" title="左右拖动调整数值" @pointerdown="numberDrag.start($event, { ...coordinateField, value: store.selectedModel?.wmdlConfig?.bounds?.[field.index] ?? 0, update: v => onFigureBoundsChange(field.index, v) })">{{ field.label }}</label>
+              <NumberInput v-bind="coordinateField" :model-value="store.selectedModel.wmdlConfig?.bounds?.[field.index] ?? 0" @update:model-value="onFigureBoundsChange(field.index, $event)" />
+            </template>
           </div>
         </div>
         <div class="info-row">
           <label class="info-label">立绘模板</label>
-          <button class="reset-btn reset-btn--small" @click="generateFigureTemplate">生成立绘模板</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="copyTemplate(figureTemplateInput)">复制</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="generateFigureTemplate">生成立绘模板</button>
         </div>
         <textarea
           v-model="figureTemplateInput"
@@ -1503,7 +1335,8 @@ function onLabelDragEnd() {
         />
         <div class="info-row">
           <label class="info-label">变换模板</label>
-          <button class="reset-btn reset-btn--small" @click="generateFigureTransformTemplate">生成变换模板</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="copyTemplate(figureTransformTemplateInput)">复制</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="generateFigureTransformTemplate">生成变换模板</button>
         </div>
         <textarea
           v-model="figureTransformTemplateInput"
@@ -1512,8 +1345,8 @@ function onLabelDragEnd() {
           @change="commitFigureTemplates"
         />
         <div v-if="store.selectedModel?.kind !== 'image'" class="info-row">
-          <button class="reset-btn reset-btn--small" @click="onReloadModel">重载模型配置</button>
-          <button class="reset-btn reset-btn--small" @click="onReloadTextures">重载纹理</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="onReloadModel">重载模型配置</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="onReloadTextures">重载纹理</button>
         </div>
       </div>
     </div>
@@ -1532,23 +1365,9 @@ function onLabelDragEnd() {
         </div>
 
         <!-- 锚点坐标 -->
-        <div class="info-row">
-          <label class="info-label">锚点 X</label>
-          <NumberInput
-            :model-value="store.selectedFigureGroup.x"
-            :step="1"
-            :precision="2"
-            @update:model-value="(v: number) => onFigureGroupCenterChange('x', v)"
-          />
-        </div>
-        <div class="info-row">
-          <label class="info-label">锚点 Y</label>
-          <NumberInput
-            :model-value="store.selectedFigureGroup.y"
-            :step="1"
-            :precision="2"
-            @update:model-value="(v: number) => onFigureGroupCenterChange('y', v)"
-          />
+        <div v-for="axis in anchorAxes" :key="axis" class="info-row">
+          <label class="info-label number-drag-label" title="左右拖动调整数值" @pointerdown="numberDrag.start($event, { ...coordinateField, value: store.selectedFigureGroup?.[axis] ?? 0, update: v => onFigureGroupCenterChange(axis, v) })">锚点 {{ axis.toUpperCase() }}</label>
+          <NumberInput v-bind="coordinateField" :model-value="store.selectedFigureGroup[axis]" @update:model-value="onFigureGroupCenterChange(axis, $event)" />
         </div>
 
         <!-- 是否包括背景 / 全部立绘 -->
@@ -1668,8 +1487,8 @@ function onLabelDragEnd() {
 
         <!-- 操作按钮 -->
         <div class="info-row">
-          <button tabindex="-1" class="reset-btn reset-btn--small" @click="onFigureGroupCleanup">清理无效目标</button>
-          <button tabindex="-1" class="reset-btn reset-btn--small" @click="onFigureGroupCenterToAverage">锚点中心点</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="onFigureGroupCleanup">清理无效目标</button>
+          <button class="ui-button reset-btn reset-btn--small" @click="onFigureGroupCenterToAverage">锚点中心点</button>
         </div>
       </div>
     </div>
@@ -1754,37 +1573,6 @@ function onLabelDragEnd() {
   .tab-btn__label .ui-symbol { display: none; }
 }
 
-.tab-settings-overlay {
-  position: absolute;
-  inset: 0;
-  background: var(--ui-scrim);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.tab-settings-btn {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 2;
-  filter: var(--ui-icon-filter);
-  pointer-events: none;
-}
-
-.tab-settings-overlay.is-visible,
-.tab-settings-btn.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* ───────── 动作 / 表情 合并页签 ───────── */
 
 .panel__motion-expression {
@@ -1856,22 +1644,6 @@ function onLabelDragEnd() {
   font-weight: 650;
 }
 
-.list-region-settings {
-  position: static;
-  transform: none;
-  width: 16px;
-  height: 16px;
-  opacity: 0.6;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
-  filter: var(--ui-icon-filter);
-  pointer-events: auto;
-}
-
-.list-region-settings:hover {
-  opacity: 1;
-}
-
 .list-region-toggle {
   width: 29px;
   padding: 0;
@@ -1939,6 +1711,14 @@ function onLabelDragEnd() {
   border-left-color: var(--ui-link);
   font-weight: 500;
 }
+
+.list-item:not(.list-item--row) {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-item--folder .ui-symbol { margin-right: 6px; vertical-align: middle; }
 
 .list-item--empty {
   color: var(--ui-muted);
@@ -2018,9 +1798,12 @@ function onLabelDragEnd() {
   cursor: default;
 }
 
-.filter-drag-label {
+.filter-drag-label,
+.number-drag-label,
+label[title="左右拖动调整数值"] {
   touch-action: none;
   user-select: none;
+  cursor: ew-resize;
 }
 
 .filter-group .form-row__color-label {
@@ -2055,22 +1838,10 @@ function onLabelDragEnd() {
 .reset-btn,
 .snapshot-btn {
   padding: 8px 12px;
-  background: var(--ui-control);
-  border: 1px solid var(--ui-edge);
-  border-radius: 6px;
-  color: var(--ui-text);
   font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
 }
 
 .snapshot-btn { flex: 1; }
-
-.reset-btn:hover,
-.snapshot-btn:hover {
-  background: var(--ui-hover);
-  border-color: var(--ui-link);
-}
 
 .reset-action-btn {
   flex: none;
@@ -2080,6 +1851,8 @@ function onLabelDragEnd() {
 /* ───────── 信息页签 ───────── */
 
 .panel__info {
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -2118,6 +1891,7 @@ function onLabelDragEnd() {
 }
 
 .info-row {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2179,6 +1953,9 @@ function onLabelDragEnd() {
   padding: 4px 10px;
   font-size: 12px;
 }
+
+.info-row > .info-label:first-child { margin-right: auto; }
+.info-row > .form-input { min-width: 0; }
 
 .list-item.is-current {
   border-left-color: var(--ui-link);

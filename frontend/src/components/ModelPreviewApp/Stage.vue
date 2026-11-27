@@ -211,7 +211,7 @@ async function openTargetMenu(event: PointerEvent, canvas: HTMLCanvasElement) {
     (event.clientY - rect.top) * app.screen.height / rect.height,
   )
   const options: TargetOption[] = [{ id: SpecialId.StageMain, name: getSpecialName(SpecialId.StageMain) }]
-  if (backgroundSprite && backgroundContainer?.visible && containsLocalBounds(backgroundSprite, point)) {
+  if (backgroundSprite.value && backgroundContainer?.visible && containsLocalBounds(backgroundSprite.value, point)) {
     options.push({ id: SpecialId.BgContainer, name: getSpecialName(SpecialId.BgContainer) })
   }
   options.push({ id: SpecialId.Camera, name: getSpecialName(SpecialId.Camera) })
@@ -968,7 +968,7 @@ let app: PIXI.Application | null = null
 const live2dById = new Map<string, Live2DModel>()
 const containersById = new Map<string, L2dwContainer>()
 let stopObservingViewport: (() => void) | null = null
-let backgroundSprite: PIXI.Sprite | null = null
+const backgroundSprite = shallowRef<PIXI.Sprite | null>(null)
 
 // Root 容器交互常量
 const DRAG_SENSITIVITY = 1      // 中键拖拽灵敏度
@@ -2368,10 +2368,11 @@ function attachDomHandlers() {
 }
 
 function fitBackground() {
-  if (!backgroundSprite || !backgroundContainer) return
+  const sprite = backgroundSprite.value
+  if (!sprite || !backgroundContainer) return
   const w = STAGE_WIDTH
   const h = STAGE_HEIGHT
-  const texture = backgroundSprite.texture.baseTexture
+  const texture = sprite.texture.baseTexture
 
   // 原始图片尺寸
   const imgW = texture.width
@@ -2380,25 +2381,25 @@ function fitBackground() {
   // 计算等比缩放，保证填满 backgroundContainer，短边刚好顶到边缘
   const scale = Math.max(w / imgW, h / imgH)
 
-  backgroundSprite.width = imgW * scale
-  backgroundSprite.height = imgH * scale
+  sprite.width = imgW * scale
+  sprite.height = imgH * scale
 
   // 居中
-  backgroundSprite.x = w / 2
-  backgroundSprite.y = h / 2
+  sprite.x = w / 2
+  sprite.y = h / 2
 }
 
 function applyBackgroundTexture(texture: PIXI.Texture) {
   if (!backgroundContainer) return
-  if (backgroundSprite) {
-    backgroundContainer.removeChild(backgroundSprite)
-    backgroundSprite.destroy({ texture: true, baseTexture: true })
-    backgroundSprite = null
+  if (backgroundSprite.value) {
+    backgroundContainer.removeChild(backgroundSprite.value)
+    backgroundSprite.value.destroy({ texture: true, baseTexture: true })
+    backgroundSprite.value = null
   }
   const sprite = new PIXI.Sprite(texture)
   sprite.anchor.set(0.5)
   backgroundContainer.addChildAt(sprite, 0)
-  backgroundSprite = sprite
+  backgroundSprite.value = sprite
   fitBackground()
 }
 
@@ -2465,10 +2466,10 @@ function dispose() {
   stopObservingViewport?.()
   stopObservingViewport = null
 
-  if (backgroundSprite) {
-    backgroundSprite.parent?.removeChild(backgroundSprite)
-    backgroundSprite.destroy({ texture: true, baseTexture: true })
-    backgroundSprite = null
+  if (backgroundSprite.value) {
+    backgroundSprite.value.parent?.removeChild(backgroundSprite.value)
+    backgroundSprite.value.destroy({ texture: true, baseTexture: true })
+    backgroundSprite.value = null
   }
 
   for (const id of [...containersById.keys()]) {
@@ -2589,14 +2590,20 @@ function dispose() {
     <!-- 变换操作提示（替换原有 hints） -->
     <div v-if="isTransforming" class="stage__transform-hint">
       <div class="transform-hint__title">正在{{ transformHint.modeName }}</div>
-      <div class="transform-hint__line">鼠标移动控制{{ transformHint.modeName }}，左键确定，右键取消</div>
-      <div class="transform-hint__line">按 X / Y 锁定对应轴（未锁轴会回滚到起点）</div>
-      <div v-if="isGuideMove" class="transform-hint__line">按住 Alt 显示准星与游标并吸附（{{ GUIDE_SNAP_PX }} px）</div>
-      <div v-if="transformMode === 'r'" class="transform-hint__line">按住 Alt 按 {{ rotationSnap }}° 间隔吸附旋转</div>
-      <div class="transform-hint__line" v-if="transformMode !== 'r'">当前锁定轴：{{ transformHint.axis }}</div>
-      <div class="transform-hint__line">当前 X={{ transformHint.x }}，Y={{ transformHint.y }}</div>
-      <div class="transform-hint__line" v-if="transformMode !== 'g'">缩放 X={{ transformHint.scaleX }}，Y={{ transformHint.scaleY }}</div>
-      <div class="transform-hint__line" v-if="transformMode !== 'g'">旋转 {{ transformHint.rotationDeg }}°</div>
+      <div class="transform-hint__line">移动鼠标调整 · <kbd>左键</kbd> 确定 · <kbd>右键</kbd> 取消</div>
+      <div v-if="transformMode !== 'r'" class="transform-hint__line"><kbd>X</kbd> / <kbd>Y</kbd> 锁轴，未锁轴回滚到起点</div>
+      <div v-if="isGuideMove" class="transform-hint__line"><kbd>Alt</kbd> 显示准星与游标并吸附（{{ GUIDE_SNAP_PX }} px）</div>
+      <div v-if="transformMode === 'r'" class="transform-hint__line"><kbd>Alt</kbd> 按 {{ rotationSnap }}° 间隔吸附</div>
+      <dl class="transform-hint__values">
+        <template v-if="transformMode !== 'r'"><dt>锁定轴</dt><dd>{{ transformHint.axis }}</dd></template>
+        <dt>X</dt><dd>{{ transformHint.x }}</dd>
+        <dt>Y</dt><dd>{{ transformHint.y }}</dd>
+        <template v-if="transformMode !== 'g'">
+          <dt>缩放 X</dt><dd>{{ transformHint.scaleX }}</dd>
+          <dt>缩放 Y</dt><dd>{{ transformHint.scaleY }}</dd>
+          <dt>旋转</dt><dd>{{ transformHint.rotationDeg }}°</dd>
+        </template>
+      </dl>
     </div>
     <div v-else-if="guideMode !== 'none'" class="stage__transform-hint stage__guide-hint">
       <div class="transform-hint__title">舞台游标</div>
@@ -2616,9 +2623,17 @@ function dispose() {
         @update:model-value="onNextModeChange"
       />
     </div>
-    <!-- <p v-if="!store.models.length && !backgroundSprite" class="stage__hint">
-      点击左上角 “加载模型” 按钮选择 Live2D 模型文件 (.model.json 或 .model3.json)
-    </p> -->
+    <div v-if="!store.models.length && (!backgroundSprite || !store.backgroundUrl) && !isTransforming && guideMode === 'none'" class="stage__empty">
+      <div class="stage__empty-card">
+        <UiIcon name="model" />
+        <strong>开始搭建你的舞台</strong>
+        <p>加载模型或图片，也可从左侧「项目」打开已有项目。</p>
+        <div class="stage__empty-actions">
+          <button class="ui-button ui-button--primary" @click="store.addFromPicker()"><UiIcon name="model" />加载模型</button>
+          <button class="ui-button" @click="store.addImageFigure()"><UiIcon name="image" />加载图片</button>
+        </div>
+      </div>
+    </div>
     <div v-if="!isTransforming && guideMode === 'none'" class="stage__bottom-blocks">
       <div class="stage__hints">
         <button
@@ -2793,6 +2808,11 @@ function dispose() {
 }
 
 .stage__transform-hint {
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+  max-width: calc(100% - 32px - var(--preview-stage-left-inset, 0px) - var(--preview-action-obstruction, var(--preview-action-width, 0px)));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   position: absolute;
   left: calc(16px + var(--preview-stage-left-inset, 0px));
   bottom: 16px;
@@ -2824,19 +2844,43 @@ function dispose() {
   margin-top: 2px;
 }
 
-.stage__hint {
+.stage__empty {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  color: var(--ui-muted);
-  font-size: 14px;
+  right: var(--preview-action-obstruction, var(--preview-action-width, 0px));
+  display: grid;
+  place-items: center;
   pointer-events: none;
-  text-align: center;
   padding: 24px;
 }
+.stage__empty-card {
+  max-width: 340px;
+  padding: 22px;
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-stage-glass);
+  box-shadow: var(--ui-panel-shadow);
+  color: var(--ui-muted);
+  font-size: 13px;
+  text-align: center;
+}
+.stage__empty-card > .ui-symbol { font-size: 28px; color: var(--ui-link); margin-bottom: 10px; }
+.stage__empty-card strong { display: block; color: var(--ui-text); font-size: 16px; }
+.stage__empty-card p { line-height: 1.7; }
+.stage__empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.stage__empty-actions button { pointer-events: auto; padding: 8px 12px; }
+.transform-hint__line kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-compact);
+  background: var(--ui-control);
+  color: var(--ui-link);
+  font: inherit;
+  font-size: 11px;
+}
+.transform-hint__values { display: grid; grid-template-columns: auto minmax(70px, 1fr); gap: 2px 24px; margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--ui-line); }
+.transform-hint__values dt { color: var(--ui-muted); }
+.transform-hint__values dd { margin: 0; text-align: right; }
 
 .stage__next-mode {
   position: absolute;
@@ -2901,6 +2945,11 @@ function dispose() {
 }
 
 .stage__hints-body {
+  box-sizing: border-box;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
   margin-top: 6px;
   padding: 12px 15px;
   background: var(--ui-stage-glass);

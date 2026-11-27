@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { adjustNumber } from '../../utils/numberAdjustment'
 
 /**
  * 可复用的"数值输入控件"。
@@ -19,7 +20,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 const props = withDefaults(
   defineProps<{
     modelValue: number
-    /** 步进值（仅展示 / 透传给 input，不参与逻辑）。 */
+    /** 滚轮微调步进。 */
     step?: number
     /** 最小值（可省略）。 */
     min?: number
@@ -45,13 +46,6 @@ const isEditing = ref(false)
 const editingText = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
 
-function clamp(v: number, lo: number | undefined, hi: number | undefined): number {
-  let r = v
-  if (typeof lo === 'number' && Number.isFinite(lo) && r < lo) r = lo
-  if (typeof hi === 'number' && Number.isFinite(hi) && r > hi) r = hi
-  return r
-}
-
 function format(v: number): string {
   if (!Number.isFinite(v)) return '0'
   // 用 toFixed 保证稳定显示 precision 位
@@ -70,6 +64,7 @@ async function startEdit() {
 }
 
 function commitEdit() {
+  if (!isEditing.value) return
   const raw = editingText.value.trim()
   // 空字符串 = 取消
   if (raw === '') {
@@ -89,15 +84,23 @@ function commitEdit() {
       return
     }
   }
-  const clamped = clamp(num, props.min, props.max)
-  // 浮点比较 + 四舍五入到 precision，避免 0.05 → 0.050000000000000044
-  const rounded = Number(clamped.toFixed(props.precision))
+  const rounded = adjustNumber(num, 0, props)
   if (rounded !== props.modelValue) emit('update:modelValue', rounded)
   isEditing.value = false
 }
 
 function cancelEdit() {
   isEditing.value = false
+}
+
+function onWheel(event: WheelEvent) {
+  if ((!isEditing.value && !event.altKey) || event.ctrlKey || event.metaKey || !event.deltaY) return
+  event.preventDefault()
+  event.stopPropagation()
+  const parsed = isEditing.value && editingText.value.trim() ? Number(editingText.value) : props.modelValue
+  const value = adjustNumber(Number.isFinite(parsed) ? parsed : props.modelValue, event.deltaY < 0 ? 1 : -1, props)
+  if (isEditing.value) editingText.value = format(value)
+  else if (value !== props.modelValue) emit('update:modelValue', value)
 }
 
 // 仅在"编辑中"时监听 document 的 pointerdown，捕获阶段触发。
@@ -132,8 +135,10 @@ onBeforeUnmount(() => {
     :step="step"
     :min="min"
     :max="max"
-    @keydown.enter.prevent="commitEdit"
-    @keydown.esc.prevent="cancelEdit"
+    @keydown.enter.stop.prevent="commitEdit"
+    @keydown.esc.stop.prevent="cancelEdit"
+    @blur="commitEdit"
+    @wheel="onWheel"
   />
   <span
     v-else
@@ -142,11 +147,13 @@ onBeforeUnmount(() => {
     tabindex="0"
     @click="startEdit"
     @keydown.enter.prevent="startEdit"
+    @wheel="onWheel"
   >{{ displayText }}</span>
 </template>
 
 <style scoped>
 .number-input {
+  font-variant-numeric: tabular-nums;
   flex: 1;
   width: 100%;
   min-width: 0;
@@ -167,7 +174,6 @@ onBeforeUnmount(() => {
   cursor: text;
   text-align: left;
   user-select: none;
-  font-variant-numeric: tabular-nums;
 }
 
 .number-input--display:hover {
@@ -187,6 +193,5 @@ onBeforeUnmount(() => {
   color: var(--ui-text);
   box-shadow: inset 0 1px 3px var(--ui-shadow);
   text-align: left;
-  font-variant-numeric: tabular-nums;
 }
 </style>

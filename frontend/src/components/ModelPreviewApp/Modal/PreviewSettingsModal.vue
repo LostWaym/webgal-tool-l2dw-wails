@@ -94,18 +94,15 @@ function onSeparatorInput(event: Event) {
           </nav>
           <div class="settings-content">
             <template v-if="activeTab === 'misc'">
+              <section class="settings-group">
+              <h3>面板与窗口</h3>
               <label><input class="ui-switch" type="checkbox" role="switch" :checked="autoHideLeftPanel" @change="updateAutoHideLeftPanel(($event.target as HTMLInputElement).checked)"> 自动隐藏左侧模型列表</label>
               <p>鼠标靠近窗口左边缘时显示，修改后自动保存。</p>
               <label><input class="ui-switch" type="checkbox" role="switch" :checked="autoHideRightPanel" @change="updateAutoHideRightPanel(($event.target as HTMLInputElement).checked)"> 自动隐藏右侧操作区</label>
               <p>鼠标靠近窗口右边缘时显示，修改后自动保存。</p>
-              <label><input class="ui-switch" type="checkbox" role="switch" :checked="legacyMode" @change="onChange"> 使用旧版表情混合模式</label>
-              <p>仅影响预览窗口中所有 Cubism 2 模型的表情参数混合，修改后立即生效。</p>
-              <label class="frame-rate-label" for="preview-frame-rate-limit">帧率限制</label>
-              <ThemeSelect id="preview-frame-rate-limit" class="frame-rate-select" :model-value="frameRateLimit" :options="frameRateOptions" @update:model-value="updateFrameRateLimit(Number($event))" />
-              <p>仅影响预览主舞台，修改后立即生效并自动保存。</p>
-              <label>旋转吸附间隔（度）</label>
-              <NumberInput :model-value="rotationSnap" :min="0.01" :step="0.01" @update:model-value="updateRotationSnap" />
-              <p>预览舞台按 R 旋转时，按住 Alt 吸附到最近的间隔倍数。修改后自动保存。</p>
+              </section>
+              <section class="settings-group">
+              <h3>舞台与游标</h3>
               <label class="focus-offset-label">注视框 Y 轴偏移</label>
               <NumberInput :model-value="focusBoxOffsetY" :step="1" @update:model-value="updateFocusBoxOffsetY" />
               <p>按 L 调整注视时使用，单位为模型变换空间坐标；正值向下，负值向上。修改后自动保存。</p>
@@ -114,6 +111,21 @@ function onSeparatorInput(event: Event) {
               <label class="guide-visibility-label">游标溢出长度（像素）</label>
               <NumberInput :model-value="guideOverflow" :min="0" :step="1" @update:model-value="updateGuideOverflow" />
               <p>游标在画框两端各延伸的舞台坐标长度，随舞台缩放；设为 0 时不延伸。修改后自动保存。</p>
+              </section>
+              <section class="settings-group">
+              <h3>交互与吸附</h3>
+              <label>旋转吸附间隔（度）</label>
+              <NumberInput :model-value="rotationSnap" :min="0.01" :step="0.01" @update:model-value="updateRotationSnap" />
+              <p>预览舞台按 R 旋转时，按住 Alt 吸附到最近的间隔倍数。修改后自动保存。</p>
+              </section>
+              <section class="settings-group">
+              <h3>渲染兼容</h3>
+              <label><input class="ui-switch" type="checkbox" role="switch" :checked="legacyMode" @change="onChange"> 使用旧版表情混合模式</label>
+              <p>仅影响预览窗口中所有 Cubism 2 模型的表情参数混合，修改后立即生效。</p>
+              <label class="frame-rate-label" for="preview-frame-rate-limit">帧率限制</label>
+              <ThemeSelect id="preview-frame-rate-limit" class="frame-rate-select" :model-value="frameRateLimit" :options="frameRateOptions" @update:model-value="updateFrameRateLimit(Number($event))" />
+              <p>仅影响预览主舞台，修改后立即生效并自动保存。</p>
+              </section>
             </template>
             <template v-else-if="activeTab === 'motionExpression'">
               <label><input class="ui-switch" type="checkbox" role="switch" :checked="folders.settings.enabled" @change="onFoldersEnabledChange"> 启用文件夹划分</label>
@@ -167,6 +179,11 @@ h2 { flex: 1; margin: 0; font-size: 16px; }
 .settings-tabs button { position: relative; display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; }
 .settings-tabs button.active { background: transparent; color: var(--ui-link); }
 .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 18px; }
+.settings-group + .settings-group { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--ui-line); }
+.settings-group h3 { margin: 0 0 14px; color: var(--ui-muted); font-size: 12px; font-weight: 600; }
+.settings-group p + label { margin-top: 18px; }
+.settings-group > label:first-of-type { margin-top: 0; }
+.settings-group > :deep(.number-input) { display: block; margin-top: 8px; }
 .separator-label, .frame-rate-label, .focus-offset-label, .guide-visibility-label { margin-top: 20px; }
 .viewport-section { margin-top: 24px; }
 .viewport-section h3 { margin: 0 0 12px; font-size: 15px; }

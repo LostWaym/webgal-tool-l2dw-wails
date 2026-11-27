@@ -17,7 +17,7 @@ const filterPresetModal = useFilterPresetModal()
 const snapshotModal = useTransformSnapshotModal()
 const { reloadConfig, reloadTextures } = usePreviewModelReload()
 const dragFromIndex = ref<number | null>(null)
-
+const dropTarget = ref<{ index: number; after: boolean } | null>(null)
 function onResizeMove(e: MouseEvent) {
   emit('resize', e.clientX)
 }
@@ -105,27 +105,41 @@ function onDragStart(event: DragEvent, index: number) {
   dragFromIndex.value = index
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', store.models[index].id)
   }
 }
 
 function onDragOver(event: DragEvent, index: number) {
+  if (dragFromIndex.value === null) return
   event.preventDefault()
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  dropTarget.value = { index, after: event.clientY >= rect.top + rect.height / 2 }
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = 'move'
   }
 }
 
 function onDrop(event: DragEvent, toIndex: number) {
+  if (dragFromIndex.value === null) return
+  onDragOver(event, toIndex)
   event.preventDefault()
   const fromIndex = dragFromIndex.value
-  if (fromIndex !== null && fromIndex !== toIndex) {
-    store.move(fromIndex, toIndex)
+  if (fromIndex !== null && dropTarget.value) {
+    const insertion = toIndex + Number(dropTarget.value.after)
+    store.move(fromIndex, insertion - Number(fromIndex < insertion))
   }
-  dragFromIndex.value = null
+  onDragEnd()
 }
 
 function onDragEnd() {
   dragFromIndex.value = null
+  dropTarget.value = null
+}
+
+function onDragLeave(event: DragEvent) {
+  if (!(event.relatedTarget instanceof Node) || !(event.currentTarget as HTMLElement).contains(event.relatedTarget)) {
+    dropTarget.value = null
+  }
 }
 </script>
 
@@ -143,6 +157,8 @@ function onDragEnd() {
       <button class="ui-button add-btn" @click="emit('settings')"><UiIcon name="settings" />设置</button>
     </header>
 
+    <div class="model-list__sections">
+    <h3 class="model-list__section-title">舞台</h3>
     <ul class="model-list__items model-list__items--special">
       <li
         v-for="id in SPECIAL_IDS"
@@ -171,9 +187,7 @@ function onDragEnd() {
           title="选择滤镜"
           @click="onOpenFilterPreset(id, $event)"
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 5h16l-6.5 7.5V19l-3 1v-7.5L4 5z" />
-          </svg>
+          <UiIcon name="filter" />
         </button>
         <button
           class="model-row__bg-load model-row__filter"
@@ -181,11 +195,7 @@ function onDragEnd() {
           title="变换快照列表"
           @click="onOpenSnapshot(id, $event)"
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="6" width="18" height="14" rx="2" />
-            <path d="M8 6l1.5-2h5L16 6" />
-            <circle cx="12" cy="13" r="3" />
-          </svg>
+          <UiIcon name="snapshot" />
         </button>
         <button
           v-if="id === SpecialId.BgContainer"
@@ -204,19 +214,21 @@ function onDragEnd() {
       </li>
     </ul>
     <hr v-if="store.models.length" class="model-list__divider" />
+    <h3 class="model-list__section-title">立绘</h3>
 
     <ul v-if="store.models.length" class="model-list__items">
       <li
         v-for="(m, index) in store.models"
         :key="m.id"
-          class="model-row model-row--figure"
-        :class="{ 'is-selected': m.id === store.selectedId, 'is-dragging': dragFromIndex === index }"
+        class="model-row model-row--figure"
+        :class="{ 'is-selected': m.id === store.selectedId, 'is-dragging': dragFromIndex === index, 'drop-before': dropTarget?.index === index && !dropTarget.after, 'drop-after': dropTarget?.index === index && dropTarget.after }"
         draggable="true"
         @click="onSelect(m.id)"
         @dragstart="onDragStart($event, index)"
         @dragover="onDragOver($event, index)"
         @drop="onDrop($event, index)"
         @dragend="onDragEnd"
+        @dragleave="onDragLeave"
       >
         <div class="model-row__quick-actions" @mousedown.prevent @dragstart.stop.prevent>
           <button
@@ -227,36 +239,23 @@ function onDragEnd() {
           >
             <UiIcon :name="m.visible ? 'eye' : 'eyeOff'" />
           </button>
-          <div class="model-row__quick-menu">
-            <button type="button" class="model-row__quick-btn" title="选择滤镜" aria-label="选择滤镜" @click="onOpenFilterPreset(m.id, $event)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M4 5h16l-6.5 7.5V19l-3 1v-7.5L4 5z" />
-              </svg>
-            </button>
-            <button type="button" class="model-row__quick-btn" title="变换快照列表" aria-label="变换快照列表" @click="onOpenSnapshot(m.id, $event)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="6" width="18" height="14" rx="2" />
-                <path d="M8 6l1.5-2h5L16 6" />
-                <circle cx="12" cy="13" r="3" />
-              </svg>
-            </button>
-            <button v-if="m.kind === 'live2d' && m.wmdlConfig?.wmdlFilePath" type="button" class="model-row__quick-btn" title="重载模型配置" aria-label="重载模型配置" @click.stop="reloadConfig(m.id)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M20 7v5h-5M4 17v-5h5" />
-                <path d="M5.5 9a7 7 0 0 1 11.8-2L20 12M4 12l2.7 5a7 7 0 0 0 11.8-2" />
-              </svg>
-            </button>
-            <button v-if="m.kind === 'live2d'" type="button" class="model-row__quick-btn" title="重载纹理" aria-label="重载纹理" @click.stop="reloadTextures(m.id)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <circle cx="8" cy="9" r="1.5" />
-                <path d="m4 18 5-5 3 3 3-3 5 5" />
-              </svg>
-            </button>
-          </div>
         </div>
         <span v-if="m.kind === 'image'" class="model-row__kind-badge" title="图片立绘">图</span>
         <span class="model-row__name" :title="m.jsonPath || m.imageUrl">{{ m.name }}</span>
+        <div class="model-row__quick-menu" @mousedown.prevent @dragstart.stop.prevent>
+          <button type="button" class="model-row__quick-btn" title="选择滤镜" aria-label="选择滤镜" @click="onOpenFilterPreset(m.id, $event)">
+            <UiIcon name="filter" />
+          </button>
+          <button type="button" class="model-row__quick-btn" title="变换快照列表" aria-label="变换快照列表" @click="onOpenSnapshot(m.id, $event)">
+            <UiIcon name="snapshot" />
+          </button>
+          <button v-if="m.kind === 'live2d' && m.wmdlConfig?.wmdlFilePath" type="button" class="model-row__quick-btn" title="重载模型配置" aria-label="重载模型配置" @click.stop="reloadConfig(m.id)">
+            <UiIcon name="reload" />
+          </button>
+          <button v-if="m.kind === 'live2d'" type="button" class="model-row__quick-btn" title="重载纹理" aria-label="重载纹理" @click.stop="reloadTextures(m.id)">
+            <UiIcon name="texture" />
+          </button>
+        </div>
         <button
           class="model-row__close"
           aria-label="移除"
@@ -270,6 +269,7 @@ function onDragEnd() {
 
     <p v-else class="model-list__empty">尚未加载任何模型</p>
 
+    <h3 v-if="store.figureGroups.length" class="model-list__section-title">立绘组</h3>
     <ul v-if="store.figureGroups.length" class="model-list__items model-list__items--groups">
       <li
         v-for="g in store.figureGroups"
@@ -290,6 +290,7 @@ function onDragEnd() {
         </button>
       </li>
     </ul>
+    </div>
   </aside>
 </template>
 
@@ -308,6 +309,7 @@ function onDragEnd() {
 }
 
 .model-list__header {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
   padding: 12px 12px 0;
@@ -350,11 +352,18 @@ function onDragEnd() {
   list-style: none;
   margin: 0;
   padding: 8px 10px;
-  overflow-y: auto;
+  overflow: visible;
+}
+
+.model-list__sections {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .model-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -378,7 +387,8 @@ function onDragEnd() {
 
 .model-row--figure,
 .model-row--group {
-  gap: 8px;
+  --model-row-gap: 8px;
+  gap: var(--model-row-gap);
   min-height: 49px;
   padding-inline: 14px;
 }
@@ -500,26 +510,25 @@ function onDragEnd() {
 }
 
 .model-row__quick-menu {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 100%;
-  transform: translate(-6px, -50%);
+  flex: none;
   display: flex;
-  padding: 2px;
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius-control);
-  background: var(--ui-control);
-  box-shadow: 0 3px 8px var(--ui-shadow);
+  max-width: 0;
+  margin-left: calc(-1 * var(--model-row-gap));
+  overflow: hidden;
+  visibility: hidden;
   opacity: 0;
+  transform: translateX(4px);
   pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: max-width 0.16s ease, margin-left 0.16s ease, opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
 }
 
-.model-row__quick-actions:hover .model-row__quick-menu,
-.model-row__quick-actions:focus-within .model-row__quick-menu {
+.model-row--figure:hover .model-row__quick-menu,
+.model-row--figure:focus-within .model-row__quick-menu {
+  max-width: 104px;
+  margin-left: 0;
   opacity: 1;
-  transform: translate(0, -50%);
+  transform: translateX(0);
+  visibility: visible;
   pointer-events: auto;
 }
 
@@ -530,6 +539,8 @@ function onDragEnd() {
 }
 
 .model-row__quick-btn {
+  flex: none;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -537,7 +548,7 @@ function onDragEnd() {
   height: 26px;
   padding: 0;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--ui-radius-compact);
   background: transparent;
   color: var(--ui-text);
   cursor: pointer;
@@ -602,8 +613,6 @@ function onDragEnd() {
 
 .model-list__items--groups {
   border-top: 1px solid var(--ui-line);
-  flex: 0 0 auto;
-  max-height: 35%;
 }
 
 .model-row--group {
@@ -624,4 +633,31 @@ function onDragEnd() {
   font-weight: 600;
   flex-shrink: 0;
 }
+
+@container (max-width: 310px) {
+  .model-row--figure { --model-row-gap: 5px; }
+  .model-row__quick-actions { margin-right: 0; }
+  .model-row__quick-btn { width: 22px; }
+}
+
+.model-list__section-title {
+  flex: none;
+  margin: 10px 18px 2px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.model-row.drop-before::before,
+.model-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--ui-accent);
+  pointer-events: none;
+}
+.model-row.drop-before::before { top: -2px; }
+.model-row.drop-after::after { bottom: -2px; }
 </style>

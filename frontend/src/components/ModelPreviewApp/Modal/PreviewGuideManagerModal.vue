@@ -196,7 +196,7 @@ async function importFile() {
 </template>
 
 <style scoped>
-.guide-mask { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--ui-shadow); }
+.guide-mask { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--ui-scrim); }
 .guide-modal { width: min(660px, 92vw); height: min(480px, 85vh); display: flex; flex-direction: column; }
 .guide-modal:focus { outline: none; }
 header, footer { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 12px 18px; }

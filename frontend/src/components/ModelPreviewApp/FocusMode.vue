@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { MotionPriority } from 'pixi-live2d-display-webgal'
 import Live2dPreview from '../common/Live2dPreview.vue'
 import SearchInput from '../common/SearchInput.vue'
+import UiIcon from '../common/UiIcon.vue'
 import { useModelStore } from '../../stores/previewStore'
 import { useMotionExpressionFolders } from '../../composables/useMotionExpressionFolders'
 import { useDraggableScroll } from '../../composables/useDraggableScroll'
@@ -284,6 +285,9 @@ function onListWheel(e: WheelEvent, type: Kind) {
         {{ rate.toFixed(1) }}×
         <small v-if="!rateSupported">（当前模型不支持）</small>
       </label>
+      <button class="ui-button" type="button" :disabled="reloading" title="重载模型（Ctrl + R）" @click="reload">
+        <UiIcon name="reload" />{{ reloading ? '重载中…' : '重载模型' }} <small>Ctrl + R</small>
+      </button>
       <button class="ui-button" type="button" @click="emit('close')">关闭 <small>Ctrl + Q</small></button>
     </header>
     <div class="focus-content">
@@ -292,10 +296,11 @@ function onListWheel(e: WheelEvent, type: Kind) {
         <div v-if="!ready" class="preview-status">{{ failed ? '模型加载失败，请关闭后重试' : '模型加载中…' }}</div>
       </div>
       <div class="focus-lists">
+        <p class="focus-gesture-tip">左键点击选中 · 右键按住滑选预览，松开确认</p>
         <section v-for="section in sections" :key="section.type" class="list-section" :class="{ collapsed: section.collapsed }">
           <div class="section-header">
-            <button class="section-title" type="button" :aria-expanded="!section.collapsed" @click="toggle(section.type)">
-              {{ section.collapsed ? '▸' : '▾' }} {{ section.title }}
+            <button class="ui-button section-title" type="button" :aria-expanded="!section.collapsed" @click="toggle(section.type)">
+              <UiIcon :name="section.collapsed ? 'right' : 'down'" /> {{ section.title }}
             </button>
             <button class="ui-button" type="button" @click="showCurrent(section.type)">当前</button>
             <button class="ui-button" type="button" :disabled="!ready" @click="playRandom(section.type)">随机</button>
@@ -304,17 +309,17 @@ function onListWheel(e: WheelEvent, type: Kind) {
             <SearchInput v-if="section.type === 'motion'" v-model="motionSearch" placeholder="搜索动作..." />
             <SearchInput v-else v-model="expressionSearch" placeholder="搜索表情..." />
             <nav v-if="folders.active.value && !section.search.trim()" class="breadcrumbs" :aria-label="section.title + '目录'">
-              <button :disabled="!section.path.length" @click="setPath(section.type, [])">root</button>
+              <UiIcon name="folder" /><button class="ui-button" :disabled="!section.path.length" @click="setPath(section.type, [])">root</button>
               <template v-for="(part, index) in section.path" :key="index">
-                <span> / </span><button :disabled="index === section.path.length - 1" @click="setPath(section.type, section.path.slice(0, index + 1))">{{ part }}</button>
+                <UiIcon name="right" /><button class="ui-button" :disabled="index === section.path.length - 1" @click="setPath(section.type, section.path.slice(0, index + 1))">{{ part }}</button>
               </template>
             </nav>
             <div :ref="(el) => { section.scroll.containerRef.value = el as HTMLElement | null }" class="item-scroll" v-bind="section.scroll.scrollHandlers" @wheel="onListWheel($event, section.type)">
               <div class="item-grid">
-                <button v-for="folder in section.directory.folders" :key="'folder:' + folder" class="item folder" @click="setPath(section.type, [...section.path, folder])">📁 {{ folder }}</button>
+                <button v-for="folder in section.directory.folders" :key="'folder:' + folder" :title="folder" class="ui-button item folder" @click="setPath(section.type, [...section.path, folder])"><UiIcon name="folder" /><span>{{ folder }}</span></button>
                 <button
                   v-for="item in section.directory.entries" :key="itemKey(section.type, item)"
-                  class="item" :class="{ selected: isSelected(section.type, item) }"
+                  class="ui-button item" :class="{ selected: isSelected(section.type, item) }"
                   :title="item.name" :data-focus-item="itemKey(section.type, item)" :data-focus-type="section.type"
                   :disabled="!ready" @click="commit(section.type, item)" @mousedown="onRightDown($event, section.type, item)"
                 >{{ nameSegments(item.name, folders.active.value, folders.settings.separator).slice(-1)[0] }}</button>
@@ -331,7 +336,7 @@ function onListWheel(e: WheelEvent, type: Kind) {
 <style scoped>
 .focus-mode { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; color: var(--ui-text); background: var(--ui-window); }
 .gesture-hint { position: fixed; z-index: 20; box-sizing: border-box; width: min(240px, calc(100vw - 16px)); height: 32px; padding: 7px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; border: 1px solid var(--ui-link); border-radius: 5px; background: var(--ui-control); color: var(--ui-text); font-size: 12px; box-shadow: 0 3px 10px var(--ui-shadow); }
-.focus-header { height: 50px; flex-shrink: 0; display: flex; align-items: center; gap: 18px; padding: 0 16px; border-bottom: 1px solid var(--ui-line); }
+.focus-header { min-height: 50px; flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--ui-line); }
 .focus-header strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-header label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .focus-header button { padding: 6px 12px; }
@@ -343,18 +348,20 @@ function onListWheel(e: WheelEvent, type: Kind) {
 .list-section.collapsed { flex: 0 0 auto; }
 .section-header { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--ui-line); }
 .section-header > button:not(.section-title) { padding: 3px 7px; font-size: 12px; }
-.section-title { flex: 1; border: 0; background: transparent; text-align: left; padding: 8px; font-weight: bold; cursor: pointer; }
+.section-title { flex: 1; justify-content: flex-start; padding: 6px 8px; font-weight: bold; }
 .section-title:hover { background: var(--ui-hover); }
 .section-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
-.breadcrumbs { flex: 0 0 auto; overflow-x: auto; white-space: nowrap; padding: 3px 6px; font-size: 12px; background: var(--ui-control); border-radius: var(--ui-radius-compact); }
-.breadcrumbs button { border: 0; background: none; padding: 2px; cursor: pointer; }
+.breadcrumbs { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; overflow-x: auto; white-space: nowrap; padding: 3px 6px; font-size: 12px; background: var(--ui-control); border-radius: var(--ui-radius-compact); }
+.breadcrumbs button { flex: none; padding: 2px 5px; font-size: inherit; }
 .breadcrumbs button:disabled { cursor: default; }
 .item-scroll { flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; user-select: none; }
 .item-grid { height: 100%; width: max-content; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 32px); grid-auto-columns: 145px; gap: 4px; align-content: start; }
-.item { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 8px; font-size: 12px; background: var(--ui-control); border: 1px solid var(--ui-control-line); cursor: pointer; }
+.item { display: block; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 8px; font-size: 12px; }
 .item:hover:not(:disabled) { background: var(--ui-hover); }
 .item:disabled { color: var(--ui-muted); cursor: not-allowed; }
 .item.selected { border-color: var(--ui-link); background: var(--ui-selected); }
 .folder { color: var(--ui-warning); }
+.folder .ui-symbol { margin-right: 6px; vertical-align: middle; }
+.focus-gesture-tip { flex: none; margin: 2px 4px; color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
 .empty { color: var(--ui-muted); font-size: 13px; }
 </style>

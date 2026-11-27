@@ -15,6 +15,7 @@ import type { PreviewProject } from './utils/previewProject'
 import { useMessage } from './composables/useMessage'
 import ColorPickerModal from './components/common/ColorPickerModal.vue'
 import MessageHost from './components/common/MessageHost.vue'
+import UiIcon from './components/common/UiIcon.vue'
 import { useModelStore } from './stores/previewStore'
 import { useShortcuts } from './composables/useShortcuts'
 import { usePreviewModelReload } from './composables/usePreviewModelReload'
@@ -29,6 +30,8 @@ const guideVisibility = usePreviewGuideVisibility()
 const { leftEnabled: autoHideLeftPanel, rightEnabled: autoHideRightPanel } = usePreviewAutoHidePanels()
 const leftPanelOpen = ref(false)
 const rightPanelOpen = ref(false)
+const leftPanelPinned = ref(false)
+const rightPanelPinned = ref(false)
 const edgeSize = 32
 const panelLeaveTolerance = 12
 let panelPointerDown = false
@@ -42,8 +45,8 @@ function updatePanelVisibility(e: MouseEvent) {
   if ((!autoHideLeftPanel.value && !autoHideRightPanel.value) || panelPointerDown || e.buttons) return
   const leftWidth = document.querySelector<HTMLElement>('.app__left')?.offsetWidth ?? 0
   const rightWidth = document.querySelector<HTMLElement>('.model-action-panel')?.offsetWidth ?? 0
-  leftPanelOpen.value = autoHideLeftPanel.value && (hasPanelInputFocus('.app__left') || e.clientX <= (leftPanelOpen.value ? leftWidth + panelLeaveTolerance : edgeSize))
-  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && (hasPanelInputFocus('.model-action-panel') || e.clientX >= window.innerWidth - (rightPanelOpen.value ? rightWidth + panelLeaveTolerance : edgeSize))
+  leftPanelOpen.value = autoHideLeftPanel.value && (leftPanelPinned.value || hasPanelInputFocus('.app__left') || e.clientX <= (leftPanelOpen.value ? leftWidth + panelLeaveTolerance : edgeSize))
+  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && (rightPanelPinned.value || hasPanelInputFocus('.model-action-panel') || e.clientX >= window.innerWidth - (rightPanelOpen.value ? rightWidth + panelLeaveTolerance : edgeSize))
 }
 
 function onPanelPointerDown(e: MouseEvent) {
@@ -58,16 +61,23 @@ function onPanelPointerUp(e: MouseEvent) {
 
 function resetPanels() {
   panelPointerDown = false
-  leftPanelOpen.value = autoHideLeftPanel.value && hasPanelInputFocus('.app__left')
-  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && hasPanelInputFocus('.model-action-panel')
+  leftPanelOpen.value = autoHideLeftPanel.value && (leftPanelPinned.value || hasPanelInputFocus('.app__left'))
+  rightPanelOpen.value = autoHideRightPanel.value && !!store.selectedId && (rightPanelPinned.value || hasPanelInputFocus('.model-action-panel'))
+}
+
+function togglePanelPin(side: 'left' | 'right') {
+  const pinned = side === 'left' ? leftPanelPinned : rightPanelPinned
+  const open = side === 'left' ? leftPanelOpen : rightPanelOpen
+  pinned.value = !pinned.value
+  open.value = true
 }
 
 function onWindowMouseLeave(e: MouseEvent) {
   if (!panelPointerDown && (e.clientX <= 0 || e.clientX >= window.innerWidth)) resetPanels()
 }
 
-watch(autoHideLeftPanel, enabled => { leftPanelOpen.value = enabled && hasPanelInputFocus('.app__left') })
-watch(autoHideRightPanel, enabled => { rightPanelOpen.value = enabled && !!store.selectedId && hasPanelInputFocus('.model-action-panel') })
+watch(autoHideLeftPanel, enabled => { leftPanelPinned.value = false; leftPanelOpen.value = enabled && hasPanelInputFocus('.app__left') })
+watch(autoHideRightPanel, enabled => { rightPanelPinned.value = false; rightPanelOpen.value = enabled && !!store.selectedId && hasPanelInputFocus('.model-action-panel') })
 watch(() => store.selectedId, id => {
   if (!id) rightPanelOpen.value = false
 })
@@ -202,8 +212,14 @@ onBeforeUnmount(() => {
     <ModelList class="app__left" :inert="autoHideLeftPanel && !leftPanelOpen ? '' : undefined" @resize="onPanelResize('left', $event)" @project="projectVisible = true" @guides="guideManagerVisible = true" @settings="settingsVisible = true" />
     <Stage v-if="stageVisible" class="app__right" :interaction-disabled="focusVisible || guideManagerVisible" :guide-manager-visible="guideManagerVisible" />
     <ModelActionPanel v-if="store.selectedId" :inert="autoHideRightPanel && !rightPanelOpen ? '' : undefined" @resize="onPanelResize('right', $event)" @open-motion-expression-settings="openMotionExpressionSettings" />
-    <div v-if="autoHideLeftPanel && !leftPanelOpen" class="app__edge-hint app__edge-hint--left" aria-hidden="true">›</div>
-    <div v-if="autoHideRightPanel && !rightPanelOpen && store.selectedId" class="app__edge-hint app__edge-hint--right" aria-hidden="true">‹</div>
+    <template v-if="!focusVisible && !isTransforming && !settingsVisible && !projectVisible && !guideManagerVisible">
+      <button v-if="autoHideLeftPanel" type="button" class="app__edge-hint app__edge-hint--left" :class="{ 'is-pinned': leftPanelPinned }" :aria-pressed="leftPanelPinned" :aria-label="leftPanelPinned ? '左侧面板恢复自动隐藏' : '展开并固定左侧面板'" :title="leftPanelPinned ? '恢复自动隐藏' : '展开并固定左侧面板'" @click="togglePanelPin('left')">
+        <UiIcon :name="leftPanelPinned ? 'pin' : 'right'" />
+      </button>
+      <button v-if="autoHideRightPanel && store.selectedId" type="button" class="app__edge-hint app__edge-hint--right" :class="{ 'is-pinned': rightPanelPinned }" :aria-pressed="rightPanelPinned" :aria-label="rightPanelPinned ? '右侧面板恢复自动隐藏' : '展开并固定右侧面板'" :title="rightPanelPinned ? '恢复自动隐藏' : '展开并固定右侧面板'" @click="togglePanelPin('right')">
+        <UiIcon :name="rightPanelPinned ? 'pin' : 'left'" />
+      </button>
+    </template>
     <TransformSnapshotModal />
     <FilterPresetModal />
     <BackgroundHistoryModal />
@@ -240,29 +256,37 @@ onBeforeUnmount(() => {
 
 .app__edge-hint {
   position: fixed;
-  top: 0;
-  bottom: 0;
-  width: var(--preview-panel-edge-size);
-  z-index: 90;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 64px;
+  padding: 0;
+  z-index: 101;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ui-panel);
+  background: var(--ui-floating);
   color: var(--ui-muted);
-  opacity: 0.65;
-  font-size: 24px;
-  pointer-events: none;
+  border: 1px solid var(--ui-control-line);
+  border-radius: var(--ui-radius-pill);
+  box-shadow: var(--ui-control-shadow);
+  opacity: 0.8;
+  font-size: 16px;
+  cursor: pointer;
   user-select: none;
+  transition: opacity 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 
+.app__edge-hint:hover,
+.app__edge-hint:focus-visible,
+.app__edge-hint.is-pinned { opacity: 1; background: var(--ui-control-fill); color: var(--ui-link); box-shadow: var(--ui-panel-shadow); }
+
 .app__edge-hint--left {
-  left: 0;
-  border-right: 1px solid var(--ui-line);
+  left: 3px;
 }
 
 .app__edge-hint--right {
-  right: 0;
-  border-left: 1px solid var(--ui-line);
+  right: 3px;
 }
 
 .app.auto-hide-left-panel .app__left {
@@ -297,6 +321,7 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .app__edge-hint,
   .app.auto-hide-left-panel .app__left,
   .app.auto-hide-right-panel .model-action-panel {
     transition: none;

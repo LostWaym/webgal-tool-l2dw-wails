@@ -29,7 +29,7 @@ import { BevelFilter } from './BevelFilter'
  *     所有变换都走 `L2dwContainer`。
  *
  * 滤镜：
- *   - 滤镜系统参考 WebGAL 的 WebGALPixiContainer；默认全空，不挂任何 PIXI.Filter。
+ *   - 滤镜系统参考 WebGAL 的 WebGALPixiContainer；默认挂载整容器 AlphaFilter，其余按需启用。
  *   - 通过 `FILTER_CONFIGS` 注册可启用滤镜；通过 `PROPERTY_CONFIGS` 暴露属性 getter/setter。
  *   - **不实现**：`shockwave` / `radiusAlpha`（按需求作废）。
  *   - `alpha`（继承自 `PIXI.Container`）保持默认递归子容器行为不动；新增的"整容器 alpha 滤镜"

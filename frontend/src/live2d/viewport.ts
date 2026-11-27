@@ -1,7 +1,19 @@
-import type { Application, Container } from 'pixi.js'
+import type { Application, Container, DisplayObject } from 'pixi.js'
 
 export function getDevicePixelRatio(): number {
   return window.devicePixelRatio || 1
+}
+
+function syncFilterResolution(object: DisplayObject, resolution: number): void {
+  if (object.filters) {
+    for (const filter of object.filters) {
+      if (filter.resolution !== resolution) filter.resolution = resolution
+    }
+  }
+  const children = (object as Container).children
+  if (children) {
+    for (const child of children) syncFilterResolution(child, resolution)
+  }
 }
 
 /** 视口位置使用逻辑尺寸，DPR 仅用于画布像素密度。 */
@@ -14,6 +26,12 @@ export function observePixiViewport(
   let resolutionQuery: MediaQueryList | null = null
   let watchedResolution = 0
   let disposed = false
+
+  function syncFilters() {
+    if (disposed) return
+    // Pixi 6 的离屏滤镜不继承画布 DPR；也需覆盖异步加载的 Live2D 自带滤镜。
+    syncFilterResolution(app.stage, app.renderer.resolution)
+  }
 
   function syncViewport() {
     if (disposed) return
@@ -48,10 +66,13 @@ export function observePixiViewport(
   const observer = new ResizeObserver(syncViewport)
   observer.observe(host)
   window.addEventListener('resize', syncViewport)
+  app.renderer.on('prerender', syncFilters)
   syncViewport()
+  syncFilters()
 
   return () => {
     disposed = true
+    app.renderer.off('prerender', syncFilters)
     observer.disconnect()
     window.removeEventListener('resize', syncViewport)
     resolutionQuery?.removeEventListener('change', syncViewport)

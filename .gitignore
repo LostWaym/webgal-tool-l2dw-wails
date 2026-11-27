@@ -6,3 +6,4 @@ frontend/dist
 /frontend/wailsjs
 /frontend/public/lib
 /frontend/package.json.md5
+/.env

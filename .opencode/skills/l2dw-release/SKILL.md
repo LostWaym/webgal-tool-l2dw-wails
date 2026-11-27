@@ -13,7 +13,7 @@ metadata:
 
 - Windows PowerShell、Git。
 - Wails v2 CLI `wails`，以及项目所需的 Go、Node.js 和 npm。`wails build` 使用项目根目录的 `wails.json`，其中配置了前端依赖安装与构建命令。
-- 7-Zip 命令行程序 `7z` 或 `7z.exe`。先通过 `Get-Command 7z` 查找，也可检查常见安装目录；找不到时请用户提供路径或安装，不要改用其他压缩格式。
+- 7-Zip 命令行程序 `7z` 或 `7z.exe`。优先读取项目根目录 `.env` 中的 `SEVEN_ZIP_PATH`（完整可执行文件路径，参见 `.env.example`），确认文件存在；未配置或路径无效时通过 `Get-Command 7z` 查找，也可检查常见安装目录。仍找不到时请用户提供路径或安装，不要改用其他压缩格式。`.env` 是本地配置，不要执行或作为脚本加载。
 - 执行外部程序后检查退出码；失败即停止并报告原因。不要因为旧产物存在而忽略构建失败。
 
 ## 打包

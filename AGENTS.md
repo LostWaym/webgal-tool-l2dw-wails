@@ -94,6 +94,7 @@ l2dw-wails/
 
 ### 综合信息
 
+- Git 提交信息使用中文。
 - PowerShell 不接受 &&。改用 ; 来分开执行
 - 当用户**明确要求**测试的时候，可编写临时ts脚本，然后使用 npx tsx 脚本路径 来进行输出log进行调试测试，注意引用路径的相对关系。**具体参考同目录文件"test-guide.md"**
 - 虽然引入了 webgal-parser 库，但实际上我们通过 inst_utils.ts 对其进行了封装，所以完全不必去看任何 webgal-parser 相关的内容，只用 inst_utils.ts 里的内容即可。

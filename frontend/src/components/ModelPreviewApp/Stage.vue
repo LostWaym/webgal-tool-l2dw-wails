@@ -212,6 +212,8 @@ function syncTargetOutlines() {
       desired.set(hovered.id, 0x65e68b)
     }
   }
+  const radialTarget = radialMenu.value && store.models.find(model => model.id === radialMenu.value?.id && model.visible)
+  if (radialTarget) desired.set(radialTarget.id, 0xffd34d)
   for (const [id, entry] of targetOutlines) {
     if (!desired.has(id) || containersById.get(id) !== entry.wrapper) clearTargetOutline(id)
   }
@@ -230,7 +232,7 @@ function syncTargetOutlines() {
 }
 
 watch(
-  [targetMenu, targetMenuActive, () => store.selectedId, () => store.models.map(model => `${model.id}:${model.visible}`)],
+  [targetMenu, targetMenuActive, radialMenu, () => store.selectedId, () => store.models.map(model => `${model.id}:${model.visible}`)],
   syncTargetOutlines,
   { flush: 'sync' },
 )

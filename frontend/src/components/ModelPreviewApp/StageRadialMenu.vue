@@ -41,6 +41,17 @@ const indicator = computed(() => {
   return point(angle, ringRadius - 9)
 })
 
+const targetHintStyle = computed(() => {
+  const x = Math.max(0, Math.min(window.innerWidth, props.x + props.dx))
+  const y = Math.max(0, Math.min(window.innerHeight, props.y + props.dy))
+  const onRight = x <= window.innerWidth / 2
+  return {
+    ...(onRight ? { left: `${x + 16}px` } : { right: `${window.innerWidth - x + 16}px` }),
+    ...(y + 48 <= window.innerHeight ? { top: `${y + 16}px` } : { bottom: `${window.innerHeight - y + 16}px` }),
+    maxWidth: `${Math.max(0, Math.min(240, (onRight ? window.innerWidth - x : x) - 24))}px`,
+  }
+})
+
 function labelStyle(action: StageRadialAction) {
   const position = point(action.angle, RADIAL_MENU.labelRadius)
   return { left: `${RADIAL_MENU.extent + position.x}px`, top: `${RADIAL_MENU.extent + position.y}px` }
@@ -69,6 +80,10 @@ function labelStyle(action: StageRadialAction) {
           <UiIcon name="close" />
           <span class="stage-radial__hint">松开取消</span>
         </div>
+      </div>
+      <div class="stage-radial__target" :style="targetHintStyle" :title="name">
+        <span class="stage-radial__target-dot"></span>
+        <span class="stage-radial__target-name">{{ name }}</span>
       </div>
     </div>
   </Teleport>
@@ -137,4 +152,30 @@ function labelStyle(action: StageRadialAction) {
 }
 .stage-radial__center.is-active { opacity: 0.55; }
 .stage-radial__hint { color: var(--ui-muted); font-size: 10px; white-space: nowrap; line-height: 1.2; }
+.stage-radial__target {
+  position: fixed;
+  box-sizing: border-box;
+  max-width: min(240px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 40%, var(--ui-control-line));
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-stage-glass);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+  color: var(--ui-text);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.stage-radial__target-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ui-warning);
+}
+.stage-radial__target-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

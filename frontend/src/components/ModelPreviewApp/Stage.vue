@@ -2397,17 +2397,17 @@ function attachDomHandlers() {
     }
 
     // g / s / r / l 进入变换模式（l = 注视）
-    if (e.key === 'g' || e.key === 's' || e.key === 'r' || e.key === 'l') {
+    if (key === 'g' || key === 's' || key === 'r' || key === 'l') {
       if (!store.selectedId) return
-      if (transformMode.value === e.key) {
+      if (transformMode.value === key) {
         // 按同键：取消并回滚
         cancelTransform()
       } else if (transformMode.value === 'none') {
-        startTransform(e.key as TransformMode)
+        startTransform(key)
       } else {
         // 切换模式：先回滚当前模式的所有修改，再以回滚后的状态为新起点
         cancelTransform()
-        startTransform(e.key as TransformMode)
+        startTransform(key)
       }
       e.preventDefault()
       return
@@ -2415,7 +2415,7 @@ function attachDomHandlers() {
 
     // 注视模式下：屏蔽轴锁定 / 其它模式切换（l 键已在上面处理）
     if (transformMode.value === 'l') {
-      if (e.key === 'x' || e.key === 'y' || e.key === 'g' || e.key === 's' || e.key === 'r') {
+      if (key === 'x' || key === 'y' || key === 'g' || key === 's' || key === 'r') {
         e.preventDefault()
       }
       return

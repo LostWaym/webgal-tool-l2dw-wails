@@ -20,6 +20,8 @@
   --ui-control-shadow: inset 0 1px rgb(255 255 255 / 8%), 0 2px 4px rgb(8 6 20 / 16%);
   --ui-panel-shadow: 0 12px 32px var(--ui-shadow);
   --ui-stage-background: var(--ui-window);
+  --ui-canvas-dark: var(--ui-window);
+  --ui-canvas-light: var(--ui-text);
   --ui-stage-fill: radial-gradient(ellipse at 50% 20%, color-mix(in srgb, var(--ui-accent) 5%, transparent), transparent 75%), linear-gradient(145deg, color-mix(in srgb, var(--ui-stage-background) 93%, black), color-mix(in srgb, var(--ui-stage-background) 84%, black));
   --ui-stage-glass-opacity: 82%;
   --ui-stage-glass: color-mix(in srgb, var(--ui-panel) var(--ui-stage-glass-opacity), transparent);
@@ -30,6 +32,8 @@
 }
 
 :root[data-scheme="light"] {
+  --ui-canvas-dark: var(--ui-text);
+  --ui-canvas-light: var(--ui-window);
   --ui-stage-fill: var(--ui-window);
   --ui-icon-filter: invert(1);
   --ui-shadow: rgb(61 45 98 / 17%);

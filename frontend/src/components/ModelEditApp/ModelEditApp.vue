@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import EditConfirmModal from './Modal/EditConfirmModal.vue'
 import EditModelList from './EditModelList.vue'
 import EditStage from './EditStage.vue'
 import EditActionPanel from './EditActionPanel.vue'
@@ -28,10 +29,22 @@ const LEFT_MAX = 600
 const RIGHT_MIN = 200
 const RIGHT_MAX = 600
 const DEFAULT_LEFT = 280
-const DEFAULT_RIGHT = 280
+const DEFAULT_RIGHT = 340
 
-const leftWidth = ref(DEFAULT_LEFT)
-const rightWidth = ref(DEFAULT_RIGHT)
+function readWidth(side: string, fallback: number, min: number, max: number) {
+  try {
+    const value = Number(localStorage.getItem(`modelEditor.${side}Width`))
+    return Number.isFinite(value) && value >= min ? Math.min(max, value) : fallback
+  } catch { return fallback }
+}
+const leftWidth = ref(readWidth('left', DEFAULT_LEFT, LEFT_MIN, LEFT_MAX))
+const rightWidth = ref(readWidth('right', DEFAULT_RIGHT, RIGHT_MIN, RIGHT_MAX))
+watch([leftWidth, rightWidth], ([left, right]) => {
+  try {
+    localStorage.setItem('modelEditor.leftWidth', String(left))
+    localStorage.setItem('modelEditor.rightWidth', String(right))
+  } catch { /* 本地偏好不可用不阻塞编辑 */ }
+})
 
 function onLeftDrag(dx: number) {
   const next = leftWidth.value + dx
@@ -57,6 +70,7 @@ function onRightDrag(dx: number) {
 
     <!-- 批量修改动作/表情 全屏模态 -->
     <EditBatchModifyModal />
+    <EditConfirmModal />
 
     <!-- 全局气泡提示 -->
     <MessageHost />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount } from 'vue'
 /**
  * 通用垂直分隔条。
  *
@@ -19,12 +20,21 @@ const emit = defineEmits<{
 }>()
 
 let lastX = 0
+let active = false
+let previousCursor = ''
+let previousUserSelect = ''
 
 function onMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return
+  onMouseUp()
+  active = true
+  previousCursor = document.body.style.cursor
+  previousUserSelect = document.body.style.userSelect
   e.preventDefault()
   lastX = e.clientX
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mouseup', onMouseUp)
+  window.addEventListener('blur', onMouseUp)
   document.body.style.cursor = 'col-resize'
   document.body.style.userSelect = 'none'
 }
@@ -36,12 +46,16 @@ function onMouseMove(e: MouseEvent) {
 }
 
 function onMouseUp() {
+  if (!active) return
+  active = false
   document.removeEventListener('mousemove', onMouseMove)
   document.removeEventListener('mouseup', onMouseUp)
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
+  window.removeEventListener('blur', onMouseUp)
+  document.body.style.cursor = previousCursor
+  document.body.style.userSelect = previousUserSelect
   emit('end')
 }
+onBeforeUnmount(onMouseUp)
 </script>
 
 <template>

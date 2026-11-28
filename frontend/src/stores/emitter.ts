@@ -25,6 +25,7 @@ export const emitter = {
 export const StageEvents = {
   TransformChange: 'stage:transform-change',
   ReloadModel: 'stage:reload-model',
+  ModelEditorPreview: 'model-editor:preview',
   /** 参数：boolean — true 进入 Blender 风格变换操作；false 退出 */
   TransformStart: 'stage:transform-start',
 } as const

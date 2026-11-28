@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import eyeIcon from '../../assets/icons/eye.png'
 import eyeOffIcon from '../../assets/icons/eye-off.png'
+import { useMessage } from '../../composables/useMessage'
 
 /**
  * 编辑器窗口的模型列表面板。
@@ -18,9 +19,11 @@ import eyeOffIcon from '../../assets/icons/eye-off.png'
  */
 const store = useWmdlModelEditorStore()
 const dragFromIndex = ref<number | null>(null)
+const dropTarget = ref<{ index: number; after: boolean } | null>(null)
+const message = useMessage()
 
 async function onAdd() {
-  await store.addModel()
+  try { await store.addModel() } catch (error) { message.error(`加载模型失败：${error}`) }
 }
 
 function onSelect(id: string) {
@@ -44,8 +47,10 @@ function onDragStart(event: DragEvent, index: number) {
   }
 }
 
-function onDragOver(event: DragEvent) {
+function onDragOver(event: DragEvent, index: number) {
   event.preventDefault()
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  dropTarget.value = { index, after: event.clientY > rect.top + rect.height / 2 }
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = 'move'
   }
@@ -54,17 +59,16 @@ function onDragOver(event: DragEvent) {
 function onDrop(event: DragEvent, toIndex: number) {
   event.preventDefault()
   const fromIndex = dragFromIndex.value
-  if (fromIndex !== null && fromIndex !== toIndex) {
-    // Reorder models array
-    const models = store.currentWmdl.models
-    const [item] = models.splice(fromIndex, 1)
-    models.splice(toIndex, 0, item)
+  if (fromIndex !== null && dropTarget.value) {
+    const insertion = toIndex + (dropTarget.value.after ? 1 : 0)
+    store.reorderModels(fromIndex, insertion > fromIndex ? insertion - 1 : insertion)
   }
-  dragFromIndex.value = null
+  onDragEnd()
 }
 
 function onDragEnd() {
   dragFromIndex.value = null
+  dropTarget.value = null
 }
 </script>
 
@@ -82,11 +86,13 @@ function onDragEnd() {
         :class="{
           'is-selected': m.id === store.selectedModelId,
           'is-dragging': dragFromIndex === index,
+          'drop-before': dropTarget?.index === index && !dropTarget.after,
+          'drop-after': dropTarget?.index === index && dropTarget.after,
         }"
         draggable="true"
         @click="onSelect(m.id)"
         @dragstart="onDragStart($event, index)"
-        @dragover="onDragOver($event)"
+        @dragover="onDragOver($event, index)"
         @drop="onDrop($event, index)"
         @dragend="onDragEnd"
       >
@@ -98,6 +104,8 @@ function onDragEnd() {
           <img class="ui-icon" :src="m.state.visible ? eyeIcon : eyeOffIcon" :alt="m.state.visible ? '眼睛' : '闭眼'" />
         </button>
         <span class="model-row__name" :title="m.modelRelativePath">{{ m.name }}</span>
+        <span v-if="index === 0" class="model-row__badge" title="主模型的偏移固定为 0">主</span>
+        <span v-if="store.loadErrors[m.id]" class="model-row__error" :title="store.loadErrors[m.id]">加载失败</span>
         <button
           class="model-row__close"
           aria-label="移除"
@@ -149,6 +157,7 @@ function onDragEnd() {
 }
 
 .model-row {
+  position: relative;
   display: flex;
   align-items: center;
   padding: 8px 12px;
@@ -157,6 +166,13 @@ function onDragEnd() {
   border-radius: var(--ui-radius-control);
   transition: background 0.12s ease, border-color 0.12s ease;
 }
+.model-row.drop-before::before, .model-row.drop-after::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 2px; background: var(--ui-link);
+}
+.model-row.drop-before::before { top: 0; }
+.model-row.drop-after::after { bottom: 0; }
+.model-row__badge { flex-shrink: 0; padding: 1px 4px; margin-left: 4px; border: 1px solid var(--ui-edge); border-radius: var(--ui-radius-compact); color: var(--ui-muted); font-size: 11px; }
+.model-row__error { color: var(--ui-danger); font-size: 11px; margin-left: 4px; }
 
 .model-row:hover {
   background: var(--ui-control);

@@ -54,6 +54,7 @@ export async function modifyMtnFiles(
   const result: BatchModifyResult = { ok: 0, failed: [] }
   for (const p of paths) {
     try {
+      if (!isMotionPath(p)) throw new Error('暂不支持此格式，仅支持 .mtn，未写入文件')
       const txt = await ReadTextFile(p)
       const next = applyMtnChange(txt, op)
       await WriteTextFile(p, next)
@@ -68,9 +69,11 @@ export async function modifyMtnFiles(
 }
 
 function applyMtnChange(txt: string, op: MotionModifyOp): string {
-  const lines = txt.split(/\r?\n/)
+  const newline = txt.includes('\r\n') ? '\r\n' : '\n'
+  const lines = txt.split(/\r+\n|\r|\n/)
   // 末尾是否带换行：保留，避免无限循环添加空行
-  const trailing = /\r?\n$/.test(txt)
+  const trailing = /[\r\n]$/.test(txt)
+  if (trailing) lines.pop()
   let matchedIdx = -1
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(MTN_PARAM_RE)
@@ -85,7 +88,7 @@ function applyMtnChange(txt: string, op: MotionModifyOp): string {
       return txt
     }
     lines.splice(matchedIdx, 1)
-    return lines.join('\n') + (trailing ? '\n' : '')
+    return lines.join(newline) + (trailing ? newline : '')
   }
   // set
   const valueStr = formatNumber(op.paramValue)
@@ -94,7 +97,7 @@ function applyMtnChange(txt: string, op: MotionModifyOp): string {
   } else {
     lines.push(`${op.paramName}=${valueStr}`)
   }
-  return lines.join('\n') + (trailing ? '\n' : '')
+  return lines.join(newline) + (trailing ? newline : '')
 }
 
 function formatNumber(v: number): string {
@@ -137,7 +140,7 @@ export async function modifyExpFiles(
   const result: BatchModifyResult = { ok: 0, failed: [] }
   for (const p of paths) {
     if (!isExpJsonPath(p)) {
-      const msg = 'only .exp.json supported (skip)'
+      const msg = '暂不支持此格式，仅支持 .exp.json，未写入文件'
       console.info('modifyExpFiles skip', p, msg)
       result.failed.push({ path: p, error: msg })
       continue

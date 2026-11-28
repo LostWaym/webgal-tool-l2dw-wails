@@ -13,6 +13,11 @@ interface TextureRecord {
 
 /** key 形如 `<modelId>|<absPath>` —— 同纹理被多模型共享时各自独立记录 */
 const records = new Map<string, TextureRecord>()
+export function clearModelTextureRecords(modelId: string): void {
+  for (const key of records.keys()) {
+    if (key.startsWith(`${modelId}|`)) records.delete(key)
+  }
+}
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 function recordKey(modelId: string, absPath: string): string {
@@ -44,6 +49,10 @@ export async function reloadTextureAt(
 
   try {
     const tex = await loadFreshTexture(absPath)
+    if (model.destroyed) {
+      tex.destroy(true)
+      return false
+    }
 
     const oldTexture = textures[textureIndex]
     if (oldTexture && oldTexture !== PIXI.Texture.WHITE) {
@@ -108,6 +117,7 @@ export function createTextureWatcher(
         let mtime: number
         try {
           mtime = await GetFileModifyTime(abs)
+          if (byId.get(modelId) !== model || pathById.get(modelId) !== jsonAbs) continue
         } catch {
           continue
         }

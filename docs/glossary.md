@@ -45,6 +45,7 @@
 ## 其他编辑器
 
 - **改模编辑器 / 模型编辑器**：`frontend/src/components/ModelEditApp/ModelEditApp.vue` 为入口；舞台和操作区在同目录的 `EditStage.vue`、`EditActionPanel.vue`；状态在 `frontend/src/stores/wmdlModelEditor.ts`。
+- **改模保存 / 未保存修改 / 舞台试播**：wmdl 与模型 JSON 分别保存，变更快照归 `wmdlModelEditor.ts`；动作、表情共用 `ModelEditApp/EditEntryList.vue`，预览分发使用 `StageEvents.ModelEditorPreview`，运行时播放入口为 `frontend/src/utils/modelEditorPreview.ts`。
 - **表情编辑器 / 演出编辑器**：`frontend/src/components/ActorEditorApp/ActorEditApp.vue` 为入口；舞台与面板是同目录的 `ActorStage.vue`、`EditPanel.vue`；与改模编辑器共用 store 定义，但按 Pinia app 实例隔离；导出状态在 `frontend/src/composables/useActorEditorState.ts`。
 - **动作采样表情**：表情编辑器从 MTN 或 motion3 选择单帧并替换当前表情参数；入口在 `frontend/src/components/ActorEditorApp/EditPanel.vue`，独立预览和时间轴在同目录的 `MotionSampleModal.vue`。
 - **动作编辑器**：入口为 `frontend/src/components/MotionEditorApp/MotionEditApp.vue`；开发前优先查阅 `docs/MOTION_DOC.md`，格式参考见 `docs/MOTION_FORMAT.md`。

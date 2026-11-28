@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { ParamCalc } from '../../stores/wmdlTypes'
 
 /**
@@ -29,6 +29,7 @@ const CALC_ORDER: ParamCalc[] = ['set', 'add', 'mult']
 const props = withDefaults(
   defineProps<{
     name: string
+    badge?: string
     min: number
     max: number
     modelValue: number
@@ -143,16 +144,29 @@ async function startEdit() {
 }
 
 function commitEdit() {
+  if (!isEditing.value) return
+  isEditing.value = false
   const num = Number(editingText.value)
   if (Number.isFinite(num)) {
     emit('update:modelValue', clamp(num, props.min, props.max))
   }
-  isEditing.value = false
 }
 
 function cancelEdit() {
   isEditing.value = false
 }
+function stopDrag() {
+  if (dragPointerId !== -1 && trackEl.value?.hasPointerCapture(dragPointerId)) {
+    trackEl.value.releasePointerCapture(dragPointerId)
+  }
+  isDragging.value = false
+  dragPointerId = -1
+}
+onMounted(() => window.addEventListener('blur', stopDrag))
+onBeforeUnmount(() => {
+  stopDrag()
+  window.removeEventListener('blur', stopDrag)
+})
 </script>
 
 <template>
@@ -185,6 +199,7 @@ function cancelEdit() {
 
     <div class="range-card__header">
       <span class="range-card__name" :title="name">{{ name }}</span>
+      <span v-if="badge" class="range-card__badge" title="该参数由物理驱动，手动值可能被覆盖">{{ badge }}</span>
     </div>
 
     <div
@@ -213,6 +228,9 @@ function cancelEdit() {
         v-model="editingText"
         class="value-input"
         type="number"
+        @click.stop
+        @mousedown.stop
+        @pointerdown.stop
         :step="Math.pow(10, -precision)"
         @keydown.enter.prevent="commitEdit"
         @keydown.esc.prevent="cancelEdit"
@@ -273,6 +291,7 @@ function cancelEdit() {
   gap: 6px;
 }
 
+.range-card__badge { flex-shrink: 0; margin-right: 20px; color: var(--ui-muted); font-size: 10px; border: 1px solid var(--ui-edge); border-radius: var(--ui-radius-compact); padding: 0 3px; }
 .range-card__name {
   flex: 1 1 auto;
   min-width: 0;

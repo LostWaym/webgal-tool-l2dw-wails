@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import EditRangeCard from './EditRangeCard.vue'
-import { writeParameter } from '../../live2d/coreAdapter'
+import { writeParameter, listPhysicsOutputIds } from '../../live2d/coreAdapter'
 import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { filterBySearch } from '../../utils/searchUtils'
 import SearchInput from '../common/SearchInput.vue'
+import { useEditorConfirm } from '../../composables/useEditorConfirm'
+import { useMessage } from '../../composables/useMessage'
 
 /**
  * 【初始参数】页签内容。
@@ -31,6 +33,32 @@ const LAYOUT = {
 } as const
 
 const store = useWmdlModelEditorStore()
+const { confirm } = useEditorConfirm()
+const message = useMessage()
+const modifiedOnly = ref(false)
+const overrideCount = computed(() => params.value.filter(p => p.hasOverride).length)
+const physicsIds = computed(() => {
+  const model = store.selectedModel
+  if (!model?.initParams.length) return new Set<string>()
+  return new Set(listPhysicsOutputIds(model.id))
+})
+async function resetAll() {
+  const model = store.selectedModel
+  const all = applyAll.value
+  if (!model || !await confirm(`确定重置${all ? '所有模型' : '当前模型'}的全部参数覆写？（不受搜索或筛选限制）`)) return
+  if (store.selectedModel !== model) return
+  const targets = all ? store.currentWmdl.models : [model]
+  let count = 0
+  for (const target of targets) {
+    for (const p of target.initParams) {
+      if (p.override === undefined) continue
+      writeParameter(target.id, p.id, p.value)
+      delete p.override
+      count++
+    }
+  }
+  message.success(`已重置 ${count} 条参数覆写`)
+}
 
 // 视图模型：把 store 里每条 initParams 投影为 { id, min, max, value,
 // override?, effective, hasOverride }。
@@ -59,13 +87,12 @@ const searchQuery = ref('')
 const applyAll = ref(false)
 
 const filteredParams = computed(() =>
-  filterBySearch(params.value, searchQuery.value, (p) => p.id),
+  filterBySearch(params.value.filter(p => !modifiedOnly.value || p.hasOverride), searchQuery.value, (p) => p.id),
 )
 
 const showNoMatch = computed(
   () =>
     hasParams.value &&
-    searchQuery.value.trim().length > 0 &&
     filteredParams.value.length === 0,
 )
 
@@ -106,12 +133,16 @@ function onReset(id: string) {
     </div>
     <template v-else>
       <div v-if="isMoc3Model" class="moc3-warning">
-        pld尚未对moc3这部分参数支持，无法保存
+        moc3 初始参数仅供预览，当前不支持保存
       </div>
       <label class="apply-all-toggle" :class="{ 'is-on': applyAll }">
         <input v-model="applyAll" class="ui-switch" type="checkbox" role="switch" />
         <span class="apply-all-toggle__label">应用于所有模型</span>
       </label>
+      <div class="override-toolbar">
+        <label><input v-model="modifiedOnly" class="ui-switch" type="checkbox" role="switch" />仅看已修改（{{ overrideCount }}）</label>
+        <button class="ui-button" :disabled="!overrideCount && !applyAll" @click="resetAll">全部重置</button>
+      </div>
       <SearchInput
         v-model="searchQuery"
         variant="edit"
@@ -126,6 +157,7 @@ function onReset(id: string) {
           <li v-for="p in filteredParams" :key="p.id" class="card-item">
             <EditRangeCard
               :name="p.id"
+              :badge="physicsIds.has(p.id) ? '物理' : undefined"
               :min="p.min"
               :max="p.max"
               :model-value="p.effective"
@@ -171,11 +203,15 @@ function onReset(id: string) {
 }
 
 .card-item {
+  position: relative;
   flex: 1 1 v-bind('`${LAYOUT.CARD_MIN_WIDTH}px`');
   max-width: v-bind('`${LAYOUT.CARD_MAX_WIDTH}px`');
   min-width: 0;
   display: block;
 }
+.override-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 12px; color: var(--ui-muted); }
+.override-toolbar label { display: inline-flex; align-items: center; gap: 6px; }
+.override-toolbar button { padding: 4px 7px; font-size: 12px; }
 
 .apply-all-toggle {
   display: inline-flex;

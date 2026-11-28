@@ -790,9 +790,21 @@ func (a *App) MissingPreviewProjectFiles(paths []string) []string {
 // of a .wmdl file. Returns the chosen path, or an empty string if the user
 // cancelled.
 func (a *App) SaveWmdlFileDialog() (string, error) {
+	return a.SaveWmdlFileDialogWithPath("")
+}
+
+// SaveWmdlFileDialogWithPath keeps Save As near the current document.
+func (a *App) SaveWmdlFileDialogWithPath(currentPath string) (string, error) {
+	filename := "untitled.wmdl"
+	directory := ""
+	if currentPath != "" {
+		directory = filepath.Dir(currentPath)
+		filename = strings.TrimSuffix(filepath.Base(currentPath), filepath.Ext(currentPath)) + ".wmdl"
+	}
 	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:                "Save WMDL File",
-		DefaultFilename:      "untitled.wmdl",
+		DefaultDirectory:     directory,
+		DefaultFilename:      filename,
 		CanCreateDirectories: true,
 		Filters: []runtime.FileFilter{
 			{DisplayName: "WMDL File", Pattern: "*.wmdl"},

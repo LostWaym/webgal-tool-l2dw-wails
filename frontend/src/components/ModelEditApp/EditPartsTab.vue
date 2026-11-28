@@ -6,6 +6,8 @@ import { useWmdlModelEditorStore } from '../../stores/wmdlModelEditor'
 import { ListPresetFiles, ReadPresetFile } from '../../../wailsjs/go/main/App'
 import { filterBySearch } from '../../utils/searchUtils'
 import SearchInput from '../common/SearchInput.vue'
+import { useMessage } from '../../composables/useMessage'
+import { useEditorConfirm } from '../../composables/useEditorConfirm'
 
 /**
  * 【部件参数】页签内容。
@@ -33,6 +35,21 @@ const LAYOUT = {
 } as const
 
 const store = useWmdlModelEditorStore()
+const message = useMessage()
+const { confirm } = useEditorConfirm()
+const presetRoot = ref<HTMLElement | null>(null)
+const modifiedOnly = ref(false)
+const overrideCount = computed(() => parts.value.filter(p => p.hasOverride).length)
+async function resetAll() {
+  const model = store.selectedModel
+  if (!model || !await confirm('确定重置当前模型的全部部件覆写？（不受搜索或筛选限制）')) return
+  if (store.selectedModel !== model) return
+  const count = overrideCount.value
+  for (const part of model.initOpacities) {
+    if (part.override !== undefined) onReset(part.id)
+  }
+  message.success(`已重置 ${count} 条部件覆写`)
+}
 
 // 部件透明度范围固定 [0, 1]
 const PART_MIN = 0
@@ -78,13 +95,12 @@ const isMoc3Model = computed(() => store.selectedModel?.isMoc3 === true)
 const searchQuery = ref('')
 
 const filteredParts = computed(() =>
-  filterBySearch(parts.value, searchQuery.value, (p) => p.name),
+  filterBySearch(parts.value.filter(p => !modifiedOnly.value || p.hasOverride), searchQuery.value, (p) => p.name),
 )
 
 const showNoMatch = computed(
   () =>
     hasParts.value &&
-    searchQuery.value.trim().length > 0 &&
     filteredParts.value.length === 0,
 )
 
@@ -118,6 +134,7 @@ async function onPresetPick(filename: string) {
     applyPresetContent(content)
   } catch (e) {
     console.error('failed to read preset', filename, e)
+    message.error(`读取预设失败：${e}`)
   }
 }
 
@@ -125,6 +142,7 @@ function applyPresetContent(content: string) {
   const item = store.selectedModel
   if (!item) return
   const lines = content.split(/\r?\n/)
+  const changed = new Set<string>()
   for (const rawLine of lines) {
     const line = rawLine.trim()
     if (!line || line.startsWith('#')) continue
@@ -132,8 +150,9 @@ function applyPresetContent(content: string) {
     if (eqIdx <= 0) continue
     const pattern = line.slice(0, eqIdx)
     const valueStr = line.slice(eqIdx + 1).trim()
-    const value = Number(valueStr)
-    if (!Number.isFinite(value)) continue
+    const rawValue = Number(valueStr)
+    if (!Number.isFinite(rawValue)) continue
+    const value = Math.max(0, Math.min(1, rawValue))
     let regex: RegExp
     try {
       regex = new RegExp(pattern)
@@ -145,14 +164,17 @@ function applyPresetContent(content: string) {
         writePartOpacity(item.id, p.id, value)
         const entry = item.initOpacities.find((it) => it.id === p.id)
         if (entry) entry.override = value
+        changed.add(p.id)
       }
     }
   }
+  if (changed.size) message.success(`预设已应用：匹配并修改 ${changed.size} 个部件`)
+  else message.info('预设未匹配到任何部件')
 }
 
 function onDocClick(e: MouseEvent) {
   if (!presetOpen.value) return
-  const root = document.getElementById('parts-preset-root')
+  const root = presetRoot.value
   if (root && !root.contains(e.target as Node)) {
     presetOpen.value = false
   }
@@ -178,11 +200,15 @@ onBeforeUnmount(() => {
     </div>
     <template v-else>
       <div v-if="isMoc3Model" class="moc3-warning">
-        pld尚未对moc3这部分参数支持，无法保存
+        moc3 部件覆写仅供预览，当前不支持保存
       </div>
-      <div id="parts-preset-root" class="preset-row">
+      <div class="override-toolbar">
+        <label><input v-model="modifiedOnly" class="ui-switch" type="checkbox" role="switch" />仅看已修改（{{ overrideCount }}）</label>
+        <button class="ui-button" :disabled="!overrideCount" @click="resetAll">全部重置</button>
+      </div>
+      <div ref="presetRoot" class="preset-row">
         <button
-          class="preset-toggle"
+          class="ui-button preset-toggle"
           :class="{ 'is-open': presetOpen }"
           @click="togglePreset"
         >
@@ -241,6 +267,9 @@ onBeforeUnmount(() => {
   padding: 12px;
   overflow: hidden;
 }
+.override-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 12px; color: var(--ui-muted); }
+.override-toolbar label { display: inline-flex; align-items: center; gap: 6px; }
+.override-toolbar button { padding: 4px 7px; font-size: 12px; }
 
 .card-scroll {
   flex: 1 1 auto;

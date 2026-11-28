@@ -15,6 +15,19 @@ import {
   writePartOpacity,
 } from '../live2d/coreAdapter'
 import type { WmdlConfig, WmdlModelItem, InitParamEntry } from './wmdlTypes'
+import { clearModelTextureRecords } from '../live2d/textureUtils'
+
+function wmdlSnapshot(config: WmdlConfig): string {
+  const { name, figureTemplate, transformTemplate, live2dBounds, models } = config
+  return JSON.stringify({ name, figureTemplate, transformTemplate, live2dBounds,
+    models: models.map(({ jsonAbsPath, offsetX, offsetY }) => ({ jsonAbsPath, offsetX, offsetY })) })
+}
+function modelEditsSnapshot(model: WmdlModelItem): string {
+  const overrides = (entries: InitParamEntry[]) => entries.filter(p => p.override !== undefined)
+    .map(p => ({ id: p.id, override: p.override }))
+  return JSON.stringify({ motions: model.motions, expressions: model.expressions,
+    params: overrides(model.initParams), parts: overrides(model.initOpacities) })
+}
 
 /** Editor-specific: output of `scanDirectory`. */
 export interface ScannedEntry {
@@ -29,7 +42,7 @@ import { deriveNameFromFile, buildModelItem, buildInMemoryWmdlConfig, configToJs
 export { deriveNameFromFile }
 
 export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
-  state: (): { currentWmdl: WmdlConfig; selectedModelId: string | null; dynamicTextureWatch: boolean } => ({
+  state: () => ({
     currentWmdl: {
       name: '',
       figureTemplate: '',
@@ -37,12 +50,26 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
       live2dBounds: [0, 0, 0, 0],
       models: [],
       wmdlFilePath: undefined,
-    },
-    selectedModelId: null,
+    } as WmdlConfig,
+    selectedModelId: null as string | null,
     dynamicTextureWatch: false,
+    savedWmdlSnapshot: '',
+    savedModelSnapshots: {} as Record<string, string>,
+    loadErrors: {} as Record<string, string>,
+    loadingModelIds: [] as string[],
+    pathRequests: {} as Record<string, number>,
   }),
 
   getters: {
+    isDirty(): boolean {
+      const configDirty = this.savedWmdlSnapshot
+        ? wmdlSnapshot(this.currentWmdl) !== this.savedWmdlSnapshot
+        : this.currentWmdl.models.length > 0 || !!this.currentWmdl.name || !!this.currentWmdl.figureTemplate ||
+          !!this.currentWmdl.transformTemplate || this.currentWmdl.live2dBounds.some(Boolean)
+      return configDirty || this.currentWmdl.models.some((m) =>
+        this.savedModelSnapshots[m.id] !== undefined &&
+        modelEditsSnapshot(m) !== this.savedModelSnapshots[m.id])
+    },
     selectedModel(state): WmdlModelItem | null {
       if (!state.selectedModelId) return null
       return state.currentWmdl.models.find((m) => m.id === state.selectedModelId) ?? null
@@ -50,6 +77,26 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
   },
 
   actions: {
+    markWmdlSaved(): void {
+      this.savedWmdlSnapshot = wmdlSnapshot(this.currentWmdl)
+    },
+    markModelLoaded(id: string): void {
+      const model = this.currentWmdl.models.find((m) => m.id === id)
+      if (model && this.savedModelSnapshots[id] === undefined) {
+        this.savedModelSnapshots[id] = modelEditsSnapshot(model)
+      }
+    },
+    normalizeMainOffset(): void {
+      const main = this.currentWmdl.models[0]
+      if (main) { main.offsetX = 0; main.offsetY = 0 }
+    },
+    reorderModels(fromIndex: number, toIndex: number): void {
+      const models = this.currentWmdl.models
+      if (fromIndex < 0 || fromIndex >= models.length || toIndex < 0 || toIndex >= models.length) return
+      const [item] = models.splice(fromIndex, 1)
+      models.splice(toIndex, 0, item)
+      this.normalizeMainOffset()
+    },
     /** Add a new model by prompting the user to pick a file. */
     async addModel(): Promise<WmdlModelItem | null> {
       const jsonPath = await choosePath(() => PickLive2DModel())
@@ -86,7 +133,12 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
 
     /** Remove a model by id. */
     async removeModel(id: string): Promise<void> {
+      clearModelTextureRecords(id)
+      delete this.savedModelSnapshots[id]
+      delete this.loadErrors[id]
+      delete this.pathRequests[id]
       this.currentWmdl.models = this.currentWmdl.models.filter((m) => m.id !== id)
+      this.normalizeMainOffset()
       if (this.selectedModelId === id) {
         this.selectedModelId =
           this.currentWmdl.models.length > 0
@@ -123,6 +175,10 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
       const { config } = await parseWmdlJson(json, filePath)
       this.currentWmdl = config
       this.selectedModelId = config.models.length > 0 ? config.models[0].id : null
+      this.savedModelSnapshots = {}
+      this.loadErrors = {}
+      this.pathRequests = {}
+      this.markWmdlSaved()
     },
 
     /** Load a live2d model json as an in-memory single-main-model wmdl (no disk write). */
@@ -130,6 +186,10 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
       const config = await buildInMemoryWmdlConfig(jsonPath)
       this.currentWmdl = config
       this.selectedModelId = config.models.length > 0 ? config.models[0].id : null
+      this.savedModelSnapshots = {}
+      this.loadErrors = {}
+      this.pathRequests = {}
+      this.savedWmdlSnapshot = ''
     },
 
     /** Update currentWmdl fields directly (for wmdl panel editing). */
@@ -140,9 +200,10 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
     /** Update a single model's offset. */
     updateModelOffset(id: string, offsetX: number, offsetY: number): void {
       const model = this.currentWmdl.models.find((m) => m.id === id)
-      if (model) {
-        model.offsetX = offsetX
-        model.offsetY = offsetY
+      if (model && Number.isFinite(offsetX) && Number.isFinite(offsetY)) {
+        const isMain = model === this.currentWmdl.models[0]
+        model.offsetX = isMain ? 0 : Number(offsetX.toFixed(3))
+        model.offsetY = isMain ? 0 : Number(offsetY.toFixed(3))
       }
     },
 
@@ -153,22 +214,29 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
 
       const model = this.currentWmdl.models.find((m) => m.id === id)
       if (!model) return
+      const request = (this.pathRequests[id] ?? 0) + 1
+      this.pathRequests[id] = request
+      const rawJsonObject = await readRawJsonObject(jsonPath)
+      if (this.pathRequests[id] !== request || !this.currentWmdl.models.includes(model)) return
+      if (!rawJsonObject) throw new Error(`无法读取模型描述：${jsonPath}`)
 
       const base = this.currentWmdl.wmdlFilePath ? pathDirname(this.currentWmdl.wmdlFilePath) : ''
       const modelRelativePath = pathRelative(base, jsonPath)
       const name = deriveNameFromPath(jsonPath)
 
+      clearModelTextureRecords(id)
+      delete this.savedModelSnapshots[id]
+      delete this.loadErrors[id]
       model.modelRelativePath = modelRelativePath
-      model.jsonAbsPath = jsonPath
       model.name = name
 
       model.motions = []
       model.expressions = []
       model.initParams = []
       model.initOpacities = []
-      model.rawJsonObject = await readRawJsonObject(jsonPath)
-      await this.populateMotionsExps(id)
-      await this.populateInitValues(id)
+      model.rawJsonObject = rawJsonObject
+      model.isMoc3 = detectModelTypeFromJson(model.rawJsonObject)
+      model.jsonAbsPath = jsonPath
     },
 
     /** Reset to a blank wmdl config. */
@@ -182,6 +250,10 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
         wmdlFilePath: undefined,
       }
       this.selectedModelId = null
+      this.savedModelSnapshots = {}
+      this.loadErrors = {}
+      this.pathRequests = {}
+      this.markWmdlSaved()
     },
 
     /**
@@ -191,9 +263,12 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
     async populateMotionsExps(modelId: string): Promise<void> {
       const item = this.currentWmdl.models.find((m) => m.id === modelId)
       if (!item || !item.jsonAbsPath) return
+      const path = item.jsonAbsPath
+      const raw = item.rawJsonObject
       const { motions, expressions } = await readMotionsAndExpressionsFromJson(
-        item.jsonAbsPath,
+        path,
       )
+      if (!this.currentWmdl.models.includes(item) || item.jsonAbsPath !== path || item.rawJsonObject !== raw) return
       item.motions = sortByName(motions)
       item.expressions = sortByName(expressions)
     },
@@ -302,6 +377,19 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
     },
 
     // ─── Motion / Expression entry edits (in-memory only) ────────────────────
+    renameEntry(kind: 'motion' | 'expression', path: string, oldName: string, name: string): void {
+      const model = this.selectedModel
+      if (!model) return
+      name = name.trim()
+      const field = kind === 'motion' ? 'motions' : 'expressions'
+      const items = model[field]
+      if (!name) throw new Error('名称不能为空')
+      if (items.some((it) => it.name === name && !(it.path === path && it.name === oldName))) {
+        throw new Error('名称已存在')
+      }
+      const item = items.find((it) => it.path === path && it.name === oldName)
+      if (item) { item.name = name; model[field] = sortByName(items) }
+    },
 
     /** Append a single motion entry to the selected model. */
     addMotion(name: string, path: string): void {
@@ -486,9 +574,13 @@ export const useWmdlModelEditorStore = defineStore('wmdlModelEditor', {
     async saveModelJson(modelId: string): Promise<{ path: string } | null> {
       const item = this.currentWmdl.models.find((m) => m.id === modelId)
       if (!item) return null
+      if (this.loadingModelIds.includes(modelId)) throw new Error('模型正在加载，请等待加载完成后再保存模型 JSON')
+      if (this.loadErrors[modelId]) throw new Error('模型加载失败，请先更改路径修复后再保存模型 JSON')
       const obj = this.serializeModelToJson(item)
       const content = JSON.stringify(obj, null, 2)
       await SaveModelJsonFile(item.jsonAbsPath, content)
+      this.savedModelSnapshots[item.id] = modelEditsSnapshot(item.isMoc3
+        ? { ...item, initParams: [], initOpacities: [] } : item)
       return { path: item.jsonAbsPath }
     },
 

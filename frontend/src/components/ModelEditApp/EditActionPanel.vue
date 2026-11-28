@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { vTabIndicator } from '../../utils/tabIndicator'
 import EditWmdlTab from './EditWmdlTab.vue'
 import EditParamsTab from './EditParamsTab.vue'
 import EditPartsTab from './EditPartsTab.vue'
@@ -39,16 +40,18 @@ onMounted(() => {
 
 <template>
   <aside class="edit-action-panel">
-    <div class="panel__tabs">
+    <div v-tab-indicator class="panel__tabs">
+      <span class="tab-indicator tab-indicator--underline" aria-hidden="true" />
       <button
         v-for="t in tabs"
         :key="t.id"
         class="ui-tab tab-btn"
         :class="{ 'is-active': activeTab === t.id }"
         :aria-pressed="activeTab === t.id"
+        :title="t.id === 'wmdl' && wmdlStore.isDirty ? '有未保存的配置或模型 JSON 修改' : undefined"
         @click="activeTab = t.id"
       >
-        {{ t.label }}
+        {{ t.label }}{{ t.id === 'wmdl' && wmdlStore.isDirty ? '*' : '' }}
       </button>
     </div>
 
@@ -73,15 +76,19 @@ onMounted(() => {
 }
 
 .panel__tabs {
+  position: relative;
   display: flex;
   border-bottom: 1px solid var(--ui-line);
-  padding: 4px 12px 0;
+  padding: 4px 4px 0;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .tab-btn {
-  flex: 1;
-  padding: 12px 8px;
+  flex: 1 0 auto;
+  padding: 12px 3px;
+  min-width: 0;
+  white-space: nowrap;
   font-size: 13px;
 }
 

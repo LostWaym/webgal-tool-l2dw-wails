@@ -30,6 +30,7 @@ const folder = ref<string>('')
 const entries = ref<ScannedEntry[]>([])
 const busy = ref(false)
 const errorMsg = ref<string>('')
+let scanSequence = 0
 
 // 命名规则配置
 const prefix = ref('')
@@ -93,39 +94,57 @@ function buildName(originalName: string, relPath: string, entrySubFolders: strin
 // 当模态打开 / kind 变化时重置选择集合；切到不同 kind 时清空旧选中。
 watch(
   () => [modal.state.visible, modal.state.kind] as const,
-  ([visible]) => {
-    if (visible) {
-      selected.value = new Set()
-      filteredEntries.value.forEach((e) => selected.value.add(e.absPath))
-    }
+  () => {
+    scanSequence++
+    busy.value = false
+    folder.value = ''
+    entries.value = []
+    nodes.value = []
+    checkedNodes.value = new Set()
+    selected.value = new Set()
+    prefix.value = ''
+    suffix.value = ''
+    separator.value = '_'
     errorMsg.value = ''
   },
 )
 
 async function doScan(dir: string) {
   if (!dir || busy.value) return
+  const sequence = ++scanSequence
+  const kind = modal.state.kind
+  dir = dir.trim()
+  folder.value = dir
+  nodes.value = deriveNodesFromFolder(dir)
+  checkedNodes.value = new Set([...checkedNodes.value].filter(n => nodes.value.includes(n)))
+  entries.value = []
+  selected.value = new Set()
   busy.value = true
   errorMsg.value = ''
   try {
     const list = await store.scanDirectory(dir, modelDir.value, scanSubfolders.value)
+    if (sequence !== scanSequence || !modal.state.visible || modal.state.kind !== kind) return
     entries.value = list
     selected.value = new Set(
       list.filter((e) => e.kind === modal.state.kind).map((e) => e.absPath),
     )
   } catch (e: any) {
+    if (sequence !== scanSequence) return
     console.error('scan failed', e)
     errorMsg.value = String(e?.message ?? e)
   } finally {
-    busy.value = false
+    if (sequence === scanSequence) busy.value = false
   }
 }
 
 async function onPickFolder() {
   if (busy.value) return
+  const sequence = scanSequence
   busy.value = true
   errorMsg.value = ''
   try {
     const dir = await choosePath(() => PickDirectory(modal.state.kind), 'directory')
+    if (sequence !== scanSequence) return
     if (!dir) { busy.value = false; return }
     folder.value = dir
     nodes.value = deriveNodesFromFolder(dir)
@@ -149,11 +168,12 @@ watch(scanSubfolders, () => {
 })
 
 function onConfirm() {
+  if (busy.value) return
   const items = filteredEntries.value
     .filter((e) => selected.value.has(e.absPath))
     .map((e) => ({
       name: buildName(e.name, e.relPath ?? '', e.subFolders ?? []),
-      path: e.relPath || e.absPath,
+      path: e.absPath,
     }))
   if (items.length === 0) {
     modal.close()
@@ -176,7 +196,7 @@ function onCancel() {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="modal.state.visible" class="batch-modal-mask" @click.self="onCancel">
-        <div class="batch-modal">
+        <div class="ui-dialog batch-modal">
           <header class="batch-modal__header">
             <h2 class="batch-modal__title">批量添加{{ kindLabel }}</h2>
             <button class="icon-btn" aria-label="关闭" @click="onCancel">×</button>
@@ -188,9 +208,10 @@ function onCancel() {
               type="text"
               class="path-input"
               placeholder="选择文件夹路径…"
+              @keydown.enter.prevent="onRescan"
             />
-            <button class="op-btn" :disabled="busy" @click="onPickFolder">打开文件夹</button>
-            <button class="op-btn" :disabled="busy || !folder" @click="onRescan">重新扫描</button>
+            <button class="ui-button op-btn" :disabled="busy" @click="onPickFolder">打开文件夹</button>
+            <button class="ui-button op-btn" :disabled="busy || !folder" @click="onRescan">重新扫描</button>
           </section>
 
           <section v-if="nodes.length" class="batch-modal__config">
@@ -279,7 +300,7 @@ function onCancel() {
             <button class="op-btn" @click="onCancel">取消</button>
             <button
               class="op-btn op-btn--primary"
-              :disabled="filteredEntries.filter((e) => selected.has(e.absPath)).length === 0"
+              :disabled="busy || filteredEntries.filter((e) => selected.has(e.absPath)).length === 0"
               @click="onConfirm"
             >
               确定

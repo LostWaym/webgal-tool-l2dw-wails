@@ -2,211 +2,57 @@
 import { PickMotionFile, PickExpressionFile } from '../../../wailsjs/go/main/App'
 import { choosePath } from '../../utils/fileDialog'
 import { useWmdlModelEditorStore, deriveNameFromFile } from '../../stores/wmdlModelEditor'
-import { pathDirname } from '../../path_utils'
+import { useEditorConfirm } from '../../composables/useEditorConfirm'
+import { useMessage } from '../../composables/useMessage'
 
-/**
- * 动作 / 表情列表上方的置顶操作区。
- *
- * props.kind 决定按钮文案 & 调用的文件 picker / 模态触发语义：
- *   - 'motion'    → PickMotionFile、模态打开"动作"批量添加
- *   - 'expression' → PickExpressionFile、模态打开"表情"批量添加
- *
- * 行为：
- *   - "删除全部"  → window.confirm 二次确认后清空当前选中模型的对应数组
- *   - "添加单个"  → 调对应的文件 picker，把所选文件 push 进 store
- *   - "批量添加"  → 触发 batch-add 事件，由父级打开 EditBatchAddModal
- */
-type Kind = 'motion' | 'expression'
-
-const props = defineProps<{
-  kind: Kind
-  disabled?: boolean
-}>()
-
-const emit = defineEmits<{
-  (e: 'batch-add'): void
-  (e: 'batch-modify'): void
-}>()
-
+const props = defineProps<{ kind: 'motion' | 'expression'; disabled?: boolean }>()
+const emit = defineEmits<{ (e: 'batch-add'): void; (e: 'batch-modify'): void }>()
 const store = useWmdlModelEditorStore()
-
-const labels: Record<Kind, { single: string; clearAll: string; clearConfirm: string; syncAll: string; syncConfirm: string; batchModify: string }> = {
-  motion: {
-    single: '添加动作',
-    clearAll: '删除全部动作',
-    clearConfirm: '确定要删除全部动作吗？',
-    syncAll: '同步所有模型',
-    syncConfirm: '是否要将本模型的动作同步到其他所有模型？',
-    batchModify: '批量修改动作',
-  },
-  expression: {
-    single: '添加表情',
-    clearAll: '删除全部表情',
-    clearConfirm: '确定要删除全部表情吗？',
-    syncAll: '同步所有模型',
-    syncConfirm: '是否要将本模型的表情同步到其他所有模型？',
-    batchModify: '批量修改表情',
-  },
-}
+const { confirm } = useEditorConfirm()
+const message = useMessage()
 
 async function onClearAll() {
-  const m = store.selectedModel
-  if (!m) return
-  const label = labels[props.kind]
-  if (!window.confirm(label.clearConfirm)) return
-  if (props.kind === 'motion') {
-    store.clearMotions()
-  } else {
-    store.clearExpressions()
-  }
+  const model = store.selectedModel
+  if (!model || !await confirm(`确定删除当前模型的全部${props.kind === 'motion' ? '动作' : '表情'}条目？此操作暂不写盘。`)) return
+  if (store.selectedModel !== model) return
+  if (props.kind === 'motion') store.clearMotions()
+  else store.clearExpressions()
 }
-
 async function onAddSingle() {
-  const m = store.selectedModel
-  if (!m) return
-  const abs = props.kind === 'motion'
-    ? await choosePath(() => PickMotionFile())
-    : await choosePath(() => PickExpressionFile())
-  if (!abs) return
-
-  // store.addMotion / addExpression 使用绝对路径；运行时通过 /abs_files/ 路由加载。
-  const name = deriveNameFromFile(abs, props.kind)
-  if (props.kind === 'motion') {
-    store.addMotion(name, abs)
-  } else {
-    store.addExpression(name, abs)
-  }
+  const model = store.selectedModel
+  if (!model) return
+  try {
+    const path = await choosePath(() => props.kind === 'motion' ? PickMotionFile() : PickExpressionFile())
+    if (!path || store.selectedModel !== model) return
+    const name = deriveNameFromFile(path, props.kind)
+    if (props.kind === 'motion') store.addMotion(name, path)
+    else store.addExpression(name, path)
+  } catch (error) { message.error(`添加失败：${error}`) }
 }
-
-function onBatchAdd() {
-  emit('batch-add')
+async function onSyncAll() {
+  const model = store.selectedModel
+  if (!model || store.currentWmdl.models.length < 2 ||
+    !await confirm('将覆盖其他模型的对应条目列表，确定同步？')) return
+  if (store.selectedModel !== model) return
+  const count = (props.kind === 'motion' ? model.motions : model.expressions).length
+  if (props.kind === 'motion') store.syncMotionsToOthers()
+  else store.syncExpressionsToOthers()
+  message.success(`已同步 ${count} 条${props.kind === 'motion' ? '动作' : '表情'}至 ${store.currentWmdl.models.length - 1} 个模型`)
 }
-
-function onBatchModify() {
-  emit('batch-modify')
-}
-
-function onSyncAll() {
-  const m = store.selectedModel
-  if (!m) return
-  const label = labels[props.kind]
-  if (!window.confirm(label.syncConfirm)) return
-  if (props.kind === 'motion') {
-    store.syncMotionsToOthers()
-  } else {
-    store.syncExpressionsToOthers()
-  }
-}
-
-// 暴露 pathDirname 给模板侧使用（保留引用避免 noUnused 警告）
-void pathDirname
 </script>
 
 <template>
   <div class="list-toolbar">
-    <button
-      class="toolbar-btn toolbar-btn--danger"
-      :disabled="props.disabled"
-      @click="onClearAll"
-    >
-      {{ labels[props.kind].clearAll }}
-    </button>
-    <button
-      class="toolbar-btn"
-      :disabled="props.disabled"
-      @click="onAddSingle"
-    >
-      {{ labels[props.kind].single }}
-    </button>
-    <button
-      class="toolbar-btn toolbar-btn--primary"
-      :disabled="props.disabled"
-      @click="onBatchAdd"
-    >
-      批量添加
-    </button>
-    <button
-      class="toolbar-btn toolbar-btn--modify"
-      :disabled="props.disabled"
-      @click="onBatchModify"
-    >
-      {{ labels[props.kind].batchModify }}
-    </button>
-    <button
-      class="toolbar-btn toolbar-btn--sync"
-      :disabled="props.disabled"
-      @click="onSyncAll"
-    >
-      {{ labels[props.kind].syncAll }}
-    </button>
+    <button class="ui-button" :disabled="disabled" @click="onAddSingle">添加单个</button>
+    <button class="ui-button" :disabled="disabled" @click="emit('batch-add')">批量添加</button>
+    <button class="ui-button" :disabled="disabled" @click="emit('batch-modify')">批量修改</button>
+    <button class="ui-button" :disabled="disabled || store.currentWmdl.models.length < 2" @click="onSyncAll">同步所有模型</button>
+    <button class="ui-button clear-button" :disabled="disabled" @click="onClearAll">删除全部</button>
   </div>
 </template>
 
 <style scoped>
-.list-toolbar {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--ui-line);
-  flex-shrink: 0;
-  background: var(--ui-panel);
-}
-
-.toolbar-btn {
-  flex: 1;
-  padding: 6px 8px;
-  background: var(--ui-control);
-  color: var(--ui-text);
-  border: 1px solid var(--ui-edge);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: background 0.12s ease;
-}
-
-.toolbar-btn:hover:not(:disabled) {
-  background: var(--ui-hover);
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.toolbar-btn--primary {
-  background: var(--ui-accent);
-  border-color: var(--ui-link);
-  color: var(--ui-on-accent);
-}
-
-.toolbar-btn--primary:hover:not(:disabled) {
-  background: var(--ui-accent-hover); color: var(--ui-on-accent);
-}
-
-.toolbar-btn--sync {
-  background: var(--ui-success);
-  border-color: var(--ui-success);
-  color: var(--ui-on-status);
-}
-
-.toolbar-btn--sync:hover:not(:disabled) {
-  background: var(--ui-success);
-  border-color: var(--ui-success); color: var(--ui-on-status);
-}
-
-.toolbar-btn--modify {
-  background: var(--ui-warning);
-  border-color: var(--ui-warning);
-  color: var(--ui-on-status);
-}
-
-.toolbar-btn--modify:hover:not(:disabled) {
-  background: var(--ui-warning);
-  border-color: var(--ui-warning); color: var(--ui-on-status);
-}
-
-.toolbar-btn--danger:hover:not(:disabled) {
-  background: var(--ui-danger);
-  border-color: var(--ui-danger); color: var(--ui-on-status);
-}
+.list-toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--ui-line); flex-shrink: 0; background: var(--ui-panel); }
+.ui-button { padding: 6px 4px; font-size: 12px; white-space: nowrap; min-width: 0; }
+.clear-button { color: var(--ui-danger); }
 </style>

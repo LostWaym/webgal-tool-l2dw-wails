@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { choosePath } from '../../utils/fileDialog'
 import { useWmdlModelEditorStore, type WmdlModelItem } from '../../stores/wmdlModelEditor'
-import { PickWmdlFile, ReadWmdlFile, SaveWmdlFile, SaveWmdlFileDialog } from '../../../wailsjs/go/main/App'
+import { PickWmdlFile, ReadWmdlFile, SaveWmdlFile, SaveWmdlFileDialogWithPath } from '../../../wailsjs/go/main/App'
 import { useMessage } from '../../composables/useMessage'
+import { useNumberDrag } from '../../composables/useNumberDrag'
+import { useEditorConfirm } from '../../composables/useEditorConfirm'
+import { configToJson } from '../../utils/wmdlUtils'
+import { pathDirname, pathRelative } from '../../path_utils'
 
 /**
  * EditWmdlTab — EditActionPanel 的子组件，负责 wmdl 页签内容。
@@ -17,9 +21,17 @@ import { useMessage } from '../../composables/useMessage'
  */
 const store = useWmdlModelEditorStore()
 const message = useMessage()
+const { confirm } = useEditorConfirm()
+const offsetDrag = useNumberDrag(() => store.selectedModelId)
 
 // 拖拽 offsetX/offsetY 标签时，每像素变化对应的数值增量
-const OFFSET_DRAG_SENSITIVITY = 0.1
+async function protectChanges() {
+  return !store.isDirty || await confirm('当前有未保存的配置或模型 JSON 修改，继续将丢弃这些修改。是否继续？')
+}
+async function onNew() {
+  if (busy.value || !await protectChanges()) return
+  store.reset()
+}
 
 // ─── 加载 / 保存 ───────────────────────────────────────────────────────────
 
@@ -27,6 +39,7 @@ const busy = ref(false)
 
 async function onLoad() {
   if (busy.value) return
+  if (!await protectChanges()) return
   busy.value = true
   try {
     const path = await choosePath(() => PickWmdlFile())
@@ -46,19 +59,24 @@ async function onLoad() {
   }
 }
 
-async function onSave() {
+async function onSave(saveAs = false) {
   if (busy.value) return
   busy.value = true
   try {
-    const path = await choosePath(() => SaveWmdlFileDialog())
+    const currentPath = store.currentWmdl.wmdlFilePath
+    const savedPath = currentPath?.toLowerCase().endsWith('.wmdl') ? currentPath : undefined
+    const path = !saveAs && savedPath ? savedPath
+      : await choosePath(() => SaveWmdlFileDialogWithPath(currentPath || store.selectedModel?.jsonAbsPath || ''))
     if (!path) return
-    // Update the wmdlFilePath anchor BEFORE toJson so the relative paths
-    // it computes are anchored at the new file location (handles "Save As"
-    // and the first save of an unsaved wmdl).
-    store.currentWmdl.wmdlFilePath = path
-    const content = store.toJson()
+    const content = configToJson({
+      ...store.currentWmdl, wmdlFilePath: path,
+      models: store.currentWmdl.models.map(m => ({ ...m })),
+    })
     await SaveWmdlFile(path, content)
-    message.success('保存成功')
+    store.currentWmdl.wmdlFilePath = path
+    for (const model of store.currentWmdl.models) model.modelRelativePath = pathRelative(pathDirname(path), model.jsonAbsPath)
+    store.markWmdlSaved()
+    message.success(`已保存 wmdl：${path}${store.isDirty ? '（模型修改未包含在 wmdl 中）' : ''}`)
   } catch (e) {
     console.error('Save wmdl failed', e)
     message.error(`保存 wmdl 失败: ${e}`)
@@ -166,7 +184,7 @@ async function onRemoveModel(id: string) {
 }
 
 async function onChangeModelPath(id: string) {
-  await store.changeModelPath(id)
+  try { await store.changeModelPath(id) } catch (error) { message.error(`更改路径失败：${error}`) }
 }
 
 function updateOffsetX(model: WmdlModelItem, v: string) {
@@ -182,39 +200,15 @@ function updateOffsetY(model: WmdlModelItem, v: string) {
 }
 
 // ─── offsetX/offsetY 拖拽增减值 ────────────────────────────────────────────
-type OffsetField = 'offsetX' | 'offsetY'
-const dragging = ref<{ model: WmdlModelItem; field: OffsetField; startX: number; startVal: number } | null>(null)
-
-function onOffsetLabelMouseDown(field: OffsetField, e: MouseEvent, model: WmdlModelItem) {
-  // 仅响应主键，避免与右键 / 中键冲突
+function onOffsetLabelPointerDown(field: 'offsetX' | 'offsetY', e: PointerEvent, model: WmdlModelItem) {
   if (e.button !== 0) return
-  dragging.value = {
-    model,
-    field,
-    startX: e.clientX,
-    startVal: field === 'offsetX' ? model.offsetX : model.offsetY,
-  }
-  window.addEventListener('mousemove', onOffsetDragMouseMove)
-  window.addEventListener('mouseup', onOffsetDragMouseUp)
-  e.preventDefault()
-}
-
-function onOffsetDragMouseMove(e: MouseEvent) {
-  const d = dragging.value
-  if (!d) return
-  const delta = (e.clientX - d.startX) * OFFSET_DRAG_SENSITIVITY
-  const next = d.startVal + delta
-  if (d.field === 'offsetX') {
-    store.updateModelOffset(d.model.id, next, d.model.offsetY)
-  } else {
-    store.updateModelOffset(d.model.id, d.model.offsetX, next)
-  }
-}
-
-function onOffsetDragMouseUp() {
-  dragging.value = null
-  window.removeEventListener('mousemove', onOffsetDragMouseMove)
-  window.removeEventListener('mouseup', onOffsetDragMouseUp)
+  store.selectModel(model.id)
+  offsetDrag.start(e, {
+    value: model[field], step: 0.1, precision: 3, pixelsPerStep: 1,
+    update: value => store.updateModelOffset(model.id,
+      field === 'offsetX' ? value : model.offsetX,
+      field === 'offsetY' ? value : model.offsetY),
+  })
 }
 
 function onSelectModel(id: string) {
@@ -224,15 +218,6 @@ function onSelectModel(id: string) {
 // 主模型 = models[0]，下标变化时把新首项的 offsetX/Y 强制归零
 const mainId = computed(() => store.currentWmdl.models[0]?.id ?? null)
 
-watch(mainId, (id) => {
-  if (!id) return
-  const m = store.currentWmdl.models[0]
-  if (!m) return
-  if (m.offsetX !== 0 || m.offsetY !== 0) {
-    store.updateModelOffset(id, 0, 0)
-  }
-})
-
 function isMain(m: WmdlModelItem): boolean {
   return m.id === mainId.value
 }
@@ -241,7 +226,7 @@ function isMain(m: WmdlModelItem): boolean {
 
 const fileName = computed(() => {
   const p = store.currentWmdl.wmdlFilePath
-  if (!p) return '（未保存）'
+  if (!p || !p.toLowerCase().endsWith('.wmdl')) return '（未保存）'
   const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))
   return idx >= 0 ? p.slice(idx + 1) : p
 })
@@ -250,20 +235,22 @@ const fileName = computed(() => {
 <template>
   <div class="wmdl-tab">
     <!-- 顶部操作区 -->
-    <div class="file-name" :title="store.currentWmdl.wmdlFilePath">{{ fileName }}</div>
+    <div class="file-name" :title="store.currentWmdl.wmdlFilePath">{{ fileName }}{{ store.isDirty ? ' · 有未保存修改' : '' }}</div>
     <header class="wmdl-tab__header">
       <button class="ui-button op-btn" :disabled="busy" @click="onLoad">加载 wmdl</button>
-      <button class="ui-button op-btn" :disabled="busy" @click="onSave">保存 wmdl</button>
+      <button class="ui-button op-btn" :disabled="busy" @click="onSave()">保存 wmdl</button>
+      <button class="ui-button op-btn" :disabled="busy" @click="onSave(true)">另存为</button>
+      <button class="ui-button op-btn" :disabled="busy" @click="onNew">新建空白 wmdl</button>
     </header>
 
     <!-- 模型 json 保存 -->
     <section class="model-json-save">
       <h3 class="section-title model-json-save__title">模型json保存</h3>
       <div class="model-json-save__row">
-        <button class="ui-button op-btn" :disabled="busy || !store.selectedModelId" @click="onSaveSelectedModelJson">
+        <button class="ui-button op-btn" :disabled="busy || !store.selectedModelId || store.loadingModelIds.includes(store.selectedModelId) || !!store.loadErrors[store.selectedModelId]" @click="onSaveSelectedModelJson">
           保存当前选中
         </button>
-        <button class="ui-button op-btn" :disabled="busy || store.currentWmdl.models.length === 0" @click="onSaveAllModelJsons">
+        <button class="ui-button op-btn" :disabled="busy || store.currentWmdl.models.length === 0 || store.loadingModelIds.length > 0 || Object.keys(store.loadErrors).length > 0" @click="onSaveAllModelJsons">
           保存所有
         </button>
         <!-- 暂时不支持另存为 -->
@@ -338,6 +325,7 @@ const fileName = computed(() => {
           @click="onSelectModel(m.id)"
         >
           <div class="model-item__name" :title="m.modelRelativePath">{{ m.name }}</div>
+          <p v-if="store.loadErrors[m.id]" class="model-error">{{ store.loadErrors[m.id] }}，请更改路径修复。</p>
           <div class="model-item__path-row">
             <span class="path-text">{{ m.modelRelativePath }}</span>
             <button class="mini-btn" @click.stop="onChangeModelPath(m.id)">更改</button>
@@ -347,8 +335,9 @@ const fileName = computed(() => {
             <label class="offset-field">
               <span
                 class="offset-field__handle"
-                :class="{ 'offset-field__handle--dragging': dragging?.model.id === m.id && dragging?.field === 'offsetX' }"
-                @mousedown="onOffsetLabelMouseDown('offsetX', $event, m)"
+                @pointerdown="onOffsetLabelPointerDown('offsetX', $event, m)"
+                @click.stop
+                @mousedown.stop
               >offsetX</span>
               <input
                 class="field__input field__input--num"
@@ -361,8 +350,9 @@ const fileName = computed(() => {
             <label class="offset-field">
               <span
                 class="offset-field__handle"
-                :class="{ 'offset-field__handle--dragging': dragging?.model.id === m.id && dragging?.field === 'offsetY' }"
-                @mousedown="onOffsetLabelMouseDown('offsetY', $event, m)"
+                @pointerdown="onOffsetLabelPointerDown('offsetY', $event, m)"
+                @click.stop
+                @mousedown.stop
               >offsetY</span>
               <input
                 class="field__input field__input--num"
@@ -393,16 +383,18 @@ const fileName = computed(() => {
 }
 
 .wmdl-tab__header {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
 
 .op-btn {
-  padding: 8px 14px;
+  padding: 8px;
   font-size: 13px;
 }
+.model-error { margin: 0; color: var(--ui-danger); font-size: 12px; overflow-wrap: anywhere; }
 
 .file-name {
   font-size: 12px;
@@ -456,6 +448,8 @@ const fileName = computed(() => {
 
 .field__label-row {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   align-items: center;
   justify-content: space-between;
 }

@@ -15,6 +15,7 @@ import {
   modifyMtnFiles,
   modifyExpFiles,
   type CalcKind,
+  type BatchModifyFailed,
 } from '../../../utils/mtnExpMdf'
 
 type Mode = 'file' | 'folder'
@@ -51,6 +52,10 @@ const folder = ref<string>('')
 const entries = ref<ScannedEntry[]>([])
 const busy = ref(false)
 const errorMsg = ref<string>('')
+const failures = ref<BatchModifyFailed[]>([])
+const resultSummary = ref('')
+const paramCandidates = computed(() => [...new Set(store.currentWmdl.models.flatMap(model =>
+  model.initParams.map(param => param.id)))].sort())
 const scanSubfolders = ref(true)
 
 const paramName = ref<string>('')
@@ -101,6 +106,7 @@ const showCalc = computed(() => {
 
 const confirmDisabled = computed(() => {
   if (busy.value) return true
+  if (showParamValue.value && !Number.isFinite(paramValue.value)) return true
   if (showParamName.value && !paramName.value.trim()) return true
   if (mode.value === 'file') return !filePath.value
   return selectedCount.value === 0
@@ -120,6 +126,8 @@ watch(
       calc.value = 'none'
       action.value = 'set'
       errorMsg.value = ''
+      failures.value = []
+      resultSummary.value = ''
       scanSubfolders.value = true
     }
   },
@@ -129,6 +137,8 @@ async function pickSingleFile() {
   if (busy.value) return
   busy.value = true
   errorMsg.value = ''
+  failures.value = []
+  resultSummary.value = ''
   try {
     const picked =
       await choosePath(() => modal.state.kind === 'motion' ? PickMotionFile() : PickExpressionFile())
@@ -203,6 +213,8 @@ async function onConfirm() {
 
   busy.value = true
   errorMsg.value = ''
+  failures.value = []
+  resultSummary.value = ''
   try {
     if (modal.state.kind === 'motion') {
       const paths =
@@ -242,10 +254,10 @@ async function onConfirm() {
 }
 
 function finishWithResult(res: { ok: number; failed: { path: string; error: string }[] }) {
-  if (res.failed.length > 0) {
-    console.error('batch modify failed files:', res.failed)
-  }
-  msg.success(`批量修改完成：成功 ${res.ok} 个，失败 ${res.failed.length} 个`)
+  failures.value = res.failed
+  resultSummary.value = `批量修改完成：成功 ${res.ok} 个，失败 ${res.failed.length} 个`
+  if (res.failed.length) msg.warning(resultSummary.value)
+  else msg.success(resultSummary.value)
   // 保持模态打开，便于用户连续微调后再次应用。
 }
 
@@ -258,7 +270,7 @@ function onClose() {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="modal.state.visible" class="batch-modal-mask" @click.self="onClose">
-        <div class="batch-modal">
+        <div class="ui-dialog batch-modal">
           <header class="batch-modal__header">
             <h2 class="batch-modal__title">批量修改{{ kindLabel }}</h2>
             <button class="icon-btn" aria-label="关闭" @click="onClose">×</button>
@@ -318,8 +330,12 @@ function onClose() {
                   type="text"
                   class="mini-input"
                   placeholder="如 PARAM_ANGLE_X"
+                  list="model-editor-parameter-candidates"
                 />
               </label>
+              <datalist id="model-editor-parameter-candidates">
+                <option v-for="name in paramCandidates" :key="name" :value="name" />
+              </datalist>
               <label v-if="showParamValue" class="config-field">
                 <span>参数值</span>
                 <input
@@ -342,6 +358,10 @@ function onClose() {
 
           <section class="batch-modal__body">
             <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
+            <div v-if="resultSummary" class="result-summary" role="status">{{ resultSummary }}</div>
+            <ul v-if="failures.length" class="failure-list">
+              <li v-for="failure in failures" :key="failure.path"><strong>{{ failure.path }}</strong><br />{{ failure.error }}</li>
+            </ul>
             <template v-if="mode === 'folder'">
               <div v-if="candidateCount === 0" class="empty-hint">
                 {{ folder ? '未找到可修改的' + kindLabel + '文件' : '请选择文件夹' }}
@@ -404,6 +424,9 @@ function onClose() {
 </template>
 
 <style scoped>
+.result-summary { padding: 8px 0; color: var(--ui-text); }
+.failure-list { padding: 8px 8px 8px 24px; margin: 0 0 12px; color: var(--ui-danger); background: var(--ui-panel-tint-danger); border: 1px solid var(--ui-danger); border-radius: var(--ui-radius-compact); font-size: 12px; overflow-wrap: anywhere; }
+.failure-list li + li { margin-top: 8px; }
 .batch-modal-mask {
   position: fixed;
   inset: 0;

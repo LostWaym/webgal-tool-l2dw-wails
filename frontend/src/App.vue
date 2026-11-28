@@ -304,6 +304,10 @@ onBeforeUnmount(() => {
   --preview-stage-left-inset: var(--preview-panel-edge-size);
 }
 
+.app.auto-hide-left-panel.left-panel-open {
+  --preview-stage-left-inset: var(--preview-list-width);
+}
+
 .app.auto-hide-right-panel .model-action-panel {
   transform: translateX(100%);
   pointer-events: none;
